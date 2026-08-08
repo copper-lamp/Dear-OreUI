@@ -1,0 +1,7 @@
+{
+    "name": "DearOreUI",
+    "entry": "DearOreUI.dll",
+    "version": "0.1.0",
+    "type": "native",
+    "platform": "win-x64"
+}
