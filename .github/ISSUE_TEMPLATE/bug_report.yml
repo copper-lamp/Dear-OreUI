@@ -1,55 +1,62 @@
-name: Bug Report
-description: Create a report to help us improve
+name: Bug Report / Bug 报告
+description: Report a reproducible DearOreUI problem / 报告可复现的问题
 title: "[Bug] "
 type: bug
 body:
   - type: textarea
     attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is.
+      label: Describe the bug / 问题描述
+      description: Describe the problem clearly and concisely / 清晰简洁地描述问题。
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: To Reproduce
-      description: Steps to reproduce the behavior.
+      label: To Reproduce / 复现步骤
+      description: Provide minimal reproducible steps / 提供最小复现步骤。
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: Expected behavior
-      description: A clear and concise description of what you expected to happen.
+      label: Expected behavior / 预期行为
+      description: Describe the expected result / 描述预期结果。
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: Screenshots
-      description: If applicable, add screenshots to help explain your problem.
+      label: Screenshots / 截图
+      description: Add sanitized screenshots when useful / 必要时附上已脱敏截图。
     
   - type: input
     attributes:
-      label: Platform
-      description: The platform you are using. (e.g. Windows 10)
+      label: Windows version / Windows 版本
+      description: Include the Windows version and architecture / 填写 Windows 版本和架构。
 
   - type: input
     attributes:
-      label: BDS Version
-      description: The version of BDS you are using. (e.g. 1.20.32.1)
+      label: Minecraft version / Minecraft 版本
+      description: Client version, not BDS server version / 填写客户端版本，不要填写 BDS 服务端版本。
 
   - type: input
     attributes:
-      label: LeviLamina Version
-      description: The version of LeviLamina you are using. (e.g. 1.0.0)
+      label: LeviLamina version / LeviLamina 版本
+      description: The LeviLamina version / LeviLamina 版本。
 
   - type: input
     attributes:
-      label: Version
-      description: The version of the mod you are using. (e.g. 1.0.0)
+      label: DearOreUI version / DearOreUI 版本
+      description: The mod version or commit / 模组版本或提交号。
 
   - type: textarea
     attributes:
-      label: Additional context
-      description: Add any other context about the problem here.
+      label: Runtime details / 运行时信息
+      description: Include page type, entry resource, resource fingerprint, Hook state, capability state, and Diagnostic ID when available / 尽可能填写页面类型、入口资源、资源指纹、Hook 状态、能力状态和 Diagnostic ID。
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Logs and environment / 日志与环境
+      description: Attach sanitized logs and list other related mods. Never include secrets or private player data / 附上脱敏日志并列出相关 Mod，不要包含密钥或玩家隐私数据。

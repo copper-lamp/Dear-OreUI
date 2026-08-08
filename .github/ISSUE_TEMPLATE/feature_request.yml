@@ -1,28 +1,30 @@
-name: Feature request
-description: Suggest an idea for this project
+name: Feature Request / 功能请求
+description: Suggest a DearOreUI feature / 提议 DearOreUI 功能
 title: "[Feature] "
 type: feature
 body:
   - type: textarea
     attributes:
-      label: Is your feature request related to a problem? Please describe.
-      description: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+      label: Problem / 要解决的问题
+      description: Describe the problem clearly / 清晰描述要解决的问题。
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: Describe the solution you'd like
-      description: A clear and concise description of what you want to happen.
+      label: Proposed solution / 方案
+      description: Describe the desired behavior and API level / 描述期望行为和 API 层级。
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: Describe alternatives you've considered
-      description: A clear and concise description of any alternative solutions or features you've considered.
+      label: Alternatives / 备选方案
+      description: Describe alternatives and their trade-offs / 描述备选方案及其取舍。
 
   - type: textarea
     attributes:
-      label: Additional context
-      description: Add any other context or screenshots about the feature request here.
+      label: Architecture impact / 架构影响
+      description: List affected modules, compatibility risks, permissions, failure fallback, tests, and documentation / 列出受影响模块、兼容性风险、权限、失败回退、测试和文档。
+    validations:
+      required: true

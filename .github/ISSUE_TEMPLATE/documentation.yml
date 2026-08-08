@@ -1,0 +1,21 @@
+name: Documentation / 文档
+description: Report a documentation issue or request a translation / 报告文档问题或请求翻译
+title: "[Docs] "
+type: task
+body:
+  - type: input
+    attributes:
+      label: Document / 文档
+      description: Link the affected document / 填写受影响文档链接。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Problem / 问题
+      description: Explain what is missing, incorrect, or unclear / 说明缺失、错误或不清晰的内容。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed change / 修改建议
+      description: Include the expected language and scope / 说明目标语言和修改范围。

@@ -1,0 +1,51 @@
+name: Compatibility Report / 兼容性验证
+description: Report an OreUI runtime compatibility result / 报告 OreUI 运行时兼容性验证结果
+title: "[Compatibility] "
+type: task
+body:
+  - type: input
+    attributes:
+      label: Minecraft version / Minecraft 版本
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: LeviLamina version / LeviLamina 版本
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: DearOreUI version or commit / DearOreUI 版本或提交号
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Windows version and architecture / Windows 版本和架构
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Page and resource details / 页面与资源信息
+      description: Include page type, entry resource, resource fingerprint, and Coherent host information / 填写页面类型、入口资源、资源指纹和 Coherent 宿主信息。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Hook and capability state / Hook 与能力状态
+      description: Include detected hooks, capabilities, injection result, Diagnostic IDs, and evidence / 填写 Hook、能力、注入结果、Diagnostic ID 和证据。
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Result / 结果
+      options:
+        - Supported / 已支持
+        - Experimental / 实验性
+        - Unknown / 未知
+        - Unsupported / 不支持
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction and sanitized logs / 复现与脱敏日志
+      description: Do not include secrets, player data, or private server information / 不要包含密钥、玩家数据或私人服务器信息。
