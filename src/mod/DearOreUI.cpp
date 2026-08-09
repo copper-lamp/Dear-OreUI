@@ -1,8 +1,6 @@
 #include "mod/MyMod.h"
 
-#include "diagnostic/Stage0Telemetry.h"
-#include "hook/Stage0OreUIHooks.h"
-#include "poc/Stage1NavigationPoc.h"
+#include "runtime/Runtime.h"
 
 #include "ll/api/mod/RegisterHelper.h"
 
@@ -15,24 +13,22 @@ DearOreUI& DearOreUI::getInstance() {
 
 bool DearOreUI::load() {
     getSelf().getLogger().debug("Loading...");
-    diagnostic::startStage0Session();
-    diagnostic::recordStage0("lifecycle", "event=load");
-    return true;
+
+    runtime::RuntimeConfig config;
+    config.dataDirectory = getSelf().getDataDir();
+    mRuntime             = std::make_unique<runtime::Runtime>(std::move(config));
+
+    return mRuntime->initialize();
 }
 
 bool DearOreUI::enable() {
     getSelf().getLogger().debug("Enabling...");
-    diagnostic::recordStage0("lifecycle", "event=enable");
-    return hook::installStage0OreUIHooks();
+    return mRuntime && mRuntime->enable();
 }
 
 bool DearOreUI::disable() {
     getSelf().getLogger().debug("Disabling...");
-    diagnostic::recordStage0("lifecycle", "event=disable");
-    poc::stopStage1Navigation();
-    auto result = hook::uninstallStage0OreUIHooks();
-    diagnostic::resetStage0Session();
-    return result;
+    return mRuntime && mRuntime->disable();
 }
 
 } // namespace dearoreui

@@ -1,7 +1,7 @@
 #include "poc/Stage1NavigationPoc.h"
 #include "poc/Stage1NavigationState.h"
 
-#include "diagnostic/Stage0Telemetry.h"
+#include "diagnostic/Stage0TelemetryCompat.h"
 
 #include "mc/client/gui/oreui/routing/Router.h"
 #include "mc/client/gui/screens/interfaces/ISceneStack.h"

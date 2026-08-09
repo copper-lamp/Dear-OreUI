@@ -1,6 +1,6 @@
 #include "hook/Stage0OreUIHooks.h"
 
-#include "diagnostic/Stage0Telemetry.h"
+#include "diagnostic/Stage0TelemetryCompat.h"
 #include "poc/Stage1NavigationPoc.h"
 
 #include "ll/api/memory/Hook.h"
