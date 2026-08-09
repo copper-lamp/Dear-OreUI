@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -31,6 +32,11 @@ std::atomic_bool& updateObserved() {
     return value;
 }
 
+std::atomic_bool& waitingRecorded() {
+    static std::atomic_bool value{};
+    return value;
+}
+
 struct RouterRecord {
     OreUI::Router* router{};
     ISceneStack* sceneStack{};
@@ -44,6 +50,11 @@ std::mutex& mutex() {
 
 std::unordered_map<OreUI::Router*, RouterRecord>& routers() {
     static std::unordered_map<OreUI::Router*, RouterRecord> value;
+    return value;
+}
+
+std::optional<RouterRecord>& pendingRouter() {
+    static std::optional<RouterRecord> value;
     return value;
 }
 
@@ -95,17 +106,33 @@ void invalidateSceneStack(ISceneStack& sceneStack) {
 
 void armStage1Navigation(OreUI::Router& router, ISceneStack& sceneStack, bool isOutOfGameRootScene) {
     if (!isOutOfGameRootScene) return;
+    registerRouter(router, sceneStack);
+    armStage1NavigationFromStartScreen(router);
+}
+
+void armStage1NavigationFromStartScreen(OreUI::Router& router) {
     if (completed().load() || scheduled().exchange(true)) return;
 
-    registerRouter(router, sceneStack);
     RouterRecord record;
     {
         std::lock_guard lock(mutex());
-        record = routers().at(&router);
+        auto const iterator = routers().find(&router);
+        if (iterator != routers().end()) {
+            record = iterator->second;
+        } else {
+            record = RouterRecord{&router, nullptr, nextGeneration().fetch_add(1) + 1};
+            routers()[&router] = record;
+            diagnostic::recordStage0(
+                "router_lifecycle",
+                "event=registered\tsource=start_screen\tgeneration=" + std::to_string(record.generation)
+            );
+        }
+        pendingRouter() = record;
     }
+    waitingRecorded().store(false);
     diagnostic::recordStage0(
         "poc_navigate",
-        "event=armed\tgeneration=" + std::to_string(record.generation)
+        "event=armed\tsource=start_screen\tgeneration=" + std::to_string(record.generation)
     );
     diagnostic::recordStage0("poc_navigate", "event=scheduled");
 
@@ -121,21 +148,63 @@ void consumeStage1Navigation() {
     {
         std::lock_guard lock(mutex());
         if (!scheduled().load() || completed().load()) return;
-        scheduled().store(false);
-        auto const iterator = std::find_if(routers().begin(), routers().end(), [](auto const& entry) {
-            return entry.second.sceneStack != nullptr;
-        });
-        if (iterator == routers().end()) {
+        if (!pendingRouter()) {
             diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
+            scheduled().store(false);
             completed().store(true);
             return;
         }
-        record = iterator->second;
+        record = *pendingRouter();
+        auto const iterator = routers().find(record.router);
+        if (
+            iterator == routers().end() || iterator->second.generation != record.generation
+        ) {
+            diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
+            pendingRouter().reset();
+            scheduled().store(false);
+            completed().store(true);
+            return;
+        }
     }
 
+    auto const location = record.router->getCurrentLocation();
+    auto const path = location ? location->getPath() : std::string{"none"};
+    if (!location || path != "/__bedrock__/start_screen") {
+        if (!waitingRecorded().exchange(true)) {
+            diagnostic::recordStage0(
+                "poc_navigate",
+                "event=waiting\treason=current_route_not_start_screen\tpath=" + path
+            );
+        }
+        return;
+    }
+
+    {
+        std::lock_guard lock(mutex());
+        if (!scheduled().load() || completed().load() || !pendingRouter()) return;
+        auto const iterator = routers().find(record.router);
+        if (iterator == routers().end() || iterator->second.generation != record.generation) {
+            diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
+            pendingRouter().reset();
+            scheduled().store(false);
+            completed().store(true);
+            return;
+        }
+        pendingRouter().reset();
+        scheduled().store(false);
+    }
+
+    diagnostic::recordStage0(
+        "poc_navigate",
+        "event=ready\tgeneration=" + std::to_string(record.generation) + "\tpath=" + path
+    );
     diagnostic::recordStage0("poc_navigate", "event=executing");
     auto const route = std::string{"/play/all?dirtyLevelId="};
-    diagnostic::recordStage0("poc_navigate", "event=requested\troute=" + route);
+    diagnostic::recordStage0(
+        "poc_navigate",
+        "event=requested\tgeneration=" + std::to_string(record.generation) + "\tfrom_path=" + path + "\troute="
+            + route
+    );
     auto const result = record.router->replaceRoute(route);
     diagnostic::recordStage0(
         "poc_navigate",
@@ -147,8 +216,10 @@ void consumeStage1Navigation() {
 void stopStage1Navigation() {
     std::lock_guard lock(mutex());
     routers().clear();
+    pendingRouter().reset();
     scheduled().store(false);
     updateObserved().store(false);
+    waitingRecorded().store(false);
     completed().store(false);
     diagnostic::recordStage0("poc_navigate", "event=stopped");
 }

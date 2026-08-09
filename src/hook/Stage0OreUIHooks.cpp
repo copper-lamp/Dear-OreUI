@@ -140,6 +140,9 @@ LL_TYPE_INSTANCE_HOOK(
 ) {
     origin(oldLocation, currentLocation);
     recordOnce("route_change", locationFields("old", oldLocation) + "\t" + locationFields("current", currentLocation));
+    if (currentLocation && currentLocation->getPath() == "/__bedrock__/start_screen") {
+        poc::armStage1NavigationFromStartScreen(*this);
+    }
 }
 
 LL_TYPE_INSTANCE_HOOK(
