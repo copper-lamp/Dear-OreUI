@@ -2,6 +2,7 @@
 
 #include "diagnostic/Stage0Telemetry.h"
 #include "hook/Stage0OreUIHooks.h"
+#include "poc/Stage1NavigationPoc.h"
 
 #include "ll/api/mod/RegisterHelper.h"
 
@@ -28,6 +29,7 @@ bool DearOreUI::enable() {
 bool DearOreUI::disable() {
     getSelf().getLogger().debug("Disabling...");
     diagnostic::recordStage0("lifecycle", "event=disable");
+    poc::stopStage1Navigation();
     auto result = hook::uninstallStage0OreUIHooks();
     diagnostic::resetStage0Session();
     return result;

@@ -1,6 +1,7 @@
 #include "hook/Stage0OreUIHooks.h"
 
 #include "diagnostic/Stage0Telemetry.h"
+#include "poc/Stage1NavigationPoc.h"
 
 #include "ll/api/memory/Hook.h"
 
@@ -8,6 +9,7 @@
 #include "mc/client/gui/TechStack.h"
 #include "mc/client/gui/oreui/SceneProvider.h"
 #include "mc/client/gui/oreui/routing/Router.h"
+#include "mc/client/game/ClientInstance.h"
 
 #include <memory>
 #include <optional>
@@ -26,6 +28,8 @@ struct HookState {
     bool routePush{};
     bool routeReplace{};
     bool routeBack{};
+    bool routerDestructorThunk{};
+    bool clientUpdate{};
 };
 
 HookState& state() {
@@ -87,11 +91,41 @@ LL_TYPE_INSTANCE_HOOK(
     OreUI::FacetRegistryLocation location
 ) {
     auto result = origin(url, router, sceneStack, mode, location);
+    poc::registerRouter(router, *sceneStack);
+    poc::armStage1Navigation(
+        router,
+        *sceneStack,
+        url == "/hbui/index.html" && location == OreUI::FacetRegistryLocation::OutOfGame
+    );
     recordOnce(
         "scene",
         "url=" + url + "\troute_mode=" + std::to_string(static_cast<int>(mode)) + "\tlocation="
         + std::to_string(static_cast<int>(location)) + "\tcreated=" + (result ? "true" : "false")
     );
+    return result;
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    Stage1RouterDestructorThunkHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::Router,
+    &OreUI::Router::$dtor,
+    void
+) {
+    poc::invalidateRouter(*this);
+    origin();
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    Stage1ClientUpdateHook,
+    ll::memory::HookPriority::Normal,
+    ClientInstance,
+    &ClientInstance::$update,
+    bool,
+    bool isInitFinished
+) {
+    auto result = origin(isInitFinished);
+    if (isInitFinished) poc::consumeStage1Navigation();
     return result;
 }
 
@@ -153,18 +187,20 @@ LL_TYPE_INSTANCE_HOOK(
 bool allInstalled() {
     auto const& value = state();
     return value.techStack && value.scene && value.routeChange && value.routePush && value.routeReplace
-        && value.routeBack;
+        && value.routeBack && value.routerDestructorThunk && value.clientUpdate;
 }
 
 bool noneInstalled() {
     auto const& value = state();
     return !value.techStack && !value.scene && !value.routeChange && !value.routePush && !value.routeReplace
-        && !value.routeBack;
+        && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate;
 }
 
 bool removeInstalled() {
     auto& value = state();
     if (value.routeBack && Stage0RouterBackHook::unhook()) value.routeBack = false;
+    if (value.routerDestructorThunk && Stage1RouterDestructorThunkHook::unhook()) value.routerDestructorThunk = false;
+    if (value.clientUpdate && Stage1ClientUpdateHook::unhook()) value.clientUpdate = false;
     if (value.routeReplace && Stage0RouterReplaceHook::unhook()) value.routeReplace = false;
     if (value.routePush && Stage0RouterPushHook::unhook()) value.routePush = false;
     if (value.routeChange && Stage0RouterChangeHook::unhook()) value.routeChange = false;
@@ -185,6 +221,8 @@ bool installStage0OreUIHooks() {
     if (value.routeChange) value.routePush = Stage0RouterPushHook::hook() == 0;
     if (value.routePush) value.routeReplace = Stage0RouterReplaceHook::hook() == 0;
     if (value.routeReplace) value.routeBack = Stage0RouterBackHook::hook() == 0;
+    if (value.routeBack) value.routerDestructorThunk = Stage1RouterDestructorThunkHook::hook() == 0;
+    if (value.routerDestructorThunk) value.clientUpdate = Stage1ClientUpdateHook::hook() == 0;
 
     if (allInstalled()) {
         diagnostic::recordStage0("status", "event=hooks_installed");
