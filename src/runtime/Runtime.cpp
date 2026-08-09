@@ -29,8 +29,11 @@ bool Runtime::initialize() {
         diagnostic::startStage0Session();
     }
 
+    mRegistry = std::make_unique<registry::ModRegistry>();
+    mApi      = std::make_unique<api::DearOreUIApi>(*mRegistry, mCapabilities, logger);
+
     logger.info("lifecycle", "load")
-        .withField("stage", "1")
+        .withField("stage", "2")
         .withField("target", "win-x64")
         .emit();
 
@@ -52,6 +55,10 @@ bool Runtime::enable() {
     logger.info("status", result ? "hooks_installed" : "hooks_unavailable")
         .emit();
 
+    if (mApi != nullptr) {
+        mApi->setReady(result);
+    }
+
     mEnabled = result;
     return result;
 }
@@ -60,6 +67,14 @@ bool Runtime::disable() {
     if (!mInitialized) return true;
 
     auto& logger = diagnostic::globalLogger();
+
+    if (mApi != nullptr) {
+        mApi->setReady(false);
+    }
+
+    if (mRegistry != nullptr) {
+        mRegistry->clear();
+    }
 
     if (mConfig.enableHooks) {
         poc::stopStage1Navigation();
@@ -76,6 +91,8 @@ bool Runtime::disable() {
 
     logger.flush();
 
+    mApi.reset();
+    mRegistry.reset();
     mEnabled      = false;
     mInitialized  = false;
     return hooksRemoved;
@@ -87,6 +104,10 @@ diagnostic::DiagnosticLogger& Runtime::diagnostics() {
 
 capability::ICapabilityQuery& Runtime::capabilities() {
     return mCapabilities;
+}
+
+api::IDearOreUIApi* Runtime::api() {
+    return mApi.get();
 }
 
 } // namespace dearoreui::runtime

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "api/IDearOreUIApi.h"
 #include "capability/ICapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
 
@@ -15,6 +16,7 @@ public:
 
     [[nodiscard]] virtual diagnostic::DiagnosticLogger& diagnostics() = 0;
     [[nodiscard]] virtual capability::ICapabilityQuery& capabilities() = 0;
+    [[nodiscard]] virtual api::IDearOreUIApi* api() = 0;
 };
 
 } // namespace dearoreui::runtime

@@ -42,6 +42,26 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
         .level      = SupportLevel::Unsupported,
         .note       = "High-risk capability, requires explicit verification",
     });
+    mCapabilities.set(CapabilityEntry{
+        .capability = Capability::ModManifestApi,
+        .level      = SupportLevel::Supported,
+        .note       = "Mod manifest validation and JSON parsing",
+    });
+    mCapabilities.set(CapabilityEntry{
+        .capability = Capability::ResourceRegistration,
+        .level      = SupportLevel::Experimental,
+        .note       = "In-memory registry only, no real page injection yet",
+    });
+    mCapabilities.set(CapabilityEntry{
+        .capability = Capability::ScriptRegistration,
+        .level      = SupportLevel::Experimental,
+        .note       = "In-memory registry only, no real page injection yet",
+    });
+    mCapabilities.set(CapabilityEntry{
+        .capability = Capability::StyleSheetRegistration,
+        .level      = SupportLevel::Experimental,
+        .note       = "In-memory registry only, no real page injection yet",
+    });
 }
 
 api::SupportLevel StaticCapabilityQuery::query(api::Capability capability) const {

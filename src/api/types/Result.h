@@ -42,4 +42,30 @@ private:
     std::variant<T, E> mStorage;
 };
 
+template <typename E>
+class Result<void, E> {
+public:
+    Result() : mError(), mHasValue(true) {}
+
+    Result(E error) : mError(std::move(error)), mHasValue(false) {}
+
+    [[nodiscard]] static Result success() { return Result{}; }
+
+    [[nodiscard]] static Result failure(E error) { return Result(std::move(error)); }
+
+    [[nodiscard]] bool isOk() const { return mHasValue; }
+
+    [[nodiscard]] bool isErr() const { return !mHasValue; }
+
+    void value() const {}
+
+    [[nodiscard]] E const& error() const { return mError; }
+
+    [[nodiscard]] E& error() { return mError; }
+
+private:
+    E    mError;
+    bool mHasValue{true};
+};
+
 } // namespace dearoreui::api

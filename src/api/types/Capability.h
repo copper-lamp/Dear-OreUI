@@ -17,6 +17,10 @@ enum class Capability {
     HostBridge,
     DiagnosticFileOutput,
     ExperimentalBundlePatch,
+    ModManifestApi,
+    ResourceRegistration,
+    ScriptRegistration,
+    StyleSheetRegistration,
 };
 
 enum class SupportLevel {

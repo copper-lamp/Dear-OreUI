@@ -1,0 +1,47 @@
+#pragma once
+
+#include "api/IDearOreUIApi.h"
+
+#include "capability/ICapabilityQuery.h"
+#include "diagnostic/DiagnosticLogger.h"
+#include "registry/IModRegistry.h"
+
+#include <atomic>
+
+namespace dearoreui::api {
+
+class DearOreUIApi : public IDearOreUIApi {
+public:
+    DearOreUIApi(
+        registry::IModRegistry&    registry,
+        capability::ICapabilityQuery& capabilities,
+        diagnostic::DiagnosticLogger& logger
+    );
+
+    [[nodiscard]] ApiInfo getInfo() const override;
+    [[nodiscard]] CapabilitySet getCapabilities() const override;
+    [[nodiscard]] SupportLevel checkSupport(Capability capability) const override;
+    [[nodiscard]] std::uint32_t getProtocolVersion() const override;
+    [[nodiscard]] bool isReady() const override;
+
+    [[nodiscard]] Result<RegistrationHandle> registerResource(
+        ModId owner, ResourceManifest const& manifest, std::string payload) override;
+
+    [[nodiscard]] Result<RegistrationHandle> registerScript(
+        ModId owner, ScriptManifest const& manifest, std::string source) override;
+
+    [[nodiscard]] Result<RegistrationHandle> registerStyleSheet(
+        ModId owner, StyleSheetManifest const& manifest, std::string source) override;
+
+    [[nodiscard]] Result<void> unregister(RegistrationHandle handle) override;
+
+    void setReady(bool ready);
+
+private:
+    registry::IModRegistry&       mRegistry;
+    capability::ICapabilityQuery& mCapabilities;
+    diagnostic::DiagnosticLogger& mLogger;
+    std::atomic<bool>             mReady{false};
+};
+
+} // namespace dearoreui::api
