@@ -1,4 +1,5 @@
 #include "poc/Stage1NavigationPoc.h"
+#include "poc/Stage1NavigationState.h"
 
 #include "diagnostic/Stage0Telemetry.h"
 
@@ -17,13 +18,8 @@ namespace dearoreui::poc {
 
 namespace {
 
-std::atomic_bool& completed() {
-    static std::atomic_bool value{};
-    return value;
-}
-
-std::atomic_bool& scheduled() {
-    static std::atomic_bool value{};
+Stage1NavigationState& navigationState() {
+    static Stage1NavigationState value;
     return value;
 }
 
@@ -111,7 +107,10 @@ void armStage1Navigation(OreUI::Router& router, ISceneStack& sceneStack, bool is
 }
 
 void armStage1NavigationFromStartScreen(OreUI::Router& router) {
-    if (completed().load() || scheduled().exchange(true)) return;
+    if (!navigationState().trySchedule()) {
+        diagnostic::recordStage0("poc_navigate", "event=skipped\treason=navigation_already_started");
+        return;
+    }
 
     RouterRecord record;
     {
@@ -147,11 +146,10 @@ void consumeStage1Navigation() {
     RouterRecord record;
     {
         std::lock_guard lock(mutex());
-        if (!scheduled().load() || completed().load()) return;
+        if (!navigationState().isScheduled()) return;
         if (!pendingRouter()) {
             diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
-            scheduled().store(false);
-            completed().store(true);
+            navigationState().complete();
             return;
         }
         record = *pendingRouter();
@@ -161,8 +159,7 @@ void consumeStage1Navigation() {
         ) {
             diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
             pendingRouter().reset();
-            scheduled().store(false);
-            completed().store(true);
+            navigationState().complete();
             return;
         }
     }
@@ -181,17 +178,16 @@ void consumeStage1Navigation() {
 
     {
         std::lock_guard lock(mutex());
-        if (!scheduled().load() || completed().load() || !pendingRouter()) return;
+        if (!pendingRouter()) return;
         auto const iterator = routers().find(record.router);
         if (iterator == routers().end() || iterator->second.generation != record.generation) {
             diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
             pendingRouter().reset();
-            scheduled().store(false);
-            completed().store(true);
+            navigationState().complete();
             return;
         }
+        if (!navigationState().tryBeginExecution()) return;
         pendingRouter().reset();
-        scheduled().store(false);
     }
 
     diagnostic::recordStage0(
@@ -210,17 +206,16 @@ void consumeStage1Navigation() {
         "poc_navigate",
         "event=completed\tsuccess=" + std::string(result ? "true" : "false")
     );
-    completed().store(true);
+    navigationState().complete();
 }
 
 void stopStage1Navigation() {
     std::lock_guard lock(mutex());
     routers().clear();
     pendingRouter().reset();
-    scheduled().store(false);
+    navigationState().reset();
     updateObserved().store(false);
     waitingRecorded().store(false);
-    completed().store(false);
     diagnostic::recordStage0("poc_navigate", "event=stopped");
 }
 
