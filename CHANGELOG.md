@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- LeviLamina 26.1 native mod scaffold.
+- LeviLamina 26.10.x native mod scaffold.
 - Windows x64 client build configuration using C++20, Clang-CL, and xmake.
 - Initial mod metadata and Tooth packaging configuration.
 - Runtime, API, compatibility, testing, and development architecture documentation.
@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Compatibility
 
 - Target platform: Windows x64.
-- Target environment: LeviLamina 26.1 client.
+- Target environment: LeviLamina 26.10.x client.
 - Build target: native shared-library mod.
 - A successful build does not establish runtime OreUI compatibility.
 
@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### 新增
 
-- LeviLamina 26.1 原生模组脚手架。
+- LeviLamina 26.10.x 原生模组脚手架。
 - 基于 C++20、Clang-CL 和 xmake 的 Windows x64 客户端构建配置。
 - 初始模组元数据和 Tooth 打包配置。
 - 运行时、API、兼容性、测试和开发架构文档。
@@ -51,6 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### 兼容性
 
 - 目标平台：Windows x64。
-- 目标环境：LeviLamina 26.1 客户端。
+- 目标环境：LeviLamina 26.10.x 客户端。
 - 构建目标：原生共享库模组。
 - 构建成功不代表运行时 OreUI 兼容性已经成立。

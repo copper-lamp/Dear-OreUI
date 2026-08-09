@@ -30,7 +30,7 @@
 
 ## 项目概览
 
-DearOreUI 是面向 LeviLamina 26.1 的 Windows x64 客户端原生模组。项目目标是在 Minecraft 客户端运行期间读取原版 OreUI 资源，合并多个 Mod 声明的变更，并将经过校验的结果注入当前 OreUI 页面。
+DearOreUI 是面向 LeviLamina 26.10.x 的 Windows x64 客户端原生模组。项目目标是在 Minecraft 客户端运行期间读取原版 OreUI 资源，合并多个 Mod 声明的变更，并将经过校验的结果注入当前 OreUI 页面。
 
 ```text
 原版 OreUI
@@ -165,7 +165,7 @@ src/
 | 组件 | 目标 |
 | --- | --- |
 | Minecraft Bedrock | Windows x64 客户端 |
-| LeviLamina | 26.1 |
+| LeviLamina | 26.10.x |
 | 原生入口 | `DearOreUI.dll` |
 | C++ 标准 | C++20 |
 | 工具链 | Clang-CL |
@@ -176,7 +176,7 @@ OreUI Bundle 的兼容性不能只依据 Minecraft 版本判断，还取决于�
 
 ## 快速开始
 
-DearOreUI 尚未发布稳定运行时版本。开发构建需要准备 Windows x64 LeviLamina 26.1 客户端环境，然后在 `DearOreUI/` 目录执行：
+DearOreUI 尚未发布稳定运行时版本。开发构建需要准备 Windows x64 LeviLamina 26.10.x 客户端环境，然后在 `DearOreUI/` 目录执行：
 
 ```powershell
 xmake repo -u
@@ -200,7 +200,7 @@ xmake -v -y
 - Git
 - xmake
 - Visual Studio 或提供 Clang-CL 的 LLVM 环境
-- LeviLamina 26.1 开发环境
+- LeviLamina 26.10.x 开发环境
 
 ### Release 构建
 

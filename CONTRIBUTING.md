@@ -12,7 +12,7 @@ Thank you for helping improve DearOreUI. Focused changes to the native runtime, 
 
 ## Project Constraints
 
-DearOreUI targets the Windows x64 LeviLamina 26.1 client. The current repository is a runtime scaffold; a successful build does not prove OreUI Hook or injection support.
+DearOreUI targets the Windows x64 LeviLamina 26.10.x client. The current repository is a runtime scaffold; a successful build does not prove OreUI Hook or injection support.
 
 Development must follow this order:
 

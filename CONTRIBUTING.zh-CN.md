@@ -12,7 +12,7 @@
 
 ## 项目约束
 
-DearOreUI 面向 Windows x64 的 LeviLamina 26.1 客户端。当前仓库仍是运行时脚手架，构建成功不代表 OreUI Hook 或注入功能已经可用。
+DearOreUI 面向 Windows x64 的 LeviLamina 26.10.x 客户端。当前仓库仍是运行时脚手架，构建成功不代表 OreUI Hook 或注入功能已经可用。
 
 开发必须遵循以下顺序：
 

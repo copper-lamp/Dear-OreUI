@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Platform | Windows x64 | Targeted |
 | Minecraft | Bedrock client | Targeted |
-| LeviLamina | 26.1 | Targeted |
+| LeviLamina | 26.10.x | Targeted |
 | Build target | Native client mod | Targeted |
 | OreUI runtime Hook | Target-version evidence required | Not implemented |
 | UI mounting | Target-version evidence required | Not implemented |

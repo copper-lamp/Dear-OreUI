@@ -30,7 +30,7 @@
 
 ## Overview
 
-DearOreUI is a native Windows x64 client mod for LeviLamina 26.1. It is designed to read the OreUI resources loaded by the original Minecraft client, combine changes declared by multiple mods, and inject the verified result back into the active OreUI page.
+DearOreUI is a native Windows x64 client mod for LeviLamina 26.10.x. It is designed to read the OreUI resources loaded by the original Minecraft client, combine changes declared by multiple mods, and inject the verified result back into the active OreUI page.
 
 ```text
 Original OreUI
@@ -165,7 +165,7 @@ The current target is a client-only LeviLamina mod for Windows x64:
 | Component | Target |
 | --- | --- |
 | Minecraft Bedrock | Client on Windows x64 |
-| LeviLamina | 26.1 |
+| LeviLamina | 26.10.x |
 | Native entry | `DearOreUI.dll` |
 | C++ standard | C++20 |
 | Toolchain | Clang-CL |
@@ -176,7 +176,7 @@ OreUI bundle compatibility cannot be inferred from the Minecraft version alone. 
 
 ## Quick Start
 
-DearOreUI is not yet distributed as a stable runtime release. For development builds, prepare a Windows x64 LeviLamina 26.1 client environment and build from the `DearOreUI/` directory.
+DearOreUI is not yet distributed as a stable runtime release. For development builds, prepare a Windows x64 LeviLamina 26.10.x client environment and build from the `DearOreUI/` directory.
 
 ```powershell
 xmake repo -u
@@ -200,7 +200,7 @@ Do not interpret a successful build as proof that runtime OreUI injection is ava
 - Git
 - xmake
 - Visual Studio or an LLVM installation providing Clang-CL
-- A LeviLamina 26.1 development environment
+- A LeviLamina 26.10.x development environment
 
 ### Release build
 

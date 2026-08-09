@@ -14,10 +14,10 @@
     },
     "variants": [
         {
-            "label": "",
+            "label": "client",
             "platform": "win-x64",
             "dependencies": {
-                "github.com/LiteLDev/LeviLamina": "26.1"
+                "github.com/LiteLDev/LeviLamina#client": "26.10.*"
             },
             "assets": [
                 {
