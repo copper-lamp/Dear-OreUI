@@ -1,6 +1,7 @@
 #include "inject/RuntimeInjector.h"
 
 #include "api/types/Error.h"
+#include "diagnostic/Stage5IpcTelemetry.h"
 #include "resource/ResourceUri.h"
 
 #include <sstream>
@@ -59,6 +60,12 @@ api::Result<InjectionReport> RuntimeInjector::inject(api::ContextId id, resource
     }
 
     report.hostBridgeAvailable = mBridge.isAvailable();
+
+    diagnostic::recordStage5BridgeState(
+        id,
+        mBridge.isAvailable(),
+        mBridge.isAvailable() ? "CoherentHostBridge" : "NullHostBridge"
+    );
 
     if (mBridge.isAvailable()) {
         auto sendResult = mBridge.sendScript(id, runtimeScript);

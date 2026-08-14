@@ -1,6 +1,8 @@
 #include "api/DearOreUIApi.h"
 
 #include "api/manifest/ManifestValidator.h"
+#include "diagnostic/Stage6TransformTelemetry.h"
+#include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
 
 #include <chrono>
@@ -41,6 +43,9 @@ Result<RegistrationHandle>
 DearOreUIApi::registerResource(ModId owner, ResourceManifest const& manifest, std::string payload) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
+    }
+    if (!mRegistry.isModRegistered(owner)) {
+        return Error{ErrorCode::InvalidArgument, "owner mod is not registered"};
     }
     if (manifest.modNamespace != owner.value()) {
         return Error{ErrorCode::InvalidArgument, "manifest namespace does not match owner"};
@@ -88,6 +93,9 @@ Result<RegistrationHandle>
 DearOreUIApi::registerScript(ModId owner, ScriptManifest const& manifest, std::string source) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
+    }
+    if (!mRegistry.isModRegistered(owner)) {
+        return Error{ErrorCode::InvalidArgument, "owner mod is not registered"};
     }
     if (manifest.modNamespace != owner.value()) {
         return Error{ErrorCode::InvalidArgument, "manifest namespace does not match owner"};
@@ -138,6 +146,9 @@ Result<RegistrationHandle>
 DearOreUIApi::registerStyleSheet(ModId owner, StyleSheetManifest const& manifest, std::string source) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
+    }
+    if (!mRegistry.isModRegistered(owner)) {
+        return Error{ErrorCode::InvalidArgument, "owner mod is not registered"};
     }
     if (manifest.modNamespace != owner.value()) {
         return Error{ErrorCode::InvalidArgument, "manifest namespace does not match owner"};
@@ -197,6 +208,64 @@ Result<void> DearOreUIApi::unregister(RegistrationHandle handle) {
     mLogger.info("registry", "unregistered").withField("handle", std::to_string(handle.value())).emit();
     return Result<void>::success();
 }
+
+Result<ModId> DearOreUIApi::registerMod(ModManifest const& manifest) {
+    auto validation = ManifestValidator::validate(manifest);
+    if (validation.isErr()) {
+        mLogger.warning("manifest", "mod_validation_failed")
+            .withMod(manifest.id)
+            .withError(validation.error().code)
+            .withMessage(validation.error().message)
+            .emit();
+        return validation.error();
+    }
+
+    registry::ModRecord record;
+    record.manifest = manifest;
+
+    auto result = mRegistry.registerMod(std::move(record));
+    if (result.isErr()) {
+        mLogger.warning("registry", "mod_registration_failed")
+            .withMod(manifest.id)
+            .withError(result.error().code)
+            .withMessage(result.error().message)
+            .emit();
+        return result.error();
+    }
+
+    diagnostic::recordStage6ModRegistered(result.value(), manifest.modNamespace, manifest.dependencies.size());
+    return result.value();
+}
+
+Result<void> DearOreUIApi::unregisterMod(ModId id) {
+    if (!id.isValid()) {
+        return Error{ErrorCode::InvalidArgument, "mod id is invalid"};
+    }
+
+    auto mod = mRegistry.findMod(id);
+    if (!mod.has_value()) {
+        return Error{ErrorCode::NotFound, "mod is not registered"};
+    }
+
+    std::size_t removedEntries = mRegistry.findByOwner(id).size();
+    bool        removed        = mRegistry.unregisterMod(id);
+    if (!removed) {
+        return Error{ErrorCode::NotFound, "mod is not registered"};
+    }
+
+    mLogger.info("registry", "mod_unregistered")
+        .withMod(id)
+        .withField("removed_entry_count", std::to_string(removedEntries))
+        .emit();
+    diagnostic::recordStage6ModUnregistered(id, removedEntries);
+    return Result<void>::success();
+}
+
+bool DearOreUIApi::isModRegistered(ModId id) const { return mRegistry.isModRegistered(id); }
+
+bool DearOreUIApi::setModEnabled(ModId id, bool enabled) { return mRegistry.setModEnabled(id, enabled); }
+
+bool DearOreUIApi::isModEnabled(ModId id) const { return mRegistry.isModEnabled(id); }
 
 Result<RegistrationHandle>
 DearOreUIApi::registerHostMethod(

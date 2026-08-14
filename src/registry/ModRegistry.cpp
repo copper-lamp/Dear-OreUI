@@ -2,6 +2,7 @@
 
 #include "api/types/Error.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace dearoreui::registry {
@@ -81,6 +82,88 @@ api::Result<api::RegistrationHandle> ModRegistry::insert(ScriptEntry entry) { re
 
 api::Result<api::RegistrationHandle> ModRegistry::insert(StyleSheetEntry entry) { return insertImpl(std::move(entry)); }
 
+api::Result<api::ModId> ModRegistry::registerMod(ModRecord record) {
+    std::lock_guard lock{mMutex};
+
+    auto const& manifest = record.manifest;
+    if (mMods.find(manifest.id) != mMods.end()) {
+        return api::Error{api::ErrorCode::AlreadyExists, "mod already registered: " + manifest.id.value()};
+    }
+
+    for (auto const& [id, existing] : mMods) {
+        static_cast<void>(id);
+        if (existing.manifest.modNamespace == manifest.modNamespace) {
+            return api::Error{
+                api::ErrorCode::NamespaceConflict,
+                "mod namespace already registered by another mod: " + manifest.modNamespace
+            };
+        }
+    }
+
+    record.registeredAt = std::chrono::system_clock::now();
+    mMods.emplace(manifest.id, std::move(record));
+    return manifest.id;
+}
+
+bool ModRegistry::unregisterMod(api::ModId id) {
+    std::lock_guard lock{mMutex};
+
+    auto modIterator = mMods.find(id);
+    if (modIterator == mMods.end()) {
+        return false;
+    }
+    mMods.erase(modIterator);
+
+    removeEntriesForOwnerLocked(id);
+    return true;
+}
+
+std::optional<ModRecord> ModRegistry::findMod(api::ModId id) const {
+    std::lock_guard lock{mMutex};
+    auto            iterator = mMods.find(id);
+    if (iterator == mMods.end()) {
+        return std::nullopt;
+    }
+    return iterator->second;
+}
+
+bool ModRegistry::isModRegistered(api::ModId id) const {
+    std::lock_guard lock{mMutex};
+    return mMods.find(id) != mMods.end();
+}
+
+bool ModRegistry::setModEnabled(api::ModId id, bool enabled) {
+    std::lock_guard lock{mMutex};
+    auto            iterator = mMods.find(id);
+    if (iterator == mMods.end()) {
+        return false;
+    }
+    iterator->second.enabled = enabled;
+    return true;
+}
+
+bool ModRegistry::isModEnabled(api::ModId id) const {
+    std::lock_guard lock{mMutex};
+    auto            iterator = mMods.find(id);
+    return iterator != mMods.end() && iterator->second.enabled;
+}
+
+std::vector<ModRecord> ModRegistry::allMods() const {
+    std::lock_guard lock{mMutex};
+    std::vector<ModRecord> result;
+    result.reserve(mMods.size());
+    for (auto const& [id, record] : mMods) {
+        static_cast<void>(id);
+        result.push_back(record);
+    }
+    return result;
+}
+
+std::size_t ModRegistry::modCount() const {
+    std::lock_guard lock{mMutex};
+    return mMods.size();
+}
+
 bool ModRegistry::remove(api::RegistrationHandle handle) {
     std::lock_guard lock{mMutex};
 
@@ -101,7 +184,10 @@ bool ModRegistry::remove(api::RegistrationHandle handle) {
 
 std::size_t ModRegistry::removeAll(api::ModId owner) {
     std::lock_guard lock{mMutex};
+    return removeEntriesForOwnerLocked(owner);
+}
 
+std::size_t ModRegistry::removeEntriesForOwnerLocked(api::ModId owner) {
     std::vector<api::RegistrationHandle> toRemove;
     for (auto const& [handle, entry] : mEntries) {
         auto const* entryOwner = std::visit([](auto const& e) -> api::ModId const* { return &e.owner; }, entry);
@@ -161,6 +247,17 @@ std::vector<api::RegistrationHandle> ModRegistry::findByNamespace(std::string_vi
     return result;
 }
 
+std::vector<RegistryEntry> ModRegistry::listEntries() const {
+    std::lock_guard           lock{mMutex};
+    std::vector<RegistryEntry> result;
+    result.reserve(mEntries.size());
+    for (auto const& [handle, entry] : mEntries) {
+        static_cast<void>(handle);
+        result.push_back(entry);
+    }
+    return result;
+}
+
 bool ModRegistry::hasConflict(api::ResourceManifest const& manifest) const {
     std::lock_guard lock{mMutex};
     return mConflictIndex.find(ConflictKey{manifest.modNamespace, manifest.path}) != mConflictIndex.end();
@@ -175,6 +272,7 @@ void ModRegistry::clear() {
     std::lock_guard lock{mMutex};
     mEntries.clear();
     mConflictIndex.clear();
+    mMods.clear();
 }
 
 api::RegistrationHandle ModRegistry::nextHandle() {

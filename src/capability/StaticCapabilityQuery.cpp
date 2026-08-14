@@ -39,14 +39,14 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
         CapabilityEntry{
             .capability = Capability::ScriptInjection,
             .level      = SupportLevel::Experimental,
-            .note       = "Minimal runtime script generation implemented; actual page submission pending stage 5",
+            .note       = "Runtime script generated; submitted via Coherent executeScript when HostBridge is available",
         }
     );
     mCapabilities.set(
         CapabilityEntry{
             .capability = Capability::HostBridge,
-            .level      = SupportLevel::Unknown,
-            .note       = "Not yet verified",
+            .level      = SupportLevel::Unsupported,
+            .note       = "Coherent JS execution entry not found in telemetry",
         }
     );
     mCapabilities.set(
@@ -61,6 +61,27 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
             .capability = Capability::ModManifestApi,
             .level      = SupportLevel::Supported,
             .note       = "Mod manifest validation and JSON parsing",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::ModRegistration,
+            .level      = SupportLevel::Supported,
+            .note       = "Mod-level registration, unregistration and enabled state",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::DependencyResolution,
+            .level      = SupportLevel::Supported,
+            .note       = "Topological sort, missing/version/cycle detection over registered mods",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::MultiModTransformPlanning,
+            .level      = SupportLevel::Experimental,
+            .note       = "Change planning and reporting available; real multi-mod page injection pending client verification",
         }
     );
     mCapabilities.set(

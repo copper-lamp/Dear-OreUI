@@ -37,6 +37,12 @@ public:
 
     [[nodiscard]] Result<void> unregister(RegistrationHandle handle) override;
 
+    [[nodiscard]] Result<ModId> registerMod(ModManifest const& manifest) override;
+    [[nodiscard]] Result<void>  unregisterMod(ModId id) override;
+    [[nodiscard]] bool          isModRegistered(ModId id) const override;
+    [[nodiscard]] bool          setModEnabled(ModId id, bool enabled) override;
+    [[nodiscard]] bool          isModEnabled(ModId id) const override;
+
     [[nodiscard]] Result<RegistrationHandle>
     registerHostMethod(
         ModId owner,

@@ -15,6 +15,8 @@
 #include "runtime/IRuntime.h"
 #include "runtime/RuntimeConfig.h"
 #include "source/ISourceReader.h"
+#include "transform/ChangePlanner.h"
+#include "transform/PageTransformer.h"
 
 #include <memory>
 
@@ -32,6 +34,7 @@ public:
     [[nodiscard]] capability::ICapabilityQuery& capabilities() override;
     [[nodiscard]] api::IDearOreUIApi*           api() override;
     [[nodiscard]] page::IPageContextManager*    pageManager() override;
+    [[nodiscard]] ipc::HostDispatcher*          hostDispatcher();
 
 private:
     // hook::IPageHookCallback
@@ -49,10 +52,12 @@ private:
     std::unique_ptr<api::DearOreUIApi>        mApi;
     std::unique_ptr<page::PageContextManager> mPageManager;
     std::unique_ptr<hook::OreUIHookAdapter>   mHookAdapter;
-    std::unique_ptr<source::ISourceReader>    mSourceReader;
-    std::unique_ptr<inject::IPageInjector>    mInjector;
-    std::unique_ptr<ipc::HostDispatcher>      mHostDispatcher;
-    std::unique_ptr<ipc::IHostBridge>         mHostBridge;
+    std::unique_ptr<source::ISourceReader>      mSourceReader;
+    std::unique_ptr<transform::ChangePlanner>   mChangePlanner;
+    std::unique_ptr<transform::PageTransformer> mPageTransformer;
+    std::unique_ptr<inject::IPageInjector>      mInjector;
+    std::unique_ptr<ipc::HostDispatcher>        mHostDispatcher;
+    std::unique_ptr<ipc::IHostBridge>           mHostBridge;
     bool                                      mInitialized{false};
     bool                                      mEnabled{false};
 };

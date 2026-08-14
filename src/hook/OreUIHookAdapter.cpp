@@ -38,6 +38,7 @@ struct AdapterState {
     std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
     std::unordered_set<std::string>                    observed;
     IPageHookCallback*                                 callback{};
+    Stage5CoherentProbe*                               probe{};
 };
 
 AdapterState& state() {
@@ -126,6 +127,12 @@ LL_TYPE_INSTANCE_HOOK(
 ) {
     diagnostic::recordStage0("hook", "event=sceneprovider_entered\turl=" + url);
     auto result = origin(url, router, sceneStack, mode, location);
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().probe != nullptr && result != nullptr) {
+            state().probe->onSceneCreated(url, result.get());
+        }
+    }
     poc::registerRouter(router, *sceneStack);
     notifyPageCreated(router, url);
     return result;
@@ -266,7 +273,8 @@ OreUIHookAdapter::OreUIHookAdapter(
 : mCallback(callback),
   mCapabilities(capabilities),
   mLogger(logger),
-  mDataDirectory(std::move(dataDirectory)) {}
+  mDataDirectory(std::move(dataDirectory)),
+  mProbe(logger) {}
 
 OreUIHookAdapter::~OreUIHookAdapter() { static_cast<void>(uninstall()); }
 
@@ -275,6 +283,7 @@ bool OreUIHookAdapter::install() {
     {
         std::lock_guard lock{adapterState.mutex};
         adapterState.callback = &mCallback;
+        adapterState.probe    = &mProbe;
     }
     if (allInstalled()) {
         return true;
@@ -320,6 +329,7 @@ bool OreUIHookAdapter::uninstall() {
     {
         std::lock_guard lock{adapterState.mutex};
         adapterState.callback = nullptr;
+        adapterState.probe    = nullptr;
     }
 
     if (noneInstalled()) return true;

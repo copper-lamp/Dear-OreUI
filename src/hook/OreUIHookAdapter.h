@@ -3,6 +3,7 @@
 #include "capability/ICapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "hook/IPageHookCallback.h"
+#include "hook/Stage5CoherentProbe.h"
 
 #include <filesystem>
 
@@ -28,6 +29,7 @@ private:
     capability::ICapabilityQuery& mCapabilities;
     diagnostic::DiagnosticLogger& mLogger;
     std::filesystem::path         mDataDirectory;
+    Stage5CoherentProbe           mProbe;
 };
 
 } // namespace dearoreui::hook

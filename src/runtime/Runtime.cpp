@@ -6,6 +6,9 @@
 #include "diagnostic/Stage0TelemetryCompat.h"
 #include "diagnostic/Stage3PageLifecycleTelemetry.h"
 #include "diagnostic/Stage4InjectTelemetry.h"
+#include "diagnostic/Stage5IpcTelemetry.h"
+#include "facet/FacetHostMethod.h"
+#include "facet/RuntimeInfoFacet.h"
 #include "hook/OreUIHookAdapter.h"
 #include "inject/RuntimeInjector.h"
 #include "ipc/NullHostBridge.h"
@@ -40,11 +43,40 @@ bool Runtime::initialize() {
 
     mRegistry           = std::make_unique<registry::ModRegistry>();
     mHostMethodRegistry = std::make_unique<ipc::HostMethodRegistry>();
+    mFacetRegistry      = std::make_unique<facet::FacetRegistry>();
     mApi                = std::make_unique<api::DearOreUIApi>(
         *mRegistry, *mHostMethodRegistry, mCapabilities, logger
     );
 
-    logger.info("lifecycle", "load").withField("stage", "3").withField("target", "win-x64").emit();
+    auto runtimeInfoFacet = std::make_shared<facet::RuntimeInfoFacet>(*mApi);
+    auto facetRegisterResult = mFacetRegistry->registerProvider(runtimeInfoFacet);
+    if (facetRegisterResult.isErr()) {
+        logger.warning("facet", "builtin_registration_failed")
+            .withError(facetRegisterResult.error().code)
+            .withMessage(facetRegisterResult.error().message)
+            .emit();
+    }
+
+    auto runtimeInfoMethod = std::make_shared<facet::FacetHostMethod>(
+        runtimeInfoFacet, api::Permission::HostReadOnly
+    );
+    api::PermissionSet runtimePermissions{std::vector{api::Permission::HostReadOnly}};
+    auto               facetResult = mHostMethodRegistry->registerMethod(
+        api::ModId{"dearoreui"}, runtimePermissions, runtimeInfoMethod
+    );
+    if (facetResult.isErr()) {
+        logger.warning("host", "builtin_facet_registration_failed")
+            .withError(facetResult.error().code)
+            .withMessage(facetResult.error().message)
+            .emit();
+    } else {
+        logger.info("host", "builtin_facet_registered")
+            .withField("handle", std::to_string(facetResult.value().value()))
+            .withField("method", runtimeInfoMethod->name())
+            .emit();
+    }
+
+    logger.info("lifecycle", "load").withField("stage", "5").withField("target", "win-x64").emit();
 
     mInitialized = true;
     return true;
@@ -67,6 +99,9 @@ bool Runtime::enable() {
 
     auto sourceBase = mConfig.minecraftDirectory / "data" / "gui" / "dist" / "hbui";
     mSourceReader   = std::make_unique<source::FileSystemSourceReader>(std::move(sourceBase));
+
+    mChangePlanner    = std::make_unique<transform::ChangePlanner>(*mRegistry);
+    mPageTransformer  = std::make_unique<transform::PageTransformer>();
 
     mHostBridge     = std::make_unique<ipc::NullHostBridge>();
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
@@ -113,6 +148,8 @@ bool Runtime::disable() {
 
     mInjector.reset();
     mSourceReader.reset();
+    mChangePlanner.reset();
+    mPageTransformer.reset();
 
     if (mPageManager != nullptr) {
         mPageManager->clear();
@@ -194,11 +231,28 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
     snapshot.contextId = id;
     diagnostic::recordStage4SnapshotCaptured(id, info, snapshot);
 
+    // Stage 6: build a change plan and materialize the final page resources.
+    transform::ChangePlan plan;
+    if (mChangePlanner != nullptr) {
+        plan = mChangePlanner->plan(id, info.scope);
+    }
+
+    transform::TransformedPage transformed;
+    if (mPageTransformer != nullptr) {
+        transformed = mPageTransformer->transform(plan, snapshot);
+    }
+
     auto index = std::make_unique<resource::ResourceIndex>();
     index->registerSnapshot(snapshot);
-
-    // Stage 4 only indexes the original snapshot.
-    // Mod-registered resources, scripts and stylesheets will be merged here in stage 6.
+    for (auto const& entry : transformed.scripts) {
+        index->registerModScript(entry);
+    }
+    for (auto const& entry : transformed.styles) {
+        index->registerModStyleSheet(entry);
+    }
+    for (auto const& entry : transformed.resources) {
+        index->registerModResource(entry);
+    }
 
     auto locations = index->listForPage(info.scope);
     diagnostic::recordStage4ResourceIndexBuilt(id, locations.size());
@@ -219,6 +273,9 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
         .withContext(id)
         .withPage(info.id)
         .withField("scope", std::to_string(static_cast<int>(info.scope)))
+        .withField("applied", std::to_string(transformed.report.applied))
+        .withField("skipped", std::to_string(transformed.report.skipped))
+        .withField("blocked", std::to_string(transformed.report.blocked))
         .emit();
 }
 
@@ -255,5 +312,7 @@ capability::ICapabilityQuery& Runtime::capabilities() { return mCapabilities; }
 api::IDearOreUIApi* Runtime::api() { return mApi.get(); }
 
 page::IPageContextManager* Runtime::pageManager() { return mPageManager.get(); }
+
+ipc::HostDispatcher* Runtime::hostDispatcher() { return mHostDispatcher.get(); }
 
 } // namespace dearoreui::runtime
