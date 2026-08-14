@@ -24,13 +24,13 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
     });
     mCapabilities.set(CapabilityEntry{
         .capability = Capability::ResourceInterception,
-        .level      = SupportLevel::Unknown,
-        .note       = "Not yet verified",
+        .level      = SupportLevel::Experimental,
+        .note       = "File-system snapshot reader implemented; runtime hook reader pending verification",
     });
     mCapabilities.set(CapabilityEntry{
         .capability = Capability::ScriptInjection,
-        .level      = SupportLevel::Unknown,
-        .note       = "Not yet verified",
+        .level      = SupportLevel::Experimental,
+        .note       = "Minimal runtime script generation implemented; actual page submission pending stage 5",
     });
     mCapabilities.set(CapabilityEntry{
         .capability = Capability::HostBridge,

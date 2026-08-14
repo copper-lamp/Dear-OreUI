@@ -5,8 +5,12 @@
 #include "diagnostic/FileDiagnosticSink.h"
 #include "diagnostic/Stage0TelemetryCompat.h"
 #include "diagnostic/Stage3PageLifecycleTelemetry.h"
+#include "diagnostic/Stage4InjectTelemetry.h"
 #include "hook/OreUIHookAdapter.h"
+#include "inject/RuntimeInjector.h"
 #include "poc/Stage1NavigationPoc.h"
+#include "resource/ResourceIndex.h"
+#include "source/FileSystemSourceReader.h"
 
 #include <utility>
 
@@ -55,6 +59,10 @@ bool Runtime::enable() {
         static_cast<hook::IPageHookCallback&>(*this), mCapabilities, logger, mConfig.dataDirectory
     );
 
+    auto sourceBase = mConfig.minecraftDirectory / "gui" / "dist" / "hbui";
+    mSourceReader   = std::make_unique<source::FileSystemSourceReader>(std::move(sourceBase));
+    mInjector       = std::make_unique<inject::RuntimeInjector>(logger);
+
     bool result = true;
     if (mConfig.enableHooks) {
         result = mHookAdapter->install();
@@ -95,6 +103,9 @@ bool Runtime::disable() {
     }
     logger.info("status", hooksRemoved ? "hooks_removed" : "hooks_remove_failed")
         .emit();
+
+    mInjector.reset();
+    mSourceReader.reset();
 
     if (mPageManager != nullptr) {
         mPageManager->clear();
@@ -141,9 +152,60 @@ api::ContextId Runtime::onPageCreated(
             .withField("scope", std::to_string(static_cast<int>(found->page.scope)))
             .withField("url", std::string(url))
             .emit();
+
+        runStage4Injection(contextId, found->page);
     }
 
     return contextId;
+}
+
+void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
+    if (mSourceReader == nullptr || mInjector == nullptr) {
+        return;
+    }
+
+    auto& logger = diagnostic::globalLogger();
+
+    auto snapshotResult = mSourceReader->capture(info);
+    if (snapshotResult.isErr()) {
+        logger.warning("source", "capture_failed")
+            .withContext(id)
+            .withError(snapshotResult.error().code)
+            .withMessage(snapshotResult.error().message)
+            .emit();
+        return;
+    }
+
+    auto snapshot = std::move(snapshotResult.value());
+    snapshot.contextId = id;
+    diagnostic::recordStage4SnapshotCaptured(id, info, snapshot);
+
+    auto index = std::make_unique<resource::ResourceIndex>();
+    index->registerSnapshot(snapshot);
+
+    // Stage 4 only indexes the original snapshot.
+    // Mod-registered resources, scripts and stylesheets will be merged here in stage 6.
+
+    auto locations = index->listForPage(info.scope);
+    diagnostic::recordStage4ResourceIndexBuilt(id, locations.size());
+
+    auto injectResult = mInjector->inject(id, *index);
+    if (injectResult.isErr()) {
+        logger.warning("inject", "failed")
+            .withContext(id)
+            .withError(injectResult.error().code)
+            .withMessage(injectResult.error().message)
+            .emit();
+        return;
+    }
+
+    diagnostic::recordStage4InjectSubmitted(id, injectResult.value());
+
+    logger.info("page", "ready")
+        .withContext(id)
+        .withPage(info.id)
+        .withField("scope", std::to_string(static_cast<int>(info.scope)))
+        .emit();
 }
 
 void Runtime::onPageDestroyed(api::ContextId id) {

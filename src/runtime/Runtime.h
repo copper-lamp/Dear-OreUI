@@ -4,10 +4,13 @@
 #include "capability/StaticCapabilityQuery.h"
 #include "hook/IPageHookCallback.h"
 #include "hook/OreUIHookAdapter.h"
+#include "inject/IPageInjector.h"
 #include "page/PageContextManager.h"
 #include "registry/ModRegistry.h"
+#include "resource/IResourceIndex.h"
 #include "runtime/IRuntime.h"
 #include "runtime/RuntimeConfig.h"
+#include "source/ISourceReader.h"
 
 #include <memory>
 
@@ -33,12 +36,16 @@ private:
     ) override;
     void onPageDestroyed(api::ContextId id) override;
 
+    void runStage4Injection(api::ContextId id, api::PageInfo const& info);
+
     RuntimeConfig                     mConfig;
     capability::StaticCapabilityQuery mCapabilities;
     std::unique_ptr<registry::ModRegistry> mRegistry;
     std::unique_ptr<api::DearOreUIApi>     mApi;
     std::unique_ptr<page::PageContextManager> mPageManager;
     std::unique_ptr<hook::OreUIHookAdapter>   mHookAdapter;
+    std::unique_ptr<source::ISourceReader>    mSourceReader;
+    std::unique_ptr<inject::IPageInjector>    mInjector;
     bool                              mInitialized{false};
     bool                              mEnabled{false};
 };
