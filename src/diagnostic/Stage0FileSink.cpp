@@ -43,8 +43,8 @@ std::string escapeFields(std::vector<DiagnosticField> const& fields) {
 } // namespace
 
 Stage0FileSink::Stage0FileSink(std::filesystem::path path, std::string sessionId)
-    : mPath(std::move(path)),
-      mSessionId(std::move(sessionId)) {
+: mPath(std::move(path)),
+  mSessionId(std::move(sessionId)) {
     std::error_code error;
     std::filesystem::create_directories(mPath.parent_path(), error);
 }

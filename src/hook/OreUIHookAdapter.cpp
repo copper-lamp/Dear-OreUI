@@ -5,11 +5,11 @@
 
 #include "ll/api/memory/Hook.h"
 
+#include "mc/client/game/ClientInstance.h"
 #include "mc/client/gui/ScreenTechStackSelector.h"
 #include "mc/client/gui/TechStack.h"
 #include "mc/client/gui/oreui/SceneProvider.h"
 #include "mc/client/gui/oreui/routing/Router.h"
-#include "mc/client/game/ClientInstance.h"
 
 #include <atomic>
 #include <memory>
@@ -34,10 +34,10 @@ struct AdapterState {
     bool routerDestructorThunk{};
     bool clientUpdate{};
 
-    std::mutex                                          mutex;
-    std::unordered_map<OreUI::Router*, api::ContextId>  routerContexts;
-    std::unordered_set<std::string>                     observed;
-    IPageHookCallback*                                  callback{};
+    std::mutex                                         mutex;
+    std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
+    std::unordered_set<std::string>                    observed;
+    IPageHookCallback*                                 callback{};
 };
 
 AdapterState& state() {
@@ -58,8 +58,8 @@ char const* techStackName(ui::TechStack stack) {
 
 std::string locationFields(std::string_view prefix, std::optional<OreUI::RouterLocation> const& location) {
     if (!location) return std::string(prefix) + "=none";
-    return std::string(prefix) + "_path=" + location->getPath() + "\t" + std::string(prefix) + "_query="
-         + location->getQuery() + "\t" + std::string(prefix) + "_fragment=" + location->getFragment();
+    return std::string(prefix) + "_path=" + location->getPath() + "\t" + std::string(prefix)
+         + "_query=" + location->getQuery() + "\t" + std::string(prefix) + "_fragment=" + location->getFragment();
 }
 
 std::optional<api::RouterLocationSnapshot> makeLocationSnapshot(std::optional<OreUI::RouterLocation> const& location) {
@@ -78,21 +78,18 @@ void recordOnce(std::string event, std::string fields) {
 }
 
 void notifyPageCreated(OreUI::Router& router, std::string_view url) {
-    auto& adapterState = state();
+    auto&           adapterState = state();
     std::lock_guard lock{adapterState.mutex};
     if (!adapterState.callback) return;
 
-    auto contextId = adapterState.callback->onPageCreated(
-        url,
-        makeLocationSnapshot(router.getCurrentLocation())
-    );
+    auto contextId = adapterState.callback->onPageCreated(url, makeLocationSnapshot(router.getCurrentLocation()));
     adapterState.routerContexts[&router] = contextId;
 }
 
 void notifyPageDestroyed(OreUI::Router& router) {
-    auto& adapterState = state();
+    auto&           adapterState = state();
     std::lock_guard lock{adapterState.mutex};
-    auto iterator = adapterState.routerContexts.find(&router);
+    auto            iterator = adapterState.routerContexts.find(&router);
     if (iterator == adapterState.routerContexts.end()) return;
 
     auto contextId = iterator->second;
@@ -121,11 +118,11 @@ LL_TYPE_INSTANCE_HOOK(
     OreUI::SceneProvider,
     &OreUI::SceneProvider::createScene,
     std::shared_ptr<AbstractScene>,
-    std::string const& url,
-    OreUI::Router& router,
+    std::string const&                              url,
+    OreUI::Router&                                  router,
     Bedrock::NotNullNonOwnerPtr<ISceneStack> const& sceneStack,
-    OreUI::RouteMode mode,
-    OreUI::FacetRegistryLocation location
+    OreUI::RouteMode                                mode,
+    OreUI::FacetRegistryLocation                    location
 ) {
     diagnostic::recordStage0("hook", "event=sceneprovider_entered\turl=" + url);
     auto result = origin(url, router, sceneStack, mode, location);
@@ -155,7 +152,10 @@ LL_TYPE_INSTANCE_HOOK(
     bool,
     bool isInitFinished
 ) {
-    diagnostic::recordStage0("hook", "event=clientupdate_entered\tinit=" + std::string(isInitFinished ? "true" : "false"));
+    diagnostic::recordStage0(
+        "hook",
+        "event=clientupdate_entered\tinit=" + std::string(isInitFinished ? "true" : "false")
+    );
     auto result = origin(isInitFinished);
     // Stage 1 navigation PoC is disabled in stage 3.
     // if (isInitFinished) poc::consumeStage1Navigation();
@@ -181,7 +181,7 @@ LL_TYPE_INSTANCE_HOOK(
     OreUI::Router,
     &OreUI::Router::_pushRoute,
     bool,
-    std::string const& route,
+    std::string const&            route,
     OreUI::Router::RouterPushMode mode
 ) {
     diagnostic::recordStage0("hook", "event=router_push_entered\troute=" + route);
@@ -237,7 +237,7 @@ bool removeInstalled() {
 }
 
 void destroyAllContexts() {
-    auto& adapterState = state();
+    auto&                       adapterState = state();
     std::vector<api::ContextId> contexts;
     {
         std::lock_guard lock{adapterState.mutex};
@@ -258,17 +258,17 @@ void destroyAllContexts() {
 } // namespace
 
 OreUIHookAdapter::OreUIHookAdapter(
-    IPageHookCallback& callback,
+    IPageHookCallback&            callback,
     capability::ICapabilityQuery& capabilities,
     diagnostic::DiagnosticLogger& logger,
-    std::filesystem::path dataDirectory
+    std::filesystem::path         dataDirectory
 )
-    : mCallback(callback), mCapabilities(capabilities), mLogger(logger),
-      mDataDirectory(std::move(dataDirectory)) {}
+: mCallback(callback),
+  mCapabilities(capabilities),
+  mLogger(logger),
+  mDataDirectory(std::move(dataDirectory)) {}
 
-OreUIHookAdapter::~OreUIHookAdapter() {
-    static_cast<void>(uninstall());
-}
+OreUIHookAdapter::~OreUIHookAdapter() { static_cast<void>(uninstall()); }
 
 bool OreUIHookAdapter::install() {
     auto& adapterState = state();
@@ -305,7 +305,7 @@ bool OreUIHookAdapter::install() {
 }
 
 bool OreUIHookAdapter::uninstall() {
-    auto& adapterState = state();
+    auto&       adapterState      = state();
     std::size_t remainingContexts = 0;
     {
         std::lock_guard lock{adapterState.mutex};
@@ -329,8 +329,6 @@ bool OreUIHookAdapter::uninstall() {
     return result;
 }
 
-bool OreUIHookAdapter::isInstalled() const {
-    return allInstalled();
-}
+bool OreUIHookAdapter::isInstalled() const { return allInstalled(); }
 
 } // namespace dearoreui::hook

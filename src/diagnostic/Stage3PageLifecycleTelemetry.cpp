@@ -42,7 +42,8 @@ void initializeStage3FileSink(std::filesystem::path dataDirectory, std::string c
     auto& sink   = stage3Sink();
     if (!sink) {
         sink = std::make_shared<Stage0FileSink>(
-            std::move(dataDirectory) / "telemetry" / "stage3-page-lifecycle.txt", sessionId
+            std::move(dataDirectory) / "telemetry" / "stage3-page-lifecycle.txt",
+            sessionId
         );
         logger.addSink(sink);
     }

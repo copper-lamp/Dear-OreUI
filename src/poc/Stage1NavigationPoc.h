@@ -16,4 +16,4 @@ void invalidateRouter(OreUI::Router& router);
 void invalidateSceneStack(ISceneStack& sceneStack);
 void stopStage1Navigation();
 
-}
+} // namespace dearoreui::poc

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "api/types/Result.h"
 #include "api/manifest/ModManifest.h"
 #include "api/manifest/ResourceManifest.h"
 #include "api/manifest/ScriptManifest.h"
 #include "api/manifest/StyleSheetManifest.h"
+#include "api/types/Result.h"
 
 #include <cstdint>
 #include <string>
@@ -25,11 +25,8 @@ public:
     [[nodiscard]] static bool isValidPath(std::string_view path);
 
 private:
-    [[nodiscard]] static Result<void> validateCommonResource(
-        std::string_view typeName,
-        std::string const& modNamespace,
-        std::string const& path
-    );
+    [[nodiscard]] static Result<void>
+    validateCommonResource(std::string_view typeName, std::string const& modNamespace, std::string const& path);
 };
 
 } // namespace dearoreui::api

@@ -26,8 +26,7 @@ public:
     explicit JsonValue(double value) : mType(Type::Number), mNumber(value) {}
     explicit JsonValue(std::string value) : mType(Type::String), mString(std::move(value)) {}
     explicit JsonValue(std::vector<JsonValue> values) : mType(Type::Array), mArray(std::move(values)) {}
-    explicit JsonValue(std::map<std::string, JsonValue> values)
-        : mType(Type::Object), mObject(std::move(values)) {}
+    explicit JsonValue(std::map<std::string, JsonValue> values) : mType(Type::Object), mObject(std::move(values)) {}
 
     [[nodiscard]] Type type() const { return mType; }
 
@@ -38,10 +37,10 @@ public:
     [[nodiscard]] bool isArray() const { return mType == Type::Array; }
     [[nodiscard]] bool isObject() const { return mType == Type::Object; }
 
-    [[nodiscard]] bool asBoolean() const { return mBoolean; }
-    [[nodiscard]] double asNumber() const { return mNumber; }
-    [[nodiscard]] std::string const& asString() const { return mString; }
-    [[nodiscard]] std::vector<JsonValue> const& asArray() const { return mArray; }
+    [[nodiscard]] bool                                    asBoolean() const { return mBoolean; }
+    [[nodiscard]] double                                  asNumber() const { return mNumber; }
+    [[nodiscard]] std::string const&                      asString() const { return mString; }
+    [[nodiscard]] std::vector<JsonValue> const&           asArray() const { return mArray; }
     [[nodiscard]] std::map<std::string, JsonValue> const& asObject() const { return mObject; }
 
     [[nodiscard]] JsonValue const* find(std::string_view key) const {
@@ -50,12 +49,12 @@ public:
     }
 
 private:
-    Type                              mType{Type::Null};
-    bool                              mBoolean{false};
-    double                            mNumber{0.0};
-    std::string                       mString;
-    std::vector<JsonValue>            mArray;
-    std::map<std::string, JsonValue>  mObject;
+    Type                             mType{Type::Null};
+    bool                             mBoolean{false};
+    double                           mNumber{0.0};
+    std::string                      mString;
+    std::vector<JsonValue>           mArray;
+    std::map<std::string, JsonValue> mObject;
 };
 
 class JsonParser {
@@ -72,11 +71,11 @@ private:
     [[nodiscard]] Result<JsonValue> parseNumber();
     [[nodiscard]] Result<JsonValue> parseLiteral(std::string_view literal, JsonValue value);
 
-    void skipWhitespace();
-    [[nodiscard]] bool eof() const { return mPos >= mText.size(); }
-    [[nodiscard]] char peek() const;
-    char advance();
-    bool consume(char expected);
+    void                skipWhitespace();
+    [[nodiscard]] bool  eof() const { return mPos >= mText.size(); }
+    [[nodiscard]] char  peek() const;
+    char                advance();
+    bool                consume(char expected);
     [[nodiscard]] Error error(std::string message) const;
 
     std::string_view mText;
@@ -84,5 +83,6 @@ private:
 };
 
 [[nodiscard]] Result<JsonValue> parseJson(std::string_view text);
+[[nodiscard]] std::string       serializeJson(JsonValue const& value);
 
 } // namespace dearoreui::api

@@ -53,8 +53,9 @@ std::string escapeJson(std::string_view value) {
 }
 
 std::string formatTimestamp(std::chrono::system_clock::time_point const& timestamp) {
-    auto const time     = std::chrono::system_clock::to_time_t(timestamp);
-    auto const millis   = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch()).count() % 1000;
+    auto const time = std::chrono::system_clock::to_time_t(timestamp);
+    auto const millis =
+        std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch()).count() % 1000;
     std::tm localTime{};
     localtime_s(&localTime, &time);
     std::ostringstream output;
@@ -106,7 +107,7 @@ void FileDiagnosticSink::consume(DiagnosticEvent const& event) {
 
 #ifdef _WIN32
     auto const pathWide = mPath.wstring();
-    HANDLE file = CreateFileW(
+    HANDLE     file     = CreateFileW(
         pathWide.c_str(),
         FILE_APPEND_DATA,
         FILE_SHARE_READ | FILE_SHARE_WRITE,

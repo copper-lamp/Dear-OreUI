@@ -18,7 +18,7 @@ Result<std::uint32_t> parseNumber(std::string_view text) {
 
 Result<Version::Components> parseCore(std::string_view text) {
     Version::Components components{};
-    std::string_view remaining = text;
+    std::string_view    remaining = text;
 
     auto prereleaseStart = remaining.find('-');
     auto buildStart      = remaining.find('+');
@@ -40,9 +40,9 @@ Result<Version::Components> parseCore(std::string_view text) {
     }
 
     std::vector<std::uint32_t> numbers;
-    std::size_t start = 0;
+    std::size_t                start = 0;
     while (start <= remaining.size()) {
-        auto end = remaining.find('.', start);
+        auto end  = remaining.find('.', start);
         auto part = remaining.substr(start, end == std::string_view::npos ? remaining.size() - start : end - start);
         if (part.empty()) {
             return Error{ErrorCode::InvalidFormat, "Empty version component"};
@@ -73,8 +73,8 @@ int comparePrerelease(std::string const& left, std::string const& right) {
     std::size_t lpos = 0;
     std::size_t rpos = 0;
     while (lpos < left.size() || rpos < right.size()) {
-        auto lend = left.find('.', lpos);
-        auto rend = right.find('.', rpos);
+        auto lend  = left.find('.', lpos);
+        auto rend  = right.find('.', rpos);
         auto lpart = left.substr(lpos, lend == std::string_view::npos ? left.size() - lpos : lend - lpos);
         auto rpart = right.substr(rpos, rend == std::string_view::npos ? right.size() - rpos : rend - rpos);
 

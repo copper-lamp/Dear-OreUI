@@ -17,7 +17,7 @@ class EventBuilder {
 public:
     EventBuilder(DiagnosticLogger& logger, Severity severity, std::string category, std::string event);
 
-    EventBuilder(EventBuilder const&) = delete;
+    EventBuilder(EventBuilder const&)            = delete;
     EventBuilder& operator=(EventBuilder const&) = delete;
     EventBuilder(EventBuilder&&)                 = default;
     EventBuilder& operator=(EventBuilder&&)      = default;
@@ -78,9 +78,9 @@ public:
     [[nodiscard]] api::DiagnosticId nextId();
 
 private:
-    std::mutex                        mMutex;
+    std::mutex                                    mMutex;
     std::vector<std::shared_ptr<IDiagnosticSink>> mSinks;
-    std::atomic<std::uint64_t>        mNextId{1};
+    std::atomic<std::uint64_t>                    mNextId{1};
 };
 
 [[nodiscard]] DiagnosticLogger& globalLogger();

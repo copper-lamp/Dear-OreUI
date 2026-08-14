@@ -30,7 +30,7 @@ public:
     }
 
 private:
-    mutable std::mutex       mMutex;
+    mutable std::mutex           mMutex;
     std::vector<DiagnosticEvent> mEvents;
 };
 

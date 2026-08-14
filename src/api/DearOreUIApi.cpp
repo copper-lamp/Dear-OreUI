@@ -9,10 +9,14 @@ namespace dearoreui::api {
 
 DearOreUIApi::DearOreUIApi(
     registry::IModRegistry&       registry,
+    ipc::HostMethodRegistry&      hostMethodRegistry,
     capability::ICapabilityQuery& capabilities,
     diagnostic::DiagnosticLogger& logger
 )
-    : mRegistry(registry), mCapabilities(capabilities), mLogger(logger) {}
+: mRegistry(registry),
+  mHostMethodRegistry(hostMethodRegistry),
+  mCapabilities(capabilities),
+  mLogger(logger) {}
 
 ApiInfo DearOreUIApi::getInfo() const {
     ApiInfo info;
@@ -23,29 +27,18 @@ ApiInfo DearOreUIApi::getInfo() const {
     return info;
 }
 
-CapabilitySet DearOreUIApi::getCapabilities() const {
-    return mCapabilities.all();
-}
+CapabilitySet DearOreUIApi::getCapabilities() const { return mCapabilities.all(); }
 
-SupportLevel DearOreUIApi::checkSupport(Capability capability) const {
-    return mCapabilities.query(capability);
-}
+SupportLevel DearOreUIApi::checkSupport(Capability capability) const { return mCapabilities.query(capability); }
 
-std::uint32_t DearOreUIApi::getProtocolVersion() const {
-    return DearOreUIProtocolVersion;
-}
+std::uint32_t DearOreUIApi::getProtocolVersion() const { return DearOreUIProtocolVersion; }
 
-bool DearOreUIApi::isReady() const {
-    return mReady.load(std::memory_order_relaxed);
-}
+bool DearOreUIApi::isReady() const { return mReady.load(std::memory_order_relaxed); }
 
-void DearOreUIApi::setReady(bool ready) {
-    mReady.store(ready, std::memory_order_relaxed);
-}
+void DearOreUIApi::setReady(bool ready) { mReady.store(ready, std::memory_order_relaxed); }
 
-Result<RegistrationHandle> DearOreUIApi::registerResource(
-    ModId owner, ResourceManifest const& manifest, std::string payload
-) {
+Result<RegistrationHandle>
+DearOreUIApi::registerResource(ModId owner, ResourceManifest const& manifest, std::string payload) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
     }
@@ -68,9 +61,9 @@ Result<RegistrationHandle> DearOreUIApi::registerResource(
     }
 
     registry::ResourceEntry entry;
-    entry.owner     = owner;
-    entry.manifest  = manifest;
-    entry.payload   = std::move(payload);
+    entry.owner    = owner;
+    entry.manifest = manifest;
+    entry.payload  = std::move(payload);
 
     auto result = mRegistry.insert(std::move(entry));
     if (result.isErr()) {
@@ -91,9 +84,8 @@ Result<RegistrationHandle> DearOreUIApi::registerResource(
     return result.value();
 }
 
-Result<RegistrationHandle> DearOreUIApi::registerScript(
-    ModId owner, ScriptManifest const& manifest, std::string source
-) {
+Result<RegistrationHandle>
+DearOreUIApi::registerScript(ModId owner, ScriptManifest const& manifest, std::string source) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
     }
@@ -142,9 +134,8 @@ Result<RegistrationHandle> DearOreUIApi::registerScript(
     return result.value();
 }
 
-Result<RegistrationHandle> DearOreUIApi::registerStyleSheet(
-    ModId owner, StyleSheetManifest const& manifest, std::string source
-) {
+Result<RegistrationHandle>
+DearOreUIApi::registerStyleSheet(ModId owner, StyleSheetManifest const& manifest, std::string source) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
     }
@@ -203,9 +194,52 @@ Result<void> DearOreUIApi::unregister(RegistrationHandle handle) {
         return Error{ErrorCode::NotFound, "registration handle not found"};
     }
 
-    mLogger.info("registry", "unregistered")
-        .withField("handle", std::to_string(handle.value()))
+    mLogger.info("registry", "unregistered").withField("handle", std::to_string(handle.value())).emit();
+    return Result<void>::success();
+}
+
+Result<RegistrationHandle>
+DearOreUIApi::registerHostMethod(
+    ModId owner,
+    PermissionSet const& permissions,
+    std::shared_ptr<ipc::IHostMethod> method
+) {
+    if (!owner.isValid()) {
+        return Error{ErrorCode::InvalidArgument, "owner is invalid"};
+    }
+    if (!method) {
+        return Error{ErrorCode::InvalidArgument, "method is null"};
+    }
+
+    auto result = mHostMethodRegistry.registerMethod(owner, permissions, method);
+    if (result.isErr()) {
+        mLogger.warning("host", "method_registration_failed")
+            .withMod(owner)
+            .withError(result.error().code)
+            .withMessage(result.error().message)
+            .emit();
+        return result.error();
+    }
+
+    mLogger.info("host", "method_registered")
+        .withMod(owner)
+        .withField("handle", std::to_string(result.value().value()))
+        .withField("method", method->name())
         .emit();
+    return result.value();
+}
+
+Result<void> DearOreUIApi::unregisterHostMethod(RegistrationHandle handle) {
+    if (!handle.isValid()) {
+        return Error{ErrorCode::InvalidArgument, "handle is invalid"};
+    }
+
+    bool removed = mHostMethodRegistry.unregister(handle);
+    if (!removed) {
+        return Error{ErrorCode::NotFound, "host method handle not found"};
+    }
+
+    mLogger.info("host", "method_unregistered").withField("handle", std::to_string(handle.value())).emit();
     return Result<void>::success();
 }
 

@@ -16,17 +16,11 @@ public:
         return mValue.compare_exchange_strong(expected, Value::Executing);
     }
 
-    [[nodiscard]] bool isScheduled() const {
-        return mValue.load() == Value::Scheduled;
-    }
+    [[nodiscard]] bool isScheduled() const { return mValue.load() == Value::Scheduled; }
 
-    void complete() {
-        mValue.store(Value::Completed);
-    }
+    void complete() { mValue.store(Value::Completed); }
 
-    void reset() {
-        mValue.store(Value::Idle);
-    }
+    void reset() { mValue.store(Value::Idle); }
 
 private:
     enum class Value {
@@ -39,4 +33,4 @@ private:
     std::atomic<Value> mValue{Value::Idle};
 };
 
-}
+} // namespace dearoreui::poc

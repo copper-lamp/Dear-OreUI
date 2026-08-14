@@ -16,16 +16,16 @@ public:
     [[nodiscard]] api::Result<api::RegistrationHandle> insert(ScriptEntry entry) override;
     [[nodiscard]] api::Result<api::RegistrationHandle> insert(StyleSheetEntry entry) override;
 
-    [[nodiscard]] bool remove(api::RegistrationHandle handle) override;
+    [[nodiscard]] bool        remove(api::RegistrationHandle handle) override;
     [[nodiscard]] std::size_t removeAll(api::ModId owner) override;
 
-    [[nodiscard]] std::optional<RegistryEntry> find(api::RegistrationHandle handle) const override;
+    [[nodiscard]] std::optional<RegistryEntry>         find(api::RegistrationHandle handle) const override;
     [[nodiscard]] std::vector<api::RegistrationHandle> findByOwner(api::ModId owner) const override;
     [[nodiscard]] std::vector<api::RegistrationHandle> findByNamespace(std::string_view ns) const override;
 
-    [[nodiscard]] bool hasConflict(api::ResourceManifest const& manifest) const override;
+    [[nodiscard]] bool        hasConflict(api::ResourceManifest const& manifest) const override;
     [[nodiscard]] std::size_t size() const override;
-    void clear() override;
+    void                      clear() override;
 
 private:
     struct ConflictKey {
@@ -55,10 +55,10 @@ private:
 
     [[nodiscard]] api::RegistrationHandle nextHandle();
 
-    mutable std::mutex                                          mMutex;
-    std::unordered_map<api::RegistrationHandle, RegistryEntry>  mEntries;
-    ConflictIndex                                               mConflictIndex;
-    std::atomic<std::uint64_t>                                  mNextHandle{1};
+    mutable std::mutex                                         mMutex;
+    std::unordered_map<api::RegistrationHandle, RegistryEntry> mEntries;
+    ConflictIndex                                              mConflictIndex;
+    std::atomic<std::uint64_t>                                 mNextHandle{1};
 };
 
 } // namespace dearoreui::registry

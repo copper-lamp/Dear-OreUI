@@ -6,8 +6,8 @@
 #include "mc/client/gui/oreui/routing/Router.h"
 #include "mc/client/gui/screens/interfaces/ISceneStack.h"
 
-#include <atomic>
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -35,8 +35,8 @@ std::atomic_bool& waitingRecorded() {
 
 struct RouterRecord {
     OreUI::Router* router{};
-    ISceneStack* sceneStack{};
-    std::uint64_t generation{};
+    ISceneStack*   sceneStack{};
+    std::uint64_t  generation{};
 };
 
 std::mutex& mutex() {
@@ -59,10 +59,10 @@ std::atomic<std::uint64_t>& nextGeneration() {
     return value;
 }
 
-}
+} // namespace
 
 void registerRouter(OreUI::Router& router, ISceneStack& sceneStack) {
-    auto const generation = nextGeneration().fetch_add(1) + 1;
+    auto const      generation = nextGeneration().fetch_add(1) + 1;
     std::lock_guard lock(mutex());
     routers()[&router] = RouterRecord{&router, &sceneStack, generation};
 }
@@ -98,11 +98,11 @@ void armStage1NavigationFromStartScreen(OreUI::Router& router) {
     RouterRecord record;
     {
         std::lock_guard lock(mutex());
-        auto const iterator = routers().find(&router);
+        auto const      iterator = routers().find(&router);
         if (iterator != routers().end()) {
             record = iterator->second;
         } else {
-            record = RouterRecord{&router, nullptr, nextGeneration().fetch_add(1) + 1};
+            record             = RouterRecord{&router, nullptr, nextGeneration().fetch_add(1) + 1};
             routers()[&router] = record;
             diagnostic::recordStage0(
                 "router_lifecycle",
@@ -135,11 +135,9 @@ void consumeStage1Navigation() {
             navigationState().complete();
             return;
         }
-        record = *pendingRouter();
+        record              = *pendingRouter();
         auto const iterator = routers().find(record.router);
-        if (
-            iterator == routers().end() || iterator->second.generation != record.generation
-        ) {
+        if (iterator == routers().end() || iterator->second.generation != record.generation) {
             diagnostic::recordStage0("poc_navigate", "event=blocked\treason=router_lifetime_unavailable");
             pendingRouter().reset();
             navigationState().complete();
@@ -148,7 +146,7 @@ void consumeStage1Navigation() {
     }
 
     auto const location = record.router->getCurrentLocation();
-    auto const path = location ? location->getPath() : std::string{"none"};
+    auto const path     = location ? location->getPath() : std::string{"none"};
     if (!location || path != "/__bedrock__/start_screen") {
         if (!waitingRecorded().exchange(true)) {
             diagnostic::recordStage0(
@@ -181,14 +179,10 @@ void consumeStage1Navigation() {
     auto const route = std::string{"/play/all?dirtyLevelId="};
     diagnostic::recordStage0(
         "poc_navigate",
-        "event=requested\tgeneration=" + std::to_string(record.generation) + "\tfrom_path=" + path + "\troute="
-            + route
+        "event=requested\tgeneration=" + std::to_string(record.generation) + "\tfrom_path=" + path + "\troute=" + route
     );
     auto const result = record.router->replaceRoute(route);
-    diagnostic::recordStage0(
-        "poc_navigate",
-        "event=completed\tsuccess=" + std::string(result ? "true" : "false")
-    );
+    diagnostic::recordStage0("poc_navigate", "event=completed\tsuccess=" + std::string(result ? "true" : "false"));
     navigationState().complete();
 }
 
@@ -202,4 +196,4 @@ void stopStage1Navigation() {
     diagnostic::recordStage0("poc_navigate", "event=stopped");
 }
 
-}
+} // namespace dearoreui::poc

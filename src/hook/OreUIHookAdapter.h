@@ -1,8 +1,8 @@
 #pragma once
 
-#include "hook/IPageHookCallback.h"
 #include "capability/ICapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
+#include "hook/IPageHookCallback.h"
 
 #include <filesystem>
 
@@ -11,10 +11,10 @@ namespace dearoreui::hook {
 class OreUIHookAdapter {
 public:
     OreUIHookAdapter(
-        IPageHookCallback& callback,
+        IPageHookCallback&            callback,
         capability::ICapabilityQuery& capabilities,
         diagnostic::DiagnosticLogger& logger,
-        std::filesystem::path dataDirectory = {}
+        std::filesystem::path         dataDirectory = {}
     );
     ~OreUIHookAdapter();
 

@@ -5,7 +5,7 @@
 namespace dearoreui::page {
 
 api::ContextId PageContextManager::createContext(api::PageInfo info) {
-    auto contextId = nextContextId();
+    auto        contextId = nextContextId();
     PageContext context;
     context.id        = contextId;
     context.page      = std::move(info);
@@ -35,7 +35,7 @@ bool PageContextManager::destroyContext(api::ContextId id) {
 
 std::optional<PageContext> PageContextManager::find(api::ContextId id) const {
     std::lock_guard lock{mMutex};
-    auto iterator = mContexts.find(id);
+    auto            iterator = mContexts.find(id);
     if (iterator == mContexts.end()) {
         return std::nullopt;
     }
@@ -43,7 +43,7 @@ std::optional<PageContext> PageContextManager::find(api::ContextId id) const {
 }
 
 std::vector<api::ContextId> PageContextManager::activeContexts() const {
-    std::lock_guard lock{mMutex};
+    std::lock_guard             lock{mMutex};
     std::vector<api::ContextId> result;
     result.reserve(mContexts.size());
     for (auto const& [id, context] : mContexts) {
@@ -75,7 +75,7 @@ void PageContextManager::clear() {
 }
 
 api::PageInfo PageContextManager::pageInfoFromUrl(std::string_view url) {
-    auto path = normalizePath(url);
+    auto          path = normalizePath(url);
     api::PageInfo info;
     info.id    = api::PageId{std::string(path)};
     info.scope = inferScope(path);
@@ -116,7 +116,7 @@ api::PageScope PageContextManager::inferScope(std::string_view path) {
 std::string PageContextManager::normalizePath(std::string_view url) {
     if (url.empty()) return "/";
 
-    auto end = url.find_first_of("?#");
+    auto end  = url.find_first_of("?#");
     auto path = url.substr(0, end);
     if (path.empty()) return "/";
     return std::string(path);

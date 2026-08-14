@@ -12,12 +12,12 @@
 namespace dearoreui::source {
 
 struct PageSourceSnapshot {
-    api::ContextId contextId;
-    std::unordered_map<std::string, std::string>      textResources;
+    api::ContextId                                             contextId;
+    std::unordered_map<std::string, std::string>               textResources;
     std::unordered_map<std::string, std::vector<std::uint8_t>> binaryResources;
-    std::chrono::system_clock::time_point capturedAt;
-    bool partial{false};
-    std::vector<api::Error> errors;
+    std::chrono::system_clock::time_point                      capturedAt;
+    bool                                                       partial{false};
+    std::vector<api::Error>                                    errors;
 };
 
 } // namespace dearoreui::source

@@ -174,9 +174,9 @@ Result<JsonValue> JsonParser::parseString() {
             if (mPos + 4 > mText.size()) {
                 return error("Incomplete unicode escape");
             }
-            auto hex = mText.substr(mPos, 4);
-            mPos += 4;
-            std::uint32_t codePoint{};
+            auto hex  = mText.substr(mPos, 4);
+            mPos     += 4;
+            std::uint32_t      codePoint{};
             std::istringstream stream{std::string{hex}};
             stream >> std::hex >> codePoint;
             if (stream.fail()) {
@@ -282,13 +282,117 @@ bool JsonParser::consume(char expected) {
     return false;
 }
 
-Error JsonParser::error(std::string message) const {
-    return Error{ErrorCode::InvalidFormat, std::move(message)};
-}
+Error JsonParser::error(std::string message) const { return Error{ErrorCode::InvalidFormat, std::move(message)}; }
 
 Result<JsonValue> parseJson(std::string_view text) {
     JsonParser parser{text};
     return parser.parse();
+}
+
+namespace {
+
+void serializeJsonValue(JsonValue const& value, std::ostringstream& stream);
+
+void escapeJsonString(std::string_view text, std::ostringstream& stream) {
+    stream << '"';
+    for (char c : text) {
+        switch (c) {
+        case '"':
+            stream << "\\\"";
+            break;
+        case '\\':
+            stream << "\\\\";
+            break;
+        case '\b':
+            stream << "\\b";
+            break;
+        case '\f':
+            stream << "\\f";
+            break;
+        case '\n':
+            stream << "\\n";
+            break;
+        case '\r':
+            stream << "\\r";
+            break;
+        case '\t':
+            stream << "\\t";
+            break;
+        default:
+            if (static_cast<unsigned char>(c) < 0x20) {
+                char buffer[7];
+                std::snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned char>(c));
+                stream << buffer;
+            } else {
+                stream << c;
+            }
+            break;
+        }
+    }
+    stream << '"';
+}
+
+void serializeJsonObject(std::map<std::string, JsonValue> const& object, std::ostringstream& stream) {
+    stream << '{';
+    bool first = true;
+    for (auto const& [key, value] : object) {
+        if (!first) stream << ',';
+        first = false;
+        escapeJsonString(key, stream);
+        stream << ':';
+        serializeJsonValue(value, stream);
+    }
+    stream << '}';
+}
+
+void serializeJsonArray(std::vector<JsonValue> const& array, std::ostringstream& stream) {
+    stream << '[';
+    bool first = true;
+    for (auto const& value : array) {
+        if (!first) stream << ',';
+        first = false;
+        serializeJsonValue(value, stream);
+    }
+    stream << ']';
+}
+
+void serializeJsonValue(JsonValue const& value, std::ostringstream& stream) {
+    switch (value.type()) {
+    case JsonValue::Type::Null:
+        stream << "null";
+        break;
+    case JsonValue::Type::Boolean:
+        stream << (value.asBoolean() ? "true" : "false");
+        break;
+    case JsonValue::Type::Number: {
+        std::ostringstream numberStream;
+        numberStream << value.asNumber();
+        auto text = numberStream.str();
+        if (text.find('.') == std::string::npos && text.find('e') == std::string::npos
+            && text.find('E') == std::string::npos) {
+            text += ".0";
+        }
+        stream << text;
+        break;
+    }
+    case JsonValue::Type::String:
+        escapeJsonString(value.asString(), stream);
+        break;
+    case JsonValue::Type::Array:
+        serializeJsonArray(value.asArray(), stream);
+        break;
+    case JsonValue::Type::Object:
+        serializeJsonObject(value.asObject(), stream);
+        break;
+    }
+}
+
+} // namespace
+
+std::string serializeJson(JsonValue const& value) {
+    std::ostringstream stream;
+    serializeJsonValue(value, stream);
+    return stream.str();
 }
 
 } // namespace dearoreui::api

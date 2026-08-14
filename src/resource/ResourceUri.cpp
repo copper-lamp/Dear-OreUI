@@ -10,9 +10,7 @@ namespace dearoreui::resource {
 
 namespace {
 
-[[nodiscard]] constexpr std::string_view schemePrefix() {
-    return "oreui://";
-}
+[[nodiscard]] constexpr std::string_view schemePrefix() { return "oreui://"; }
 
 [[nodiscard]] ResourceUriScheme parseScheme(std::string_view scheme) {
     if (scheme == "resource") return ResourceUriScheme::Resource;
@@ -38,54 +36,36 @@ namespace {
 
 api::Result<ResourceUri> ResourceUri::parse(std::string_view uri) {
     if (!uri.starts_with(schemePrefix())) {
-        return api::Error{
-            api::ErrorCode::InvalidFormat,
-            "URI must start with oreui://"
-        };
+        return api::Error{api::ErrorCode::InvalidFormat, "URI must start with oreui://"};
     }
 
     auto remainder = uri.substr(schemePrefix().size());
     auto slash     = remainder.find('/');
     if (slash == std::string_view::npos || slash == 0) {
-        return api::Error{
-            api::ErrorCode::InvalidFormat,
-            "URI missing scheme segment"
-        };
+        return api::Error{api::ErrorCode::InvalidFormat, "URI missing scheme segment"};
     }
 
     auto schemeStr = remainder.substr(0, slash);
     auto scheme    = parseScheme(schemeStr);
     if (scheme == ResourceUriScheme::Unknown) {
-        return api::Error{
-            api::ErrorCode::InvalidFormat,
-            "URI scheme is not recognized"
-        };
+        return api::Error{api::ErrorCode::InvalidFormat, "URI scheme is not recognized"};
     }
 
     auto afterScheme = remainder.substr(slash + 1);
     slash            = afterScheme.find('/');
     if (slash == std::string_view::npos || slash == 0) {
-        return api::Error{
-            api::ErrorCode::InvalidFormat,
-            "URI missing namespace segment"
-        };
+        return api::Error{api::ErrorCode::InvalidFormat, "URI missing namespace segment"};
     }
 
-    auto ns  = std::string(afterScheme.substr(0, slash));
+    auto ns   = std::string(afterScheme.substr(0, slash));
     auto path = std::string(afterScheme.substr(slash + 1));
 
     if (!api::ManifestValidator::isValidNamespace(ns)) {
-        return api::Error{
-            api::ErrorCode::InvalidArgument,
-            "URI namespace is invalid"
-        };
+        return api::Error{api::ErrorCode::InvalidArgument, "URI namespace is invalid"};
     }
 
     if (path.empty() || !api::ManifestValidator::isValidPath(path)) {
-        return api::Error{
-            api::ErrorCode::InvalidArgument,
-            "URI path is invalid"
-        };
+        return api::Error{api::ErrorCode::InvalidArgument, "URI path is invalid"};
     }
 
     ResourceUri result;
@@ -105,8 +85,6 @@ bool ResourceUri::operator==(ResourceUri const& other) const {
     return scheme == other.scheme && modNamespace == other.modNamespace && path == other.path;
 }
 
-bool ResourceUri::operator!=(ResourceUri const& other) const {
-    return !(*this == other);
-}
+bool ResourceUri::operator!=(ResourceUri const& other) const { return !(*this == other); }
 
 } // namespace dearoreui::resource

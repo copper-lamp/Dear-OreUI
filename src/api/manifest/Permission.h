@@ -55,15 +55,11 @@ public:
 
     void grant(Permission permission) { mPermissions.insert(permission); }
 
-    [[nodiscard]] bool has(Permission permission) const {
-        return mPermissions.find(permission) != mPermissions.end();
-    }
+    [[nodiscard]] bool has(Permission permission) const { return mPermissions.find(permission) != mPermissions.end(); }
 
     [[nodiscard]] std::unordered_set<Permission> const& all() const { return mPermissions; }
 
-    [[nodiscard]] bool operator==(PermissionSet const& other) const {
-        return mPermissions == other.mPermissions;
-    }
+    [[nodiscard]] bool operator==(PermissionSet const& other) const { return mPermissions == other.mPermissions; }
 
     [[nodiscard]] bool operator!=(PermissionSet const& other) const { return !(*this == other); }
 

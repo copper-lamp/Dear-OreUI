@@ -1,8 +1,8 @@
 #include "hook/Stage0OreUIHooks.h"
 
-#include "hook/OreUIHookAdapter.h"
 #include "capability/StaticCapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
+#include "hook/OreUIHookAdapter.h"
 
 #include <optional>
 #include <string_view>
@@ -12,9 +12,7 @@ namespace dearoreui::hook {
 namespace {
 
 struct NullPageHookCallback : IPageHookCallback {
-    [[nodiscard]] api::ContextId onPageCreated(
-        std::string_view, std::optional<api::RouterLocationSnapshot>
-    ) override {
+    [[nodiscard]] api::ContextId onPageCreated(std::string_view, std::optional<api::RouterLocationSnapshot>) override {
         return api::ContextId{};
     }
 
@@ -23,9 +21,9 @@ struct NullPageHookCallback : IPageHookCallback {
 
 OreUIHookAdapter& sharedAdapter() {
     static capability::StaticCapabilityQuery capabilities;
-    static diagnostic::DiagnosticLogger     logger;
-    static NullPageHookCallback             callback;
-    static OreUIHookAdapter                 adapter(callback, capabilities, logger);
+    static diagnostic::DiagnosticLogger      logger;
+    static NullPageHookCallback              callback;
+    static OreUIHookAdapter                  adapter(callback, capabilities, logger);
     return adapter;
 }
 
@@ -37,8 +35,6 @@ bool installStage0OreUIHooks() {
     return adapter.install();
 }
 
-bool uninstallStage0OreUIHooks() {
-    return sharedAdapter().uninstall();
-}
+bool uninstallStage0OreUIHooks() { return sharedAdapter().uninstall(); }
 
 } // namespace dearoreui::hook

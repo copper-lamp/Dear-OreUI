@@ -31,10 +31,10 @@ enum class SupportLevel {
 };
 
 struct CapabilityEntry {
-    Capability  capability{Capability::None};
-    SupportLevel level{SupportLevel::Unknown};
+    Capability             capability{Capability::None};
+    SupportLevel           level{SupportLevel::Unknown};
     std::optional<Version> verifiedSince;
-    std::string note;
+    std::string            note;
 };
 
 class CapabilitySet {
@@ -48,9 +48,7 @@ public:
         return iterator == mEntries.end() ? SupportLevel::Unknown : iterator->second.level;
     }
 
-    [[nodiscard]] bool isSupported(Capability capability) const {
-        return query(capability) == SupportLevel::Supported;
-    }
+    [[nodiscard]] bool isSupported(Capability capability) const { return query(capability) == SupportLevel::Supported; }
 
     [[nodiscard]] bool isExperimentalOrSupported(Capability capability) const {
         auto level = query(capability);

@@ -23,9 +23,9 @@ public:
     void setSummaryError(api::Error error) { mSummaryError = std::move(error); }
 
 private:
-    api::DiagnosticId        mId;
+    api::DiagnosticId            mId;
     std::vector<DiagnosticEvent> mEvents;
-    api::Error               mSummaryError;
+    api::Error                   mSummaryError;
 };
 
 } // namespace dearoreui::diagnostic

@@ -41,10 +41,10 @@ private:
     Value mValue{};
 };
 
-using ContextId    = StrongId<struct ContextIdTag, std::uint64_t>;
-using ModId        = StrongId<struct ModIdTag, std::string>;
-using PageId       = StrongId<struct PageIdTag, std::string>;
-using ChangeId     = StrongId<struct ChangeIdTag, std::uint64_t>;
+using ContextId          = StrongId<struct ContextIdTag, std::uint64_t>;
+using ModId              = StrongId<struct ModIdTag, std::string>;
+using PageId             = StrongId<struct PageIdTag, std::string>;
+using ChangeId           = StrongId<struct ChangeIdTag, std::uint64_t>;
 using RequestId          = StrongId<struct RequestIdTag, std::uint64_t>;
 using DiagnosticId       = StrongId<struct DiagnosticIdTag, std::uint64_t>;
 using RegistrationHandle = StrongId<struct RegistrationHandleTag, std::uint64_t>;

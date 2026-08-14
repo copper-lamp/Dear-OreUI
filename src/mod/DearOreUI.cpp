@@ -29,9 +29,7 @@ namespace {
 
 [[nodiscard]] bool hasHbuiRoot(std::filesystem::path const& root) {
     std::error_code code;
-    return std::filesystem::is_regular_file(
-        root / "data" / "gui" / "dist" / "hbui" / "index.html", code
-    );
+    return std::filesystem::is_regular_file(root / "data" / "gui" / "dist" / "hbui" / "index.html", code);
 }
 
 [[nodiscard]] std::filesystem::path detectMinecraftDirectory() {

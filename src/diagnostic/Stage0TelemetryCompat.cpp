@@ -22,23 +22,22 @@ std::shared_ptr<Stage0FileSink>& stage0Sink() {
 }
 
 std::string generateSessionId() {
-    auto const now = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    );
+    auto const now =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
     return std::to_string(now.count());
 }
 
 struct ParsedFields {
-    std::string eventName = "record";
+    std::string                  eventName = "record";
     std::vector<DiagnosticField> fields;
 };
 
 ParsedFields parseFields(std::string_view fields) {
     ParsedFields result;
-    std::size_t start = 0;
+    std::size_t  start = 0;
     while (start <= fields.size()) {
-        auto end   = fields.find('\t', start);
-        auto field = fields.substr(start, end == std::string_view::npos ? fields.size() - start : end - start);
+        auto end       = fields.find('\t', start);
+        auto field     = fields.substr(start, end == std::string_view::npos ? fields.size() - start : end - start);
         auto separator = field.find('=');
         if (separator == std::string_view::npos) {
             result.fields.emplace_back(std::string{field}, "");
@@ -63,10 +62,8 @@ void initializeStage0FileSink(std::filesystem::path dataDirectory) {
     auto& logger = globalLogger();
     auto& sink   = stage0Sink();
     if (!sink) {
-        sink = std::make_shared<Stage0FileSink>(
-            std::move(dataDirectory) / "telemetry" / "stage0-oreui.txt",
-            sessionId()
-        );
+        sink =
+            std::make_shared<Stage0FileSink>(std::move(dataDirectory) / "telemetry" / "stage0-oreui.txt", sessionId());
         logger.addSink(sink);
     }
 }
@@ -80,9 +77,9 @@ void startStage0Session() {
 }
 
 void recordStage0(std::string_view event, std::string_view fields) {
-    auto& logger = globalLogger();
-    auto parsed  = parseFields(fields);
-    auto builder = logger.info(std::string{event}, parsed.eventName);
+    auto& logger  = globalLogger();
+    auto  parsed  = parseFields(fields);
+    auto  builder = logger.info(std::string{event}, parsed.eventName);
     for (auto const& field : parsed.fields) {
         builder.withField(field.key, field.value);
     }
@@ -95,8 +92,6 @@ void resetStage0Session() {
     sessionId().clear();
 }
 
-std::string const& currentStage0SessionId() {
-    return sessionId();
-}
+std::string const& currentStage0SessionId() { return sessionId(); }
 
 } // namespace dearoreui::diagnostic

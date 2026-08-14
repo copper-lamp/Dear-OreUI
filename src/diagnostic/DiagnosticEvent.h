@@ -21,17 +21,17 @@ struct DiagnosticField {
 };
 
 struct DiagnosticEvent {
-    api::DiagnosticId id;
+    api::DiagnosticId                     id;
     std::chrono::system_clock::time_point timestamp;
-    Severity severity{Severity::Info};
-    std::string category;
-    std::string event;
-    std::optional<api::ContextId> contextId;
-    std::optional<api::ModId> modId;
-    std::optional<api::PageId> pageId;
-    std::optional<api::ErrorCode> errorCode;
-    std::vector<DiagnosticField> fields;
-    std::string message;
+    Severity                              severity{Severity::Info};
+    std::string                           category;
+    std::string                           event;
+    std::optional<api::ContextId>         contextId;
+    std::optional<api::ModId>             modId;
+    std::optional<api::PageId>            pageId;
+    std::optional<api::ErrorCode>         errorCode;
+    std::vector<DiagnosticField>          fields;
+    std::string                           message;
 
     [[nodiscard]] std::string const* findField(std::string_view key) const {
         for (auto const& field : fields) {

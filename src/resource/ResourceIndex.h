@@ -18,17 +18,15 @@ public:
     void registerModStyleSheet(registry::StyleSheetEntry const& entry) override;
 
     [[nodiscard]] std::optional<ResourceLocation> resolve(std::string_view uri) const override;
-    [[nodiscard]] std::vector<ResourceLocation> listForPage(api::PageScope scope) const override;
+    [[nodiscard]] std::vector<ResourceLocation>   listForPage(api::PageScope scope) const override;
 
 private:
-    [[nodiscard]] static bool scopeMatches(
-        api::PageScope target, std::vector<api::PageScope> const& scopes
-    );
+    [[nodiscard]] static bool        scopeMatches(api::PageScope target, std::vector<api::PageScope> const& scopes);
     [[nodiscard]] static std::string contentTypeFor(api::ResourceKind kind);
 
-    mutable std::mutex mMutex;
+    mutable std::mutex                                mMutex;
     std::unordered_map<std::string, ResourceLocation> mLocations;
-    std::unordered_set<std::string> mOriginalPaths;
+    std::unordered_set<std::string>                   mOriginalPaths;
 };
 
 } // namespace dearoreui::resource

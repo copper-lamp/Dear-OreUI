@@ -37,8 +37,8 @@ struct RouterLocationSnapshot {
 };
 
 struct PageInfo {
-    PageId                  id;
-    PageScope               scope{PageScope::Custom};
+    PageId                                id;
+    PageScope                             scope{PageScope::Custom};
     std::optional<RouterLocationSnapshot> location;
 };
 

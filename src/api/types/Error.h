@@ -33,9 +33,9 @@ enum class ErrorCode {
 };
 
 struct Error {
-    ErrorCode   code{ErrorCode::None};
-    std::string message;
-    std::string category;
+    ErrorCode                code{ErrorCode::None};
+    std::string              message;
+    std::string              category;
     std::vector<std::string> details;
 
     [[nodiscard]] bool isOk() const { return code == ErrorCode::None && message.empty(); }

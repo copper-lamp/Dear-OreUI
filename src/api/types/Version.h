@@ -23,16 +23,15 @@ public:
 
     Version() = default;
 
-    Version(std::uint32_t major, std::uint32_t minor, std::uint32_t patch)
-        : mComponents{major, minor, patch, {}, {}} {}
+    Version(std::uint32_t major, std::uint32_t minor, std::uint32_t patch) : mComponents{major, minor, patch, {}, {}} {}
 
     Version(Components components) : mComponents(std::move(components)) {}
 
     [[nodiscard]] static Result<Version> parse(std::string_view text);
 
-    [[nodiscard]] std::uint32_t major() const { return mComponents.major; }
-    [[nodiscard]] std::uint32_t minor() const { return mComponents.minor; }
-    [[nodiscard]] std::uint32_t patch() const { return mComponents.patch; }
+    [[nodiscard]] std::uint32_t      major() const { return mComponents.major; }
+    [[nodiscard]] std::uint32_t      minor() const { return mComponents.minor; }
+    [[nodiscard]] std::uint32_t      patch() const { return mComponents.patch; }
     [[nodiscard]] std::string const& prerelease() const { return mComponents.prerelease; }
     [[nodiscard]] std::string const& build() const { return mComponents.build; }
 

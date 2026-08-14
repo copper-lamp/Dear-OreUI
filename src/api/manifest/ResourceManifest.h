@@ -1,9 +1,9 @@
 #pragma once
 
-#include "api/types/Page.h"
-#include "api/types/Version.h"
 #include "api/manifest/Dependency.h"
 #include "api/manifest/Permission.h"
+#include "api/types/Page.h"
+#include "api/types/Version.h"
 
 #include <optional>
 #include <string>
@@ -55,20 +55,20 @@ struct VersionConstraint {
 };
 
 struct ResourceManifest {
-    std::string              modNamespace;
-    std::string              path;
-    ResourceKind             kind{ResourceKind::Binary};
-    ResourceSource           source{ResourceSource::Inline};
+    std::string                      modNamespace;
+    std::string                      path;
+    ResourceKind                     kind{ResourceKind::Binary};
+    ResourceSource                   source{ResourceSource::Inline};
     std::optional<VersionConstraint> versionConstraint;
-    std::vector<PageScope>   pageScopes;
-    std::vector<Dependency>  dependencies;
-    std::vector<std::string> conflicts;
-    PermissionSet            permissions;
-    std::string              fingerprint; // optional content fingerprint
+    std::vector<PageScope>           pageScopes;
+    std::vector<Dependency>          dependencies;
+    std::vector<std::string>         conflicts;
+    PermissionSet                    permissions;
+    std::string                      fingerprint; // optional content fingerprint
 
     [[nodiscard]] bool operator==(ResourceManifest const& other) const {
-        return modNamespace == other.modNamespace && path == other.path && kind == other.kind
-            && source == other.source && fingerprint == other.fingerprint;
+        return modNamespace == other.modNamespace && path == other.path && kind == other.kind && source == other.source
+            && fingerprint == other.fingerprint;
     }
 
     [[nodiscard]] bool operator!=(ResourceManifest const& other) const { return !(*this == other); }

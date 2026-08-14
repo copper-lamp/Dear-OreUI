@@ -12,9 +12,7 @@ namespace dearoreui::source {
 
 namespace {
 
-[[nodiscard]] api::Error makeError(
-    api::ErrorCode code, std::string const& message, std::string detail
-) {
+[[nodiscard]] api::Error makeError(api::ErrorCode code, std::string const& message, std::string detail) {
     api::Error error;
     error.code    = code;
     error.message = message;
@@ -64,7 +62,7 @@ namespace {
 }
 
 FileSystemSourceReader::FileSystemSourceReader(std::filesystem::path baseDirectory)
-    : mBaseDirectory(std::move(baseDirectory)) {}
+: mBaseDirectory(std::move(baseDirectory)) {}
 
 api::Result<PageSourceSnapshot> FileSystemSourceReader::capture(api::PageInfo const& page) {
     PageSourceSnapshot snapshot;
@@ -74,11 +72,9 @@ api::Result<PageSourceSnapshot> FileSystemSourceReader::capture(api::PageInfo co
     std::error_code code;
     if (!std::filesystem::exists(mBaseDirectory, code)) {
         snapshot.partial = true;
-        snapshot.errors.push_back(makeError(
-            api::ErrorCode::ResourceNotFound,
-            "base directory does not exist",
-            mBaseDirectory.string()
-        ));
+        snapshot.errors.push_back(
+            makeError(api::ErrorCode::ResourceNotFound, "base directory does not exist", mBaseDirectory.string())
+        );
         return snapshot;
     }
 
@@ -86,11 +82,7 @@ api::Result<PageSourceSnapshot> FileSystemSourceReader::capture(api::PageInfo co
     auto pagePath     = mBaseDirectory / relativePage;
     if (pagePath.empty() || pagePath == mBaseDirectory) {
         snapshot.partial = true;
-        snapshot.errors.push_back(makeError(
-            api::ErrorCode::InvalidArgument,
-            "page id is empty",
-            page.id.value()
-        ));
+        snapshot.errors.push_back(makeError(api::ErrorCode::InvalidArgument, "page id is empty", page.id.value()));
         return snapshot;
     }
 
@@ -99,36 +91,31 @@ api::Result<PageSourceSnapshot> FileSystemSourceReader::capture(api::PageInfo co
     auto canonicalPage = std::filesystem::weakly_canonical(pagePath, code);
     if (code) {
         snapshot.partial = true;
-        snapshot.errors.push_back(makeError(
-            api::ErrorCode::ResourceNotFound,
-            "failed to canonicalize page path",
-            pagePath.string()
-        ));
+        snapshot.errors.push_back(
+            makeError(api::ErrorCode::ResourceNotFound, "failed to canonicalize page path", pagePath.string())
+        );
         return snapshot;
     }
 
     if (canonicalPage.string().find(canonicalBase.string()) != 0) {
         snapshot.partial = true;
-        snapshot.errors.push_back(makeError(
-            api::ErrorCode::PermissionDenied,
-            "page path escapes base directory",
-            pagePath.string()
-        ));
+        snapshot.errors.push_back(
+            makeError(api::ErrorCode::PermissionDenied, "page path escapes base directory", pagePath.string())
+        );
         return snapshot;
     }
 
     auto target = std::filesystem::exists(canonicalPage, code) && std::filesystem::is_directory(canonicalPage, code)
-                      ? canonicalPage
-                      : canonicalPage.parent_path();
+                    ? canonicalPage
+                    : canonicalPage.parent_path();
 
     captureDirectory(target, snapshot);
     return snapshot;
 }
 
 bool FileSystemSourceReader::isTextResource(std::filesystem::path const& path) const {
-    static std::unordered_set<std::string> const textExtensions{
-        ".html", ".css", ".js", ".json", ".jsonc", ".txt", ".md"
-    };
+    static std::unordered_set<std::string> const
+         textExtensions{".html", ".css", ".js", ".json", ".jsonc", ".txt", ".md"};
     auto ext = path.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
         return static_cast<char>(std::tolower(c));
@@ -146,14 +133,12 @@ void FileSystemSourceReader::captureDirectory(
     PageSourceSnapshot&          snapshot
 ) const {
     std::error_code code;
-    auto iterator = std::filesystem::recursive_directory_iterator(directory, code);
+    auto            iterator = std::filesystem::recursive_directory_iterator(directory, code);
     if (code) {
         snapshot.partial = true;
-        snapshot.errors.push_back(makeError(
-            api::ErrorCode::ResourceNotFound,
-            "cannot iterate directory",
-            directory.string()
-        ));
+        snapshot.errors.push_back(
+            makeError(api::ErrorCode::ResourceNotFound, "cannot iterate directory", directory.string())
+        );
         return;
     }
 
@@ -163,7 +148,7 @@ void FileSystemSourceReader::captureDirectory(
         }
 
         auto const& path = entry.path();
-        auto key         = makeRelativePath(path);
+        auto        key  = makeRelativePath(path);
         if (key.empty()) {
             continue;
         }
@@ -172,11 +157,9 @@ void FileSystemSourceReader::captureDirectory(
             auto content = readTextFile(path);
             if (content.empty() && std::filesystem::file_size(path, code) > 0) {
                 snapshot.partial = true;
-                snapshot.errors.push_back(makeError(
-                    api::ErrorCode::ResourceNotFound,
-                    "failed to read text resource",
-                    key
-                ));
+                snapshot.errors.push_back(
+                    makeError(api::ErrorCode::ResourceNotFound, "failed to read text resource", key)
+                );
                 continue;
             }
             snapshot.textResources.emplace(std::move(key), std::move(content));
@@ -184,11 +167,9 @@ void FileSystemSourceReader::captureDirectory(
             auto content = readBinaryFile(path);
             if (content.empty() && std::filesystem::file_size(path, code) > 0) {
                 snapshot.partial = true;
-                snapshot.errors.push_back(makeError(
-                    api::ErrorCode::ResourceNotFound,
-                    "failed to read binary resource",
-                    key
-                ));
+                snapshot.errors.push_back(
+                    makeError(api::ErrorCode::ResourceNotFound, "failed to read binary resource", key)
+                );
                 continue;
             }
             snapshot.binaryResources.emplace(std::move(key), std::move(content));

@@ -12,17 +12,11 @@ bool allOf(std::string_view text, bool (*predicate)(char)) {
     return std::all_of(text.begin(), text.end(), [predicate](char c) { return predicate(c); });
 }
 
-bool isIdChar(char c) {
-    return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
-}
+bool isIdChar(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
 
-bool isNamespaceChar(char c) {
-    return std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '-' || c == '_';
-}
+bool isNamespaceChar(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '-' || c == '_'; }
 
-bool isPathControlChar(char c) {
-    return c == '\\' || c == ':';
-}
+bool isPathControlChar(char c) { return c == '\\' || c == ':'; }
 
 } // namespace
 
@@ -92,8 +86,8 @@ Result<void> ManifestValidator::validate(ModManifest const& manifest) {
     if (manifest.apiVersion != DearOreUIProtocolVersion) {
         return Error{
             ErrorCode::VersionMismatch,
-            "api_version mismatch: expected " + std::to_string(DearOreUIProtocolVersion)
-                + ", got " + std::to_string(manifest.apiVersion)
+            "api_version mismatch: expected " + std::to_string(DearOreUIProtocolVersion) + ", got "
+                + std::to_string(manifest.apiVersion)
         };
     }
 
@@ -180,7 +174,7 @@ Result<void> ManifestValidator::validate(StyleSheetManifest const& manifest) {
 }
 
 Result<void> ManifestValidator::validateCommonResource(
-    std::string_view typeName,
+    std::string_view   typeName,
     std::string const& modNamespace,
     std::string const& path
 ) {

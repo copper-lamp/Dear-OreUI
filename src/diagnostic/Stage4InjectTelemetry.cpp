@@ -6,7 +6,9 @@
 namespace dearoreui::diagnostic {
 
 void recordStage4SnapshotCaptured(
-    api::ContextId id, api::PageInfo const& info, source::PageSourceSnapshot const& snapshot
+    api::ContextId                    id,
+    api::PageInfo const&              info,
+    source::PageSourceSnapshot const& snapshot
 ) {
     static_cast<void>(info);
 
@@ -20,19 +22,12 @@ void recordStage4SnapshotCaptured(
         .emit();
 }
 
-void recordStage4ResourceIndexBuilt(
-    api::ContextId id, std::size_t locationCount
-) {
+void recordStage4ResourceIndexBuilt(api::ContextId id, std::size_t locationCount) {
     auto& logger = globalLogger();
-    logger.info("resource", "index_built")
-        .withContext(id)
-        .withField("locations", std::to_string(locationCount))
-        .emit();
+    logger.info("resource", "index_built").withContext(id).withField("locations", std::to_string(locationCount)).emit();
 }
 
-void recordStage4InjectSubmitted(
-    api::ContextId id, inject::InjectionReport const& report
-) {
+void recordStage4InjectSubmitted(api::ContextId id, inject::InjectionReport const& report) {
     auto& logger = globalLogger();
     logger.info("inject", "submitted")
         .withContext(id)
@@ -43,11 +38,7 @@ void recordStage4InjectSubmitted(
         .emit();
 
     for (auto const& error : report.errors) {
-        logger.warning("inject", "error")
-            .withContext(id)
-            .withError(error.code)
-            .withMessage(error.message)
-            .emit();
+        logger.warning("inject", "error").withContext(id).withError(error.code).withMessage(error.message).emit();
     }
 }
 

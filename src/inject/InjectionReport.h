@@ -9,11 +9,13 @@
 namespace dearoreui::inject {
 
 struct InjectionReport {
-    api::ContextId contextId;
-    bool success{false};
+    api::ContextId           contextId;
+    bool                     success{false};
+    bool                     hostBridgeAvailable{false};
+    std::size_t              hostCalls{0};
     std::vector<std::string> injectedScripts;
     std::vector<std::string> injectedStyleSheets;
-    std::vector<api::Error> errors;
+    std::vector<api::Error>  errors;
 };
 
 } // namespace dearoreui::inject

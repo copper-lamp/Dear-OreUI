@@ -167,7 +167,7 @@ Result<std::vector<Dependency>> parseDependencies(JsonValue const* value) {
             return Error{ErrorCode::InvalidFormat, "dependency must be an object"};
         }
         Dependency dependency;
-        auto nsResult = requireString(item.find("namespace"), "dependency.namespace");
+        auto       nsResult = requireString(item.find("namespace"), "dependency.namespace");
         if (nsResult.isErr()) return nsResult.error();
         dependency.modNamespace = std::move(nsResult.value());
 

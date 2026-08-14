@@ -5,4 +5,4 @@ namespace dearoreui::hook {
 [[nodiscard]] bool installStage0OreUIHooks();
 [[nodiscard]] bool uninstallStage0OreUIHooks();
 
-}
+} // namespace dearoreui::hook

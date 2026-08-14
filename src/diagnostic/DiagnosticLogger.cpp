@@ -2,24 +2,19 @@
 
 namespace dearoreui::diagnostic {
 
-EventBuilder::EventBuilder(
-    DiagnosticLogger& logger,
-    Severity          severity,
-    std::string       category,
-    std::string       event
-)
-    : mLogger(logger),
-      mEvent(DiagnosticEvent{
+EventBuilder::EventBuilder(DiagnosticLogger& logger, Severity severity, std::string category, std::string event)
+: mLogger(logger),
+  mEvent(
+      DiagnosticEvent{
           .id        = logger.nextId(),
           .timestamp = std::chrono::system_clock::now(),
           .severity  = severity,
           .category  = std::move(category),
           .event     = std::move(event),
-      }) {}
+      }
+  ) {}
 
-void EventBuilder::emit() {
-    mLogger.emit(std::move(mEvent));
-}
+void EventBuilder::emit() { mLogger.emit(std::move(mEvent)); }
 
 void DiagnosticLogger::addSink(std::shared_ptr<IDiagnosticSink> sink) {
     std::lock_guard lock(mMutex);
@@ -73,9 +68,7 @@ void DiagnosticLogger::clearSinks() {
     mSinks.clear();
 }
 
-api::DiagnosticId DiagnosticLogger::nextId() {
-    return api::DiagnosticId{mNextId.fetch_add(1)};
-}
+api::DiagnosticId DiagnosticLogger::nextId() { return api::DiagnosticId{mNextId.fetch_add(1)}; }
 
 DiagnosticLogger& globalLogger() {
     static DiagnosticLogger logger;

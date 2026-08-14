@@ -15,10 +15,10 @@ public:
     [[nodiscard]] virtual bool enable()     = 0;
     [[nodiscard]] virtual bool disable()    = 0;
 
-    [[nodiscard]] virtual diagnostic::DiagnosticLogger& diagnostics() = 0;
+    [[nodiscard]] virtual diagnostic::DiagnosticLogger& diagnostics()  = 0;
     [[nodiscard]] virtual capability::ICapabilityQuery& capabilities() = 0;
-    [[nodiscard]] virtual api::IDearOreUIApi* api() = 0;
-    [[nodiscard]] virtual page::IPageContextManager* pageManager() = 0;
+    [[nodiscard]] virtual api::IDearOreUIApi*           api()          = 0;
+    [[nodiscard]] virtual page::IPageContextManager*    pageManager()  = 0;
 };
 
 } // namespace dearoreui::runtime

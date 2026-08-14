@@ -9,13 +9,9 @@ namespace dearoreui::registry {
 namespace {
 
 struct FingerprintVisitor {
-    [[nodiscard]] std::string const& operator()(ResourceEntry const& entry) const {
-        return entry.manifest.fingerprint;
-    }
+    [[nodiscard]] std::string const& operator()(ResourceEntry const& entry) const { return entry.manifest.fingerprint; }
 
-    [[nodiscard]] std::string const& operator()(ScriptEntry const& entry) const {
-        return entry.manifest.fingerprint;
-    }
+    [[nodiscard]] std::string const& operator()(ScriptEntry const& entry) const { return entry.manifest.fingerprint; }
 
     [[nodiscard]] std::string const& operator()(StyleSheetEntry const& entry) const {
         return entry.manifest.fingerprint;
@@ -27,9 +23,7 @@ struct NamespaceVisitor {
         return entry.manifest.modNamespace;
     }
 
-    [[nodiscard]] std::string const& operator()(ScriptEntry const& entry) const {
-        return entry.manifest.modNamespace;
-    }
+    [[nodiscard]] std::string const& operator()(ScriptEntry const& entry) const { return entry.manifest.modNamespace; }
 
     [[nodiscard]] std::string const& operator()(StyleSheetEntry const& entry) const {
         return entry.manifest.modNamespace;
@@ -57,8 +51,8 @@ api::Result<api::RegistrationHandle> ModRegistry::insertImpl(Entry entry) {
         return api::Error{api::ErrorCode::ResourceConflict, "Resource path already registered by another entry"};
     }
 
-    auto handle = nextHandle();
-    entry.handle    = handle;
+    auto handle        = nextHandle();
+    entry.handle       = handle;
     entry.registeredAt = now;
 
     mEntries.emplace(handle, std::move(entry));
@@ -81,17 +75,11 @@ ModRegistry::ConflictKey ModRegistry::conflictKeyFor(StyleSheetEntry const& entr
     return ConflictKey{entry.manifest.modNamespace, entry.manifest.path};
 }
 
-api::Result<api::RegistrationHandle> ModRegistry::insert(ResourceEntry entry) {
-    return insertImpl(std::move(entry));
-}
+api::Result<api::RegistrationHandle> ModRegistry::insert(ResourceEntry entry) { return insertImpl(std::move(entry)); }
 
-api::Result<api::RegistrationHandle> ModRegistry::insert(ScriptEntry entry) {
-    return insertImpl(std::move(entry));
-}
+api::Result<api::RegistrationHandle> ModRegistry::insert(ScriptEntry entry) { return insertImpl(std::move(entry)); }
 
-api::Result<api::RegistrationHandle> ModRegistry::insert(StyleSheetEntry entry) {
-    return insertImpl(std::move(entry));
-}
+api::Result<api::RegistrationHandle> ModRegistry::insert(StyleSheetEntry entry) { return insertImpl(std::move(entry)); }
 
 bool ModRegistry::remove(api::RegistrationHandle handle) {
     std::lock_guard lock{mMutex};
@@ -102,9 +90,7 @@ bool ModRegistry::remove(api::RegistrationHandle handle) {
     }
 
     auto key = std::visit(
-        [](auto const& entry) -> ConflictKey {
-            return ConflictKey{entry.manifest.modNamespace, entry.manifest.path};
-        },
+        [](auto const& entry) -> ConflictKey { return ConflictKey{entry.manifest.modNamespace, entry.manifest.path}; },
         iterator->second
     );
 
@@ -118,10 +104,7 @@ std::size_t ModRegistry::removeAll(api::ModId owner) {
 
     std::vector<api::RegistrationHandle> toRemove;
     for (auto const& [handle, entry] : mEntries) {
-        auto const* entryOwner = std::visit(
-            [](auto const& e) -> api::ModId const* { return &e.owner; },
-            entry
-        );
+        auto const* entryOwner = std::visit([](auto const& e) -> api::ModId const* { return &e.owner; }, entry);
         if (entryOwner->value() == owner.value()) {
             toRemove.push_back(handle);
         }
@@ -147,7 +130,7 @@ std::size_t ModRegistry::removeAll(api::ModId owner) {
 
 std::optional<RegistryEntry> ModRegistry::find(api::RegistrationHandle handle) const {
     std::lock_guard lock{mMutex};
-    auto iterator = mEntries.find(handle);
+    auto            iterator = mEntries.find(handle);
     if (iterator == mEntries.end()) {
         return std::nullopt;
     }
@@ -155,13 +138,10 @@ std::optional<RegistryEntry> ModRegistry::find(api::RegistrationHandle handle) c
 }
 
 std::vector<api::RegistrationHandle> ModRegistry::findByOwner(api::ModId owner) const {
-    std::lock_guard lock{mMutex};
+    std::lock_guard                      lock{mMutex};
     std::vector<api::RegistrationHandle> result;
     for (auto const& [handle, entry] : mEntries) {
-        auto const* entryOwner = std::visit(
-            [](auto const& e) -> api::ModId const* { return &e.owner; },
-            entry
-        );
+        auto const* entryOwner = std::visit([](auto const& e) -> api::ModId const* { return &e.owner; }, entry);
         if (entryOwner->value() == owner.value()) {
             result.push_back(handle);
         }
@@ -170,7 +150,7 @@ std::vector<api::RegistrationHandle> ModRegistry::findByOwner(api::ModId owner) 
 }
 
 std::vector<api::RegistrationHandle> ModRegistry::findByNamespace(std::string_view ns) const {
-    std::lock_guard lock{mMutex};
+    std::lock_guard                      lock{mMutex};
     std::vector<api::RegistrationHandle> result;
     for (auto const& [handle, entry] : mEntries) {
         auto const& modNamespace = std::visit(NamespaceVisitor{}, entry);
