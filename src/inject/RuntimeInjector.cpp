@@ -74,11 +74,11 @@ api::Result<InjectionReport> RuntimeInjector::inject(api::ContextId id, resource
             report.success = false;
             return report;
         }
-        report.injectedScripts.push_back("oreui://__dearoreui__/stage5-runtime.js");
+        report.injectedScripts.emplace_back("oreui://__dearoreui__/stage5-runtime.js");
     } else {
         // Stage 5 runtime script is generated even when the bridge is unavailable.
         // The script contains a safe stub that reports HostBridgeUnavailable.
-        report.injectedScripts.push_back("oreui://__dearoreui__/stage5-runtime.js?submitted=false");
+        report.injectedScripts.emplace_back("oreui://__dearoreui__/stage5-runtime.js?submitted=false");
     }
 
     report.success = true;

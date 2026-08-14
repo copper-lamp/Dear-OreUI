@@ -68,7 +68,7 @@ private:
     [[nodiscard]] api::RegistrationHandle nextHandle();
 
     // Removes all entries owned by `owner`. Caller must hold mMutex.
-    [[nodiscard]] std::size_t removeEntriesForOwnerLocked(api::ModId owner);
+    [[nodiscard]] std::size_t removeEntriesForOwnerLocked(const api::ModId& owner);
 
     mutable std::mutex                                         mMutex;
     std::unordered_map<api::RegistrationHandle, RegistryEntry> mEntries;

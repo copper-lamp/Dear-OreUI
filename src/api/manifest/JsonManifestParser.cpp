@@ -72,7 +72,7 @@ Result<JsonValue> JsonParser::parseObject() {
         if (keyResult.isErr()) {
             return keyResult.error();
         }
-        std::string key = std::move(keyResult.value().asString());
+        std::string key = keyResult.value().asString();
 
         skipWhitespace();
         if (!consume(':')) {

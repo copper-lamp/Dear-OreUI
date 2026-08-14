@@ -58,12 +58,12 @@ ParsedFields parseFields(std::string_view fields) {
 
 } // namespace
 
-void initializeStage0FileSink(std::filesystem::path dataDirectory) {
+void initializeStage0FileSink(const std::filesystem::path& dataDirectory) {
     auto& logger = globalLogger();
     auto& sink   = stage0Sink();
     if (!sink) {
         sink =
-            std::make_shared<Stage0FileSink>(std::move(dataDirectory) / "telemetry" / "stage0-oreui.txt", sessionId());
+            std::make_shared<Stage0FileSink>(dataDirectory / "telemetry" / "stage0-oreui.txt", sessionId());
         logger.addSink(sink);
     }
 }

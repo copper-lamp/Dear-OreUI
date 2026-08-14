@@ -41,7 +41,7 @@ EventBuilder DiagnosticLogger::critical(std::string category, std::string event)
     return EventBuilder(*this, Severity::Critical, std::move(category), std::move(event));
 }
 
-void DiagnosticLogger::emit(DiagnosticEvent event) {
+void DiagnosticLogger::emit(const DiagnosticEvent& event) {
     std::vector<std::shared_ptr<IDiagnosticSink>> sinks;
     {
         std::lock_guard lock(mMutex);

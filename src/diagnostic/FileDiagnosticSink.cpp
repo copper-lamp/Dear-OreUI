@@ -75,14 +75,14 @@ void FileDiagnosticSink::consume(DiagnosticEvent const& event) {
     std::ostringstream output;
     output << "{"
            << "\"id\":" << event.id.value() << ","
-           << "\"timestamp\":\"" << escapeJson(formatTimestamp(event.timestamp)) << "\","
-           << "\"severity\":\"" << escapeJson(severityName(event.severity)) << "\","
-           << "\"category\":\"" << escapeJson(event.category) << "\","
-           << "\"event\":\"" << escapeJson(event.event) << "\"";
+           << R"("timestamp":")" << escapeJson(formatTimestamp(event.timestamp)) << "\","
+           << R"("severity":")" << escapeJson(severityName(event.severity)) << "\","
+           << R"("category":")" << escapeJson(event.category) << "\","
+           << R"("event":")" << escapeJson(event.event) << "\"";
 
     if (event.contextId) output << ",\"context_id\":" << event.contextId->value();
-    if (event.modId) output << ",\"mod_id\":\"" << escapeJson(event.modId->value()) << "\"";
-    if (event.pageId) output << ",\"page_id\":\"" << escapeJson(event.pageId->value()) << "\"";
+    if (event.modId) output << R"(,"mod_id":")" << escapeJson(event.modId->value()) << "\"";
+    if (event.pageId) output << R"(,"page_id":")" << escapeJson(event.pageId->value()) << "\"";
     if (event.errorCode) output << ",\"error_code\":" << static_cast<int>(*event.errorCode);
 
     if (!event.fields.empty()) {
@@ -97,7 +97,7 @@ void FileDiagnosticSink::consume(DiagnosticEvent const& event) {
     }
 
     if (!event.message.empty()) {
-        output << ",\"message\":\"" << escapeJson(event.message) << "\"";
+        output << R"(,"message":")" << escapeJson(event.message) << "\"";
     }
 
     output << "}";

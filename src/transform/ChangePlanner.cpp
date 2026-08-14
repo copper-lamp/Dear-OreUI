@@ -60,7 +60,7 @@ bool ChangePlanner::scopeMatches(api::PageScope target, std::vector<api::PageSco
 }
 
 DependencyProblem::Kind
-ChangePlanner::problemKindFor(api::ModId owner, std::vector<DependencyProblem> const& problems) {
+ChangePlanner::problemKindFor(const api::ModId& owner, std::vector<DependencyProblem> const& problems) {
     for (auto const& problem : problems) {
         if (problem.dependant == owner) {
             return problem.kind;

@@ -100,9 +100,10 @@ api::Result<api::ModId> ModRegistry::registerMod(ModRecord record) {
         }
     }
 
+    api::ModId id = manifest.id; // Copy before `record` is moved into the registry.
     record.registeredAt = std::chrono::system_clock::now();
-    mMods.emplace(manifest.id, std::move(record));
-    return manifest.id;
+    mMods.emplace(id, std::move(record));
+    return id;
 }
 
 bool ModRegistry::unregisterMod(api::ModId id) {
@@ -114,7 +115,7 @@ bool ModRegistry::unregisterMod(api::ModId id) {
     }
     mMods.erase(modIterator);
 
-    removeEntriesForOwnerLocked(id);
+    static_cast<void>(removeEntriesForOwnerLocked(id));
     return true;
 }
 
@@ -187,7 +188,7 @@ std::size_t ModRegistry::removeAll(api::ModId owner) {
     return removeEntriesForOwnerLocked(owner);
 }
 
-std::size_t ModRegistry::removeEntriesForOwnerLocked(api::ModId owner) {
+std::size_t ModRegistry::removeEntriesForOwnerLocked(const api::ModId& owner) {
     std::vector<api::RegistrationHandle> toRemove;
     for (auto const& [handle, entry] : mEntries) {
         auto const* entryOwner = std::visit([](auto const& e) -> api::ModId const* { return &e.owner; }, entry);

@@ -25,7 +25,7 @@ public:
     HostMethodRegistry() = default;
 
     [[nodiscard]] api::Result<api::RegistrationHandle>
-    registerMethod(api::ModId owner, api::PermissionSet const& permissions, std::shared_ptr<IHostMethod> method);
+    registerMethod(const api::ModId& owner, api::PermissionSet const& permissions, const std::shared_ptr<IHostMethod>& method);
 
     [[nodiscard]] bool unregister(api::RegistrationHandle handle);
 

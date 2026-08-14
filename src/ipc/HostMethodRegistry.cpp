@@ -5,9 +5,9 @@
 namespace dearoreui::ipc {
 
 api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
-    api::ModId                   owner,
+    const api::ModId&                   owner,
     api::PermissionSet const&    permissions,
-    std::shared_ptr<IHostMethod> method
+    const std::shared_ptr<IHostMethod>& method
 ) {
     if (!owner.isValid() || method == nullptr) {
         return api::Error{api::ErrorCode::InvalidArgument, "invalid owner or method"};

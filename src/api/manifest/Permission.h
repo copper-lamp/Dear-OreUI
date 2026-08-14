@@ -47,7 +47,7 @@ class PermissionSet {
 public:
     PermissionSet() = default;
 
-    explicit PermissionSet(std::vector<Permission> permissions) {
+    explicit PermissionSet(const std::vector<Permission>& permissions) {
         for (auto permission : permissions) {
             grant(permission);
         }

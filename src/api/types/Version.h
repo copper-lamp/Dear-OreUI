@@ -25,7 +25,7 @@ public:
 
     Version(std::uint32_t major, std::uint32_t minor, std::uint32_t patch) : mComponents{major, minor, patch, {}, {}} {}
 
-    Version(Components components) : mComponents(std::move(components)) {}
+    explicit Version(Components components) : mComponents(std::move(components)) {}
 
     [[nodiscard]] static Result<Version> parse(std::string_view text);
 

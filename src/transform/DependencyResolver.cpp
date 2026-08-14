@@ -10,6 +10,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace dearoreui::transform {
 
@@ -154,7 +155,7 @@ namespace {
 ) {
     std::vector<api::ModId>       path;
     std::unordered_set<api::ModId> seen;
-    api::ModId                     current = start;
+    api::ModId                     current = std::move(start);
     for (std::size_t step = 0; step < confined.size() + 1; ++step) {
         if (!seen.insert(current).second) {
             auto iterator = std::find(path.begin(), path.end(), current);
@@ -263,7 +264,7 @@ DependencyResolution DependencyResolver::resolve(std::vector<registry::ModRecord
         if (found == dependantOf.end()) {
             continue;
         }
-        for (auto dependant : found->second) {
+        for (const auto& dependant : found->second) {
             if (excluded.insert(dependant).second) {
                 queue.push_back(dependant);
             }
@@ -281,7 +282,7 @@ DependencyResolution DependencyResolver::resolve(std::vector<registry::ModRecord
         if (excluded.count(depId) != 0) {
             continue;
         }
-        for (auto dependant : dependants) {
+        for (const auto& dependant : dependants) {
             if (excluded.count(dependant) == 0) {
                 ++inDegree[dependant];
             }
@@ -304,7 +305,7 @@ DependencyResolution DependencyResolver::resolve(std::vector<registry::ModRecord
         if (found == dependantOf.end()) {
             continue;
         }
-        for (auto dependant : found->second) {
+        for (const auto& dependant : found->second) {
             if (excluded.count(dependant) != 0) {
                 continue;
             }

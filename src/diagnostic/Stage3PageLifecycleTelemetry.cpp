@@ -37,12 +37,12 @@ std::string scopeName(api::PageScope scope) {
 
 } // namespace
 
-void initializeStage3FileSink(std::filesystem::path dataDirectory, std::string const& sessionId) {
+void initializeStage3FileSink(const std::filesystem::path& dataDirectory, std::string const& sessionId) {
     auto& logger = globalLogger();
     auto& sink   = stage3Sink();
     if (!sink) {
         sink = std::make_shared<Stage0FileSink>(
-            std::move(dataDirectory) / "telemetry" / "stage3-page-lifecycle.txt",
+            dataDirectory / "telemetry" / "stage3-page-lifecycle.txt",
             sessionId
         );
         logger.addSink(sink);

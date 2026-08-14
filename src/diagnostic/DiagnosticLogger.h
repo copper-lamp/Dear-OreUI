@@ -71,7 +71,7 @@ public:
     [[nodiscard]] EventBuilder error(std::string category, std::string event);
     [[nodiscard]] EventBuilder critical(std::string category, std::string event);
 
-    void emit(DiagnosticEvent event);
+    void emit(const DiagnosticEvent& event);
     void flush();
     void clearSinks();
 

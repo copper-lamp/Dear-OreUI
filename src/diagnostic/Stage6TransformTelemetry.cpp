@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "diagnostic/Stage6TransformTelemetry.h"
 
 #include "diagnostic/DiagnosticLogger.h"
@@ -13,7 +15,7 @@ namespace {
 void recordStage6ModRegistered(api::ModId id, std::string_view modNamespace, std::size_t dependencyCount) {
     globalLogger()
         .info("stage6", "mod_registered")
-        .withMod(id)
+        .withMod(std::move(id))
         .withField("namespace", std::string{modNamespace})
         .withField("dependency_count", std::to_string(dependencyCount))
         .emit();
@@ -22,7 +24,7 @@ void recordStage6ModRegistered(api::ModId id, std::string_view modNamespace, std
 void recordStage6ModUnregistered(api::ModId id, std::size_t removedEntryCount) {
     globalLogger()
         .info("stage6", "mod_unregistered")
-        .withMod(id)
+        .withMod(std::move(id))
         .withField("removed_entry_count", std::to_string(removedEntryCount))
         .emit();
 }
