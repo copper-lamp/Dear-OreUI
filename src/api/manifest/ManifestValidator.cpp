@@ -173,6 +173,55 @@ Result<void> ManifestValidator::validate(StyleSheetManifest const& manifest) {
     return validateCommonResource("stylesheet", manifest.modNamespace, manifest.path);
 }
 
+Result<void> ManifestValidator::validate(UiManifest const& manifest) {
+    if (manifest.modNamespace.empty()) {
+        return Error{ErrorCode::InvalidManifest, "ui namespace is required"};
+    }
+    if (!isValidNamespace(manifest.modNamespace)) {
+        return Error{ErrorCode::InvalidArgument, "ui namespace is invalid"};
+    }
+    if (manifest.id.empty()) {
+        return Error{ErrorCode::InvalidManifest, "ui id is required"};
+    }
+    if (!isValidId(manifest.id)) {
+        return Error{ErrorCode::InvalidArgument, "ui id contains invalid characters"};
+    }
+    if (!manifest.containerId.empty() && !isValidId(manifest.containerId)) {
+        return Error{ErrorCode::InvalidArgument, "ui container_id contains invalid characters"};
+    }
+    if (manifest.fingerprint.empty()) {
+        return Error{ErrorCode::InvalidManifest, "ui fingerprint is required"};
+    }
+
+    std::unordered_set<std::string> scriptPaths;
+    for (auto const& path : manifest.scripts) {
+        if (!isValidPath(path)) {
+            return Error{ErrorCode::InvalidArgument, "ui script path is invalid: " + path};
+        }
+        if (!scriptPaths.insert(path).second) {
+            return Error{ErrorCode::AlreadyExists, "duplicate ui script path: " + path};
+        }
+    }
+
+    std::unordered_set<std::string> stylePaths;
+    for (auto const& path : manifest.styles) {
+        if (!isValidPath(path)) {
+            return Error{ErrorCode::InvalidArgument, "ui style path is invalid: " + path};
+        }
+        if (!stylePaths.insert(path).second) {
+            return Error{ErrorCode::AlreadyExists, "duplicate ui style path: " + path};
+        }
+    }
+
+    for (auto const& conflict : manifest.conflicts) {
+        if (conflict.empty()) {
+            return Error{ErrorCode::InvalidManifest, "ui conflict declaration cannot be empty"};
+        }
+    }
+
+    return Result<void>::success();
+}
+
 Result<void> ManifestValidator::validateCommonResource(
     std::string_view   typeName,
     std::string const& modNamespace,

@@ -24,6 +24,9 @@ enum class Capability {
     ResourceRegistration,
     ScriptRegistration,
     StyleSheetRegistration,
+    OverlayRegistration,
+    UiMount,
+    DeclarativeOverlay,
 };
 
 enum class SupportLevel {

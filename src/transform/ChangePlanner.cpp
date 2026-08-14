@@ -19,27 +19,36 @@ ChangeOperation ChangePlanner::toOperation(registry::RegistryEntry const& entry)
     return std::visit(
         [](auto const& e) {
             ChangeOperation operation;
-            operation.handle              = e.handle;
-            operation.owner               = e.owner;
-            operation.modNamespace        = e.manifest.modNamespace;
-            operation.path                = e.manifest.path;
-            operation.fingerprint         = e.manifest.fingerprint;
-            operation.pageScopes          = e.manifest.pageScopes;
-            operation.declaredConflicts   = e.manifest.conflicts;
-            operation.dependencies        = e.manifest.dependencies;
-            operation.versionConstrained  = e.manifest.versionConstraint.has_value();
+            operation.handle             = e.handle;
+            operation.owner              = e.owner;
+            operation.modNamespace       = e.manifest.modNamespace;
+            operation.fingerprint        = e.manifest.fingerprint;
+            operation.pageScopes         = e.manifest.pageScopes;
+            operation.declaredConflicts  = e.manifest.conflicts;
+            operation.dependencies       = e.manifest.dependencies;
 
             using EntryType = std::decay_t<decltype(e)>;
             if constexpr (std::is_same_v<EntryType, registry::ScriptEntry>) {
-                operation.kind    = ChangeOperationKind::AddScript;
-                operation.content = e.source;
+                operation.path      = e.manifest.path;
+                operation.kind      = ChangeOperationKind::AddScript;
+                operation.content   = e.source;
+                operation.versionConstrained = e.manifest.versionConstraint.has_value();
             } else if constexpr (std::is_same_v<EntryType, registry::StyleSheetEntry>) {
-                operation.kind    = ChangeOperationKind::AddStyleSheet;
-                operation.content = e.source;
-            } else {
-                operation.kind         = ChangeOperationKind::AddResource;
+                operation.path      = e.manifest.path;
+                operation.kind      = ChangeOperationKind::AddStyleSheet;
+                operation.content   = e.source;
+                operation.versionConstrained = e.manifest.versionConstraint.has_value();
+            } else if constexpr (std::is_same_v<EntryType, registry::ResourceEntry>) {
+                operation.path       = e.manifest.path;
+                operation.kind       = ChangeOperationKind::AddResource;
                 operation.resourceKind = e.manifest.kind;
-                operation.content      = e.payload;
+                operation.content    = e.payload;
+                operation.versionConstrained = e.manifest.versionConstraint.has_value();
+            } else if constexpr (std::is_same_v<EntryType, registry::UiEntry>) {
+                operation.path       = e.manifest.id;
+                operation.kind       = ChangeOperationKind::AddUi;
+                operation.uiManifest = e.manifest;
+                operation.content    = e.htmlBody;
             }
             return operation;
         },

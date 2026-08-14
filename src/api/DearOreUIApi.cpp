@@ -2,6 +2,7 @@
 
 #include "api/manifest/ManifestValidator.h"
 #include "diagnostic/Stage6TransformTelemetry.h"
+#include "diagnostic/Stage7UiTelemetry.h"
 #include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
 
@@ -309,6 +310,117 @@ Result<void> DearOreUIApi::unregisterHostMethod(RegistrationHandle handle) {
     }
 
     mLogger.info("host", "method_unregistered").withField("handle", std::to_string(handle.value())).emit();
+    return Result<void>::success();
+}
+
+namespace {
+
+[[nodiscard]] dearoreui::api::Result<dearoreui::api::RegistrationHandle> registerUiImpl(
+    dearoreui::api::ModId                                              owner,
+    dearoreui::api::UiManifest                                         manifest,
+    std::string                                                        htmlBody,
+    dearoreui::api::UiKind                                             expectedKind,
+    dearoreui::registry::IModRegistry&                                 registry,
+    dearoreui::diagnostic::DiagnosticLogger&                           logger
+) {
+    using namespace dearoreui::api;
+
+    if (!owner.isValid()) {
+        return Error{ErrorCode::InvalidArgument, "owner is invalid"};
+    }
+    if (!registry.isModRegistered(owner)) {
+        return Error{ErrorCode::InvalidArgument, "owner mod is not registered"};
+    }
+    if (manifest.modNamespace != owner.value()) {
+        return Error{ErrorCode::InvalidArgument, "manifest namespace does not match owner"};
+    }
+
+    manifest.kind = expectedKind;
+
+    auto validation = ManifestValidator::validate(manifest);
+    if (validation.isErr()) {
+        logger.warning("manifest", "ui_validation_failed")
+            .withMod(owner)
+            .withError(validation.error().code)
+            .withMessage(validation.error().message)
+            .emit();
+        return validation.error();
+    }
+
+    auto const modNamespace = manifest.modNamespace;
+    auto const uiId         = manifest.id;
+    auto const kind         = manifest.kind;
+
+    dearoreui::registry::UiEntry entry;
+    entry.owner    = owner;
+    entry.manifest = std::move(manifest);
+    entry.htmlBody = std::move(htmlBody);
+
+    auto result = registry.insert(std::move(entry));
+    if (result.isErr()) {
+        logger.warning("registry", "ui_registration_failed")
+            .withMod(owner)
+            .withError(result.error().code)
+            .withMessage(result.error().message)
+            .emit();
+        return result.error();
+    }
+
+    logger.info("ui", "registered")
+        .withMod(owner)
+        .withField("handle", std::to_string(result.value().value()))
+        .withField("namespace", modNamespace)
+        .withField("ui_id", uiId)
+        .withField("kind", std::string(uiKindName(kind)))
+        .emit();
+    dearoreui::diagnostic::recordStage7UiRegistered(owner, modNamespace, uiId, kind);
+    return result.value();
+}
+
+} // namespace
+
+Result<RegistrationHandle>
+DearOreUIApi::registerOverlay(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Overlay, mRegistry, mLogger);
+}
+
+Result<RegistrationHandle>
+DearOreUIApi::registerPanel(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Panel, mRegistry, mLogger);
+}
+
+Result<RegistrationHandle>
+DearOreUIApi::registerButton(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Button, mRegistry, mLogger);
+}
+
+Result<RegistrationHandle>
+DearOreUIApi::registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Page, mRegistry, mLogger);
+}
+
+Result<void> DearOreUIApi::unregisterUi(RegistrationHandle handle) {
+    if (!handle.isValid()) {
+        return Error{ErrorCode::InvalidArgument, "handle is invalid"};
+    }
+
+    auto found = mRegistry.find(handle);
+    if (!found.has_value() || !std::holds_alternative<registry::UiEntry>(found.value())) {
+        return Error{ErrorCode::NotFound, "ui registration handle not found"};
+    }
+
+    auto const& entry = std::get<registry::UiEntry>(found.value());
+    bool        removed = mRegistry.remove(handle);
+    if (!removed) {
+        return Error{ErrorCode::NotFound, "ui registration handle not found"};
+    }
+
+    mLogger.info("ui", "unregistered")
+        .withField("handle", std::to_string(handle.value()))
+        .withField("namespace", entry.manifest.modNamespace)
+        .withField("ui_id", entry.manifest.id)
+        .emit();
+    diagnostic::recordStage7UiUnregistered(handle, entry.manifest.modNamespace, entry.manifest.id);
     return Result<void>::success();
 }
 

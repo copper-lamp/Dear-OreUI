@@ -4,6 +4,7 @@
 #include "api/manifest/ResourceManifest.h"
 #include "api/manifest/ScriptManifest.h"
 #include "api/manifest/StyleSheetManifest.h"
+#include "api/manifest/UiManifest.h"
 #include "api/types/Result.h"
 
 #include <cstdint>
@@ -19,6 +20,7 @@ public:
     [[nodiscard]] static Result<void> validate(ResourceManifest const& manifest);
     [[nodiscard]] static Result<void> validate(ScriptManifest const& manifest);
     [[nodiscard]] static Result<void> validate(StyleSheetManifest const& manifest);
+    [[nodiscard]] static Result<void> validate(UiManifest const& manifest);
 
     [[nodiscard]] static bool isValidId(std::string_view id);
     [[nodiscard]] static bool isValidNamespace(std::string_view ns);

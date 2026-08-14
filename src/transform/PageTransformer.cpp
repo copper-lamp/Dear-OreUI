@@ -54,6 +54,22 @@ toResourceEntry(ChangeOperation const& op, api::PageScope scope, std::chrono::sy
     return entry;
 }
 
+[[nodiscard]] registry::UiEntry
+toUiEntry(ChangeOperation const& op, api::PageScope scope, std::chrono::system_clock::time_point at) {
+    registry::UiEntry entry;
+    entry.handle    = op.handle;
+    entry.owner     = op.owner;
+    entry.manifest  = op.uiManifest.value_or(api::UiManifest{});
+    entry.manifest.modNamespace = op.modNamespace;
+    if (!op.path.empty()) {
+        entry.manifest.id = op.path;
+    }
+    entry.manifest.pageScopes = {scope};
+    entry.htmlBody            = op.content;
+    entry.registeredAt        = at;
+    return entry;
+}
+
 } // namespace
 
 TransformedPage PageTransformer::transform(ChangePlan const& plan, source::PageSourceSnapshot const& snapshot) const {
@@ -78,6 +94,9 @@ TransformedPage PageTransformer::transform(ChangePlan const& plan, source::PageS
             break;
         case ChangeOperationKind::AddResource:
             page.resources.push_back(toResourceEntry(applied, plan.pageScope, snapshot.capturedAt));
+            break;
+        case ChangeOperationKind::AddUi:
+            page.uiEntries.push_back(toUiEntry(applied, plan.pageScope, snapshot.capturedAt));
             break;
         }
         page.report.operations.push_back(std::move(applied));

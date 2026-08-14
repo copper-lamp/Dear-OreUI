@@ -26,6 +26,7 @@ public:
     [[nodiscard]] api::Result<api::RegistrationHandle> insert(ResourceEntry entry) override;
     [[nodiscard]] api::Result<api::RegistrationHandle> insert(ScriptEntry entry) override;
     [[nodiscard]] api::Result<api::RegistrationHandle> insert(StyleSheetEntry entry) override;
+    [[nodiscard]] api::Result<api::RegistrationHandle> insert(UiEntry entry) override;
 
     [[nodiscard]] bool        remove(api::RegistrationHandle handle) override;
     [[nodiscard]] std::size_t removeAll(api::ModId owner) override;
@@ -34,8 +35,10 @@ public:
     [[nodiscard]] std::vector<api::RegistrationHandle> findByOwner(api::ModId owner) const override;
     [[nodiscard]] std::vector<api::RegistrationHandle> findByNamespace(std::string_view ns) const override;
     [[nodiscard]] std::vector<RegistryEntry>           listEntries() const override;
+    [[nodiscard]] std::vector<UiEntry>                 listUiEntries() const override;
 
     [[nodiscard]] bool        hasConflict(api::ResourceManifest const& manifest) const override;
+    [[nodiscard]] bool        hasUiConflict(api::UiManifest const& manifest) const override;
     [[nodiscard]] std::size_t size() const override;
     void                      clear() override;
 
@@ -57,13 +60,33 @@ private:
         }
     };
 
-    using ConflictIndex = std::unordered_map<ConflictKey, api::RegistrationHandle, ConflictKeyHash>;
+    struct UiConflictKey {
+        std::string modNamespace;
+        std::string id;
+
+        [[nodiscard]] bool operator==(UiConflictKey const& other) const {
+            return modNamespace == other.modNamespace && id == other.id;
+        }
+    };
+
+    struct UiConflictKeyHash {
+        [[nodiscard]] std::size_t operator()(UiConflictKey const& key) const {
+            auto h1 = std::hash<std::string>{}(key.modNamespace);
+            auto h2 = std::hash<std::string>{}(key.id);
+            return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+        }
+    };
+
+    using ConflictIndex    = std::unordered_map<ConflictKey, api::RegistrationHandle, ConflictKeyHash>;
+    using UiConflictIndex  = std::unordered_map<UiConflictKey, api::RegistrationHandle, UiConflictKeyHash>;
 
     template <typename Entry>
     [[nodiscard]] api::Result<api::RegistrationHandle> insertImpl(Entry entry);
 
     template <typename Entry>
     [[nodiscard]] static ConflictKey conflictKeyFor(Entry const& entry);
+
+    [[nodiscard]] static UiConflictKey uiConflictKeyFor(UiEntry const& entry);
 
     [[nodiscard]] api::RegistrationHandle nextHandle();
 
@@ -73,6 +96,7 @@ private:
     mutable std::mutex                                         mMutex;
     std::unordered_map<api::RegistrationHandle, RegistryEntry> mEntries;
     ConflictIndex                                              mConflictIndex;
+    UiConflictIndex                                            mUiConflictIndex;
     std::unordered_map<api::ModId, ModRecord>                  mMods;
     std::atomic<std::uint64_t>                                 mNextHandle{1};
 };

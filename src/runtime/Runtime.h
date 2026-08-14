@@ -17,6 +17,8 @@
 #include "source/ISourceReader.h"
 #include "transform/ChangePlanner.h"
 #include "transform/PageTransformer.h"
+#include "ui/MountManager.h"
+#include "ui/UiPlanner.h"
 
 #include <memory>
 
@@ -56,6 +58,9 @@ private:
     std::unique_ptr<transform::ChangePlanner>   mChangePlanner;
     std::unique_ptr<transform::PageTransformer> mPageTransformer;
     std::unique_ptr<inject::IPageInjector>      mInjector;
+    std::unique_ptr<ui::UiPlanner>              mUiPlanner;
+    std::unique_ptr<ui::MountManager>           mMountManager;
+    std::unique_ptr<ui::IMountHost>             mMountHost;
     std::unique_ptr<ipc::HostDispatcher>        mHostDispatcher;
     std::unique_ptr<ipc::IHostBridge>           mHostBridge;
     bool                                      mInitialized{false};

@@ -105,6 +105,27 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
             .note       = "In-memory registry only, no real page injection yet",
         }
     );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::OverlayRegistration,
+            .level      = SupportLevel::Experimental,
+            .note       = "UI manifest registration and registry storage",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::UiMount,
+            .level      = SupportLevel::Experimental,
+            .note       = "Page-scoped UI mount planning and lifecycle tracking",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::DeclarativeOverlay,
+            .level      = SupportLevel::Experimental,
+            .note       = "Independent DOM overlay bootstrap script generation",
+        }
+    );
 }
 
 api::SupportLevel StaticCapabilityQuery::query(api::Capability capability) const {

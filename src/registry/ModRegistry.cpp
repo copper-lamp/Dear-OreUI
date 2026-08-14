@@ -17,6 +17,8 @@ struct FingerprintVisitor {
     [[nodiscard]] std::string const& operator()(StyleSheetEntry const& entry) const {
         return entry.manifest.fingerprint;
     }
+
+    [[nodiscard]] std::string const& operator()(UiEntry const& entry) const { return entry.manifest.fingerprint; }
 };
 
 struct NamespaceVisitor {
@@ -29,6 +31,8 @@ struct NamespaceVisitor {
     [[nodiscard]] std::string const& operator()(StyleSheetEntry const& entry) const {
         return entry.manifest.modNamespace;
     }
+
+    [[nodiscard]] std::string const& operator()(UiEntry const& entry) const { return entry.manifest.modNamespace; }
 };
 
 } // namespace
@@ -76,11 +80,42 @@ ModRegistry::ConflictKey ModRegistry::conflictKeyFor(StyleSheetEntry const& entr
     return ConflictKey{entry.manifest.modNamespace, entry.manifest.path};
 }
 
+ModRegistry::UiConflictKey ModRegistry::uiConflictKeyFor(UiEntry const& entry) {
+    return UiConflictKey{entry.manifest.modNamespace, entry.manifest.id};
+}
+
 api::Result<api::RegistrationHandle> ModRegistry::insert(ResourceEntry entry) { return insertImpl(std::move(entry)); }
 
 api::Result<api::RegistrationHandle> ModRegistry::insert(ScriptEntry entry) { return insertImpl(std::move(entry)); }
 
 api::Result<api::RegistrationHandle> ModRegistry::insert(StyleSheetEntry entry) { return insertImpl(std::move(entry)); }
+
+api::Result<api::RegistrationHandle> ModRegistry::insert(UiEntry entry) {
+    auto key = uiConflictKeyFor(entry);
+    auto now = std::chrono::system_clock::now();
+
+    std::lock_guard lock{mMutex};
+
+    auto iterator = mUiConflictIndex.find(key);
+    if (iterator != mUiConflictIndex.end()) {
+        auto existing = mEntries.find(iterator->second);
+        if (existing != mEntries.end()) {
+            auto const& existingFingerprint = std::visit(FingerprintVisitor{}, existing->second);
+            if (existingFingerprint == entry.manifest.fingerprint) {
+                return iterator->second;
+            }
+        }
+        return api::Error{api::ErrorCode::ResourceConflict, "UI id already registered by another entry"};
+    }
+
+    auto handle        = nextHandle();
+    entry.handle       = handle;
+    entry.registeredAt = now;
+
+    mEntries.emplace(handle, std::move(entry));
+    mUiConflictIndex.emplace(std::move(key), handle);
+    return handle;
+}
 
 api::Result<api::ModId> ModRegistry::registerMod(ModRecord record) {
     std::lock_guard lock{mMutex};
@@ -173,12 +208,18 @@ bool ModRegistry::remove(api::RegistrationHandle handle) {
         return false;
     }
 
-    auto key = std::visit(
-        [](auto const& entry) -> ConflictKey { return ConflictKey{entry.manifest.modNamespace, entry.manifest.path}; },
+    std::visit(
+        [this](auto const& entry) {
+            using EntryType = std::decay_t<decltype(entry)>;
+            if constexpr (std::is_same_v<EntryType, UiEntry>) {
+                mUiConflictIndex.erase(uiConflictKeyFor(entry));
+            } else {
+                mConflictIndex.erase(conflictKeyFor(entry));
+            }
+        },
         iterator->second
     );
 
-    mConflictIndex.erase(key);
     mEntries.erase(iterator);
     return true;
 }
@@ -202,13 +243,17 @@ std::size_t ModRegistry::removeEntriesForOwnerLocked(const api::ModId& owner) {
         if (iterator == mEntries.end()) {
             continue;
         }
-        auto key = std::visit(
-            [](auto const& entry) -> ConflictKey {
-                return ConflictKey{entry.manifest.modNamespace, entry.manifest.path};
+        std::visit(
+            [this](auto const& entry) {
+                using EntryType = std::decay_t<decltype(entry)>;
+                if constexpr (std::is_same_v<EntryType, UiEntry>) {
+                    mUiConflictIndex.erase(uiConflictKeyFor(entry));
+                } else {
+                    mConflictIndex.erase(conflictKeyFor(entry));
+                }
             },
             iterator->second
         );
-        mConflictIndex.erase(key);
         mEntries.erase(iterator);
     }
 
@@ -259,9 +304,26 @@ std::vector<RegistryEntry> ModRegistry::listEntries() const {
     return result;
 }
 
+std::vector<UiEntry> ModRegistry::listUiEntries() const {
+    std::lock_guard    lock{mMutex};
+    std::vector<UiEntry> result;
+    for (auto const& [handle, entry] : mEntries) {
+        static_cast<void>(handle);
+        if (std::holds_alternative<UiEntry>(entry)) {
+            result.push_back(std::get<UiEntry>(entry));
+        }
+    }
+    return result;
+}
+
 bool ModRegistry::hasConflict(api::ResourceManifest const& manifest) const {
     std::lock_guard lock{mMutex};
     return mConflictIndex.find(ConflictKey{manifest.modNamespace, manifest.path}) != mConflictIndex.end();
+}
+
+bool ModRegistry::hasUiConflict(api::UiManifest const& manifest) const {
+    std::lock_guard lock{mMutex};
+    return mUiConflictIndex.find(UiConflictKey{manifest.modNamespace, manifest.id}) != mUiConflictIndex.end();
 }
 
 std::size_t ModRegistry::size() const {
@@ -273,6 +335,7 @@ void ModRegistry::clear() {
     std::lock_guard lock{mMutex};
     mEntries.clear();
     mConflictIndex.clear();
+    mUiConflictIndex.clear();
     mMods.clear();
 }
 

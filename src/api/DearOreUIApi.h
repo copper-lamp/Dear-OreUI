@@ -52,6 +52,20 @@ public:
 
     [[nodiscard]] Result<void> unregisterHostMethod(RegistrationHandle handle) override;
 
+    [[nodiscard]] Result<RegistrationHandle>
+    registerOverlay(ModId owner, UiManifest const& manifest, std::string htmlBody) override;
+
+    [[nodiscard]] Result<RegistrationHandle>
+    registerPanel(ModId owner, UiManifest const& manifest, std::string htmlBody) override;
+
+    [[nodiscard]] Result<RegistrationHandle>
+    registerButton(ModId owner, UiManifest const& manifest, std::string htmlBody) override;
+
+    [[nodiscard]] Result<RegistrationHandle>
+    registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) override;
+
+    [[nodiscard]] Result<void> unregisterUi(RegistrationHandle handle) override;
+
     void setReady(bool ready);
 
 private:

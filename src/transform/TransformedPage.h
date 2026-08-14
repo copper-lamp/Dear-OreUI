@@ -14,6 +14,7 @@ struct TransformedPage {
     std::vector<registry::ScriptEntry>       scripts;
     std::vector<registry::StyleSheetEntry>   styles;
     std::vector<registry::ResourceEntry>     resources;
+    std::vector<registry::UiEntry>           uiEntries;
     ChangeReport                             report;
 };
 

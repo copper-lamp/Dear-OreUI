@@ -30,6 +30,7 @@ public:
     [[nodiscard]] virtual api::Result<api::RegistrationHandle> insert(ResourceEntry entry)   = 0;
     [[nodiscard]] virtual api::Result<api::RegistrationHandle> insert(ScriptEntry entry)     = 0;
     [[nodiscard]] virtual api::Result<api::RegistrationHandle> insert(StyleSheetEntry entry) = 0;
+    [[nodiscard]] virtual api::Result<api::RegistrationHandle> insert(UiEntry entry)         = 0;
 
     [[nodiscard]] virtual bool        remove(api::RegistrationHandle handle) = 0;
     [[nodiscard]] virtual std::size_t removeAll(api::ModId owner)            = 0;
@@ -38,8 +39,10 @@ public:
     [[nodiscard]] virtual std::vector<api::RegistrationHandle> findByOwner(api::ModId owner) const        = 0;
     [[nodiscard]] virtual std::vector<api::RegistrationHandle> findByNamespace(std::string_view ns) const = 0;
     [[nodiscard]] virtual std::vector<RegistryEntry>           listEntries() const                        = 0;
+    [[nodiscard]] virtual std::vector<UiEntry>                 listUiEntries() const                      = 0;
 
     [[nodiscard]] virtual bool        hasConflict(api::ResourceManifest const& manifest) const = 0;
+    [[nodiscard]] virtual bool        hasUiConflict(api::UiManifest const& manifest) const     = 0;
     [[nodiscard]] virtual std::size_t size() const                                             = 0;
     virtual void                      clear()                                                  = 0;
 };

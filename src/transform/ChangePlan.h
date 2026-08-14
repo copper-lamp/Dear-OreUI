@@ -2,6 +2,7 @@
 
 #include "api/manifest/Dependency.h"
 #include "api/manifest/ResourceManifest.h"
+#include "api/manifest/UiManifest.h"
 #include "api/types/Error.h"
 #include "api/types/Id.h"
 #include "api/types/Page.h"
@@ -9,12 +10,13 @@
 #include "transform/DependencyProblem.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace dearoreui::transform {
 
-enum class ChangeOperationKind { AddScript, AddStyleSheet, AddResource };
+enum class ChangeOperationKind { AddScript, AddStyleSheet, AddResource, AddUi };
 
 enum class ChangeOperationStatus {
     Pending,
@@ -43,6 +45,7 @@ struct ChangeOperation {
     std::vector<std::string>    declaredConflicts;
     std::vector<api::Dependency> dependencies;
     bool                        versionConstrained{false};
+    std::optional<api::UiManifest> uiManifest;
 };
 
 struct ChangePlan {

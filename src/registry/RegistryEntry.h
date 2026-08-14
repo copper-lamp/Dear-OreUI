@@ -3,6 +3,7 @@
 #include "api/manifest/ResourceManifest.h"
 #include "api/manifest/ScriptManifest.h"
 #include "api/manifest/StyleSheetManifest.h"
+#include "api/manifest/UiManifest.h"
 #include "api/types/Id.h"
 
 #include <chrono>
@@ -35,6 +36,14 @@ struct StyleSheetEntry {
     std::chrono::system_clock::time_point registeredAt;
 };
 
-using RegistryEntry = std::variant<ResourceEntry, ScriptEntry, StyleSheetEntry>;
+struct UiEntry {
+    api::RegistrationHandle               handle;
+    api::ModId                            owner;
+    api::UiManifest                       manifest;
+    std::string                           htmlBody;
+    std::chrono::system_clock::time_point registeredAt;
+};
+
+using RegistryEntry = std::variant<ResourceEntry, ScriptEntry, StyleSheetEntry, UiEntry>;
 
 } // namespace dearoreui::registry

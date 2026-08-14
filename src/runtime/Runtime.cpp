@@ -15,6 +15,9 @@
 #include "poc/Stage1NavigationPoc.h"
 #include "resource/ResourceIndex.h"
 #include "source/FileSystemSourceReader.h"
+#include "ui/MountManager.h"
+#include "ui/NullMountHost.h"
+#include "ui/UiPlanner.h"
 
 #include <utility>
 
@@ -108,6 +111,9 @@ bool Runtime::enable() {
         *mHostMethodRegistry, *mPageManager, logger
     );
     mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
+    mUiPlanner      = std::make_unique<ui::UiPlanner>(*mRegistry);
+    mMountHost      = std::make_unique<ui::NullMountHost>();
+    mMountManager   = std::make_unique<ui::MountManager>(*mMountHost);
 
     bool result = true;
     if (mConfig.enableHooks) {
@@ -147,6 +153,9 @@ bool Runtime::disable() {
     logger.info("status", hooksRemoved ? "hooks_removed" : "hooks_remove_failed").emit();
 
     mInjector.reset();
+    mMountManager.reset();
+    mMountHost.reset();
+    mUiPlanner.reset();
     mSourceReader.reset();
     mChangePlanner.reset();
     mPageTransformer.reset();
@@ -269,6 +278,22 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
 
     diagnostic::recordStage4InjectSubmitted(id, injectResult.value());
 
+    // Stage 7: plan and mount UI overlays for this page scope.
+    if (mUiPlanner != nullptr && mMountManager != nullptr && mInjector != nullptr) {
+        auto uiPlan        = mUiPlanner->plan(id, info.scope);
+        auto mountResult   = mMountManager->mountPage(id, std::move(uiPlan));
+        if (mountResult.isOk()) {
+            auto uiInjectResult = mInjector->injectUi(id, mountResult.value());
+            if (uiInjectResult.isErr()) {
+                logger.warning("inject", "ui_bootstrap_failed")
+                    .withContext(id)
+                    .withError(uiInjectResult.error().code)
+                    .withMessage(uiInjectResult.error().message)
+                    .emit();
+            }
+        }
+    }
+
     logger.info("page", "ready")
         .withContext(id)
         .withPage(info.id)
@@ -281,6 +306,10 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
 
 void Runtime::onPageDestroyed(api::ContextId id) {
     auto& logger = diagnostic::globalLogger();
+
+    if (mMountManager != nullptr) {
+        static_cast<void>(mMountManager->unmountPage(id));
+    }
 
     if (mHostDispatcher != nullptr) {
         mHostDispatcher->invalidateContext(id);
