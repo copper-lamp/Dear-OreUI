@@ -10,7 +10,7 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
     mCapabilities.set(CapabilityEntry{
         .capability = Capability::PageLifecycleObservation,
         .level      = SupportLevel::Supported,
-        .note       = "Verified via ScreenTechStackSelector and SceneProvider hooks",
+        .note       = "Verified: PageContext created on SceneProvider::createScene and destroyed on Router::$dtor",
     });
     mCapabilities.set(CapabilityEntry{
         .capability = Capability::RouteNavigation,

@@ -3,6 +3,7 @@
 #include "api/IDearOreUIApi.h"
 #include "capability/ICapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
+#include "page/IPageContextManager.h"
 
 namespace dearoreui::runtime {
 
@@ -17,6 +18,7 @@ public:
     [[nodiscard]] virtual diagnostic::DiagnosticLogger& diagnostics() = 0;
     [[nodiscard]] virtual capability::ICapabilityQuery& capabilities() = 0;
     [[nodiscard]] virtual api::IDearOreUIApi* api() = 0;
+    [[nodiscard]] virtual page::IPageContextManager* pageManager() = 0;
 };
 
 } // namespace dearoreui::runtime

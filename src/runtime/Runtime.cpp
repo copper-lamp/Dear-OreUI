@@ -4,7 +4,7 @@
 #include "diagnostic/DiagnosticLogger.h"
 #include "diagnostic/FileDiagnosticSink.h"
 #include "diagnostic/Stage0TelemetryCompat.h"
-#include "hook/Stage0OreUIHooks.h"
+#include "hook/OreUIHookAdapter.h"
 #include "poc/Stage1NavigationPoc.h"
 
 #include <utility>
@@ -33,7 +33,7 @@ bool Runtime::initialize() {
     mApi      = std::make_unique<api::DearOreUIApi>(*mRegistry, mCapabilities, logger);
 
     logger.info("lifecycle", "load")
-        .withField("stage", "2")
+        .withField("stage", "3")
         .withField("target", "win-x64")
         .emit();
 
@@ -48,15 +48,26 @@ bool Runtime::enable() {
     auto& logger = diagnostic::globalLogger();
     logger.info("lifecycle", "enable").emit();
 
+    mPageManager = std::make_unique<page::PageContextManager>();
+    mHookAdapter = std::make_unique<hook::OreUIHookAdapter>(
+        static_cast<hook::IPageHookCallback&>(*this), mCapabilities, logger
+    );
+
     bool result = true;
     if (mConfig.enableHooks) {
-        result = hook::installStage0OreUIHooks();
+        result = mHookAdapter->install();
     }
     logger.info("status", result ? "hooks_installed" : "hooks_unavailable")
         .emit();
 
     if (mApi != nullptr) {
         mApi->setReady(result);
+    }
+
+    if (result) {
+        logger.info("runtime", "ready")
+            .withField("page_lifecycle", "enabled")
+            .emit();
     }
 
     mEnabled = result;
@@ -72,18 +83,27 @@ bool Runtime::disable() {
         mApi->setReady(false);
     }
 
+    bool hooksRemoved = true;
+    if (mHookAdapter != nullptr) {
+        if (mConfig.enableHooks) {
+            poc::stopStage1Navigation();
+        }
+        hooksRemoved = mHookAdapter->uninstall();
+        mHookAdapter.reset();
+    }
+    logger.info("status", hooksRemoved ? "hooks_removed" : "hooks_remove_failed")
+        .emit();
+
+    if (mPageManager != nullptr) {
+        mPageManager->clear();
+        mPageManager.reset();
+    }
+
     if (mRegistry != nullptr) {
         mRegistry->clear();
     }
 
-    if (mConfig.enableHooks) {
-        poc::stopStage1Navigation();
-    }
-    auto hooksRemoved = mConfig.enableHooks ? hook::uninstallStage0OreUIHooks() : true;
-
     logger.info("lifecycle", "disable").emit();
-    logger.info("status", hooksRemoved ? "hooks_removed" : "hooks_remove_failed")
-        .emit();
 
     if (mConfig.enableStage0Compatibility) {
         diagnostic::resetStage0Session();
@@ -95,7 +115,50 @@ bool Runtime::disable() {
     mRegistry.reset();
     mEnabled      = false;
     mInitialized  = false;
-    return hooksRemoved;
+    return true;
+}
+
+api::ContextId Runtime::onPageCreated(
+    std::string_view url, std::optional<api::RouterLocationSnapshot> location
+) {
+    auto& logger = diagnostic::globalLogger();
+
+    if (mPageManager == nullptr) {
+        return api::ContextId{};
+    }
+
+    auto info     = page::PageContextManager::pageInfoFromUrl(url);
+    info.location = std::move(location);
+    auto contextId = mPageManager->createContext(std::move(info));
+
+    if (auto found = mPageManager->find(contextId); found) {
+        logger.info("page", "created")
+            .withContext(contextId)
+            .withPage(found->page.id)
+            .withField("scope", std::to_string(static_cast<int>(found->page.scope)))
+            .withField("url", std::string(url))
+            .emit();
+    }
+
+    return contextId;
+}
+
+void Runtime::onPageDestroyed(api::ContextId id) {
+    auto& logger = diagnostic::globalLogger();
+
+    if (mPageManager == nullptr) return;
+
+    auto context = mPageManager->find(id);
+    bool removed = mPageManager->destroyContext(id);
+
+    logger.info("page", "destroyed")
+        .withContext(id)
+        .withField("removed", removed ? "true" : "false")
+        .withField(
+            "page_id",
+            context ? context->page.id.value() : std::string{"unknown"}
+        )
+        .emit();
 }
 
 diagnostic::DiagnosticLogger& Runtime::diagnostics() {
@@ -108,6 +171,10 @@ capability::ICapabilityQuery& Runtime::capabilities() {
 
 api::IDearOreUIApi* Runtime::api() {
     return mApi.get();
+}
+
+page::IPageContextManager* Runtime::pageManager() {
+    return mPageManager.get();
 }
 
 } // namespace dearoreui::runtime
