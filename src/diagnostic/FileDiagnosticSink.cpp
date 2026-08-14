@@ -3,6 +3,10 @@
 #include <iomanip>
 #include <sstream>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace dearoreui::diagnostic {
 
 namespace {
@@ -67,12 +71,6 @@ FileDiagnosticSink::FileDiagnosticSink(std::filesystem::path path) : mPath(std::
 }
 
 void FileDiagnosticSink::consume(DiagnosticEvent const& event) {
-    std::lock_guard lock(mMutex);
-    if (!mOutput.is_open()) {
-        mOutput.open(mPath, std::ios::out | std::ios::app | std::ios::binary);
-    }
-    if (!mOutput.is_open()) return;
-
     std::ostringstream output;
     output << "{"
            << "\"id\":" << event.id.value() << ","
@@ -102,12 +100,55 @@ void FileDiagnosticSink::consume(DiagnosticEvent const& event) {
     }
 
     output << "}";
-    mOutput << output.str() << '\n';
+    auto const line = output.str() + '\n';
+
+    std::lock_guard lock(mMutex);
+
+#ifdef _WIN32
+    auto const pathWide = mPath.wstring();
+    HANDLE file = CreateFileW(
+        pathWide.c_str(),
+        FILE_APPEND_DATA,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        nullptr,
+        OPEN_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    if (file == INVALID_HANDLE_VALUE) {
+        // Fallback: try the standard stream path if the Windows API path fails.
+        if (!mOutput.is_open()) {
+            mOutput.open(mPath, std::ios::out | std::ios::app | std::ios::binary);
+        }
+        if (mOutput.is_open()) {
+            mOutput << line;
+        }
+        return;
+    }
+
+    // Ensure new content is appended at the end of the file.
+    LARGE_INTEGER distance{};
+    distance.QuadPart = 0;
+    SetFilePointerEx(file, distance, nullptr, FILE_END);
+
+    DWORD written = 0;
+    WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+    CloseHandle(file);
+#else
+    if (!mOutput.is_open()) {
+        mOutput.open(mPath, std::ios::out | std::ios::app | std::ios::binary);
+    }
+    if (mOutput.is_open()) {
+        mOutput << line;
+    }
+#endif
 }
 
 void FileDiagnosticSink::flush() {
     std::lock_guard lock(mMutex);
+#ifndef _WIN32
     if (mOutput.is_open()) mOutput.flush();
+#endif
 }
 
 } // namespace dearoreui::diagnostic

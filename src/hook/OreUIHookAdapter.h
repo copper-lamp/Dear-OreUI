@@ -4,6 +4,8 @@
 #include "capability/ICapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
 
+#include <filesystem>
+
 namespace dearoreui::hook {
 
 class OreUIHookAdapter {
@@ -11,7 +13,8 @@ public:
     OreUIHookAdapter(
         IPageHookCallback& callback,
         capability::ICapabilityQuery& capabilities,
-        diagnostic::DiagnosticLogger& logger
+        diagnostic::DiagnosticLogger& logger,
+        std::filesystem::path dataDirectory = {}
     );
     ~OreUIHookAdapter();
 
@@ -24,6 +27,7 @@ private:
     IPageHookCallback&            mCallback;
     capability::ICapabilityQuery& mCapabilities;
     diagnostic::DiagnosticLogger& mLogger;
+    std::filesystem::path         mDataDirectory;
 };
 
 } // namespace dearoreui::hook

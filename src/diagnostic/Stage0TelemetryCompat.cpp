@@ -95,4 +95,8 @@ void resetStage0Session() {
     sessionId().clear();
 }
 
+std::string const& currentStage0SessionId() {
+    return sessionId();
+}
+
 } // namespace dearoreui::diagnostic

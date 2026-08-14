@@ -69,10 +69,28 @@ void Stage0FileSink::consume(DiagnosticEvent const& event) {
     line += "\tevent=";
     line += escape(event.event);
 
+    if (event.contextId) {
+        line += "\tcontext_id=";
+        line += std::to_string(event.contextId->value());
+    }
+    if (event.pageId) {
+        line += "\tpage_id=";
+        line += escape(event.pageId->value());
+    }
+    if (event.modId) {
+        line += "\tmod_id=";
+        line += escape(event.modId->value());
+    }
+
     auto fields = escapeFields(event.fields);
     if (!fields.empty()) {
         line += '\t';
         line += fields;
+    }
+
+    if (!event.message.empty()) {
+        line += "\tmessage=";
+        line += escape(event.message);
     }
 
     mOutput << line << '\n';

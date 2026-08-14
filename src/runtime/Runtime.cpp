@@ -4,6 +4,7 @@
 #include "diagnostic/DiagnosticLogger.h"
 #include "diagnostic/FileDiagnosticSink.h"
 #include "diagnostic/Stage0TelemetryCompat.h"
+#include "diagnostic/Stage3PageLifecycleTelemetry.h"
 #include "hook/OreUIHookAdapter.h"
 #include "poc/Stage1NavigationPoc.h"
 
@@ -28,6 +29,7 @@ bool Runtime::initialize() {
         diagnostic::initializeStage0FileSink(mConfig.dataDirectory);
         diagnostic::startStage0Session();
     }
+    diagnostic::initializeStage3FileSink(mConfig.dataDirectory, diagnostic::currentStage0SessionId());
 
     mRegistry = std::make_unique<registry::ModRegistry>();
     mApi      = std::make_unique<api::DearOreUIApi>(*mRegistry, mCapabilities, logger);
@@ -50,7 +52,7 @@ bool Runtime::enable() {
 
     mPageManager = std::make_unique<page::PageContextManager>();
     mHookAdapter = std::make_unique<hook::OreUIHookAdapter>(
-        static_cast<hook::IPageHookCallback&>(*this), mCapabilities, logger
+        static_cast<hook::IPageHookCallback&>(*this), mCapabilities, logger, mConfig.dataDirectory
     );
 
     bool result = true;
@@ -127,11 +129,12 @@ api::ContextId Runtime::onPageCreated(
         return api::ContextId{};
     }
 
-    auto info     = page::PageContextManager::pageInfoFromUrl(url);
-    info.location = std::move(location);
+    auto info      = page::PageContextManager::pageInfoFromUrl(url);
+    info.location  = std::move(location);
     auto contextId = mPageManager->createContext(std::move(info));
 
     if (auto found = mPageManager->find(contextId); found) {
+        diagnostic::recordStage3PageCreated(contextId, found->page, url);
         logger.info("page", "created")
             .withContext(contextId)
             .withPage(found->page.id)
@@ -150,6 +153,10 @@ void Runtime::onPageDestroyed(api::ContextId id) {
 
     auto context = mPageManager->find(id);
     bool removed = mPageManager->destroyContext(id);
+
+    if (context) {
+        diagnostic::recordStage3PageDestroyed(id, context->page);
+    }
 
     logger.info("page", "destroyed")
         .withContext(id)
