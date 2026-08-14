@@ -111,6 +111,7 @@ LL_TYPE_INSTANCE_HOOK(
     ui::TechStack,
     std::string const& screenName
 ) {
+    diagnostic::recordStage0("hook", "event=techstack_entered\tscreen=" + screenName);
     return origin(screenName);
 }
 
@@ -126,6 +127,7 @@ LL_TYPE_INSTANCE_HOOK(
     OreUI::RouteMode mode,
     OreUI::FacetRegistryLocation location
 ) {
+    diagnostic::recordStage0("hook", "event=sceneprovider_entered\turl=" + url);
     auto result = origin(url, router, sceneStack, mode, location);
     poc::registerRouter(router, *sceneStack);
     notifyPageCreated(router, url);
@@ -139,6 +141,7 @@ LL_TYPE_INSTANCE_HOOK(
     &OreUI::Router::$dtor,
     void
 ) {
+    diagnostic::recordStage0("hook", "event=router_dtor_entered");
     notifyPageDestroyed(*this);
     poc::invalidateRouter(*this);
     origin();
@@ -152,6 +155,7 @@ LL_TYPE_INSTANCE_HOOK(
     bool,
     bool isInitFinished
 ) {
+    diagnostic::recordStage0("hook", "event=clientupdate_entered\tinit=" + std::string(isInitFinished ? "true" : "false"));
     auto result = origin(isInitFinished);
     // Stage 1 navigation PoC is disabled in stage 3.
     // if (isInitFinished) poc::consumeStage1Navigation();
@@ -167,6 +171,7 @@ LL_TYPE_INSTANCE_HOOK(
     std::optional<OreUI::RouterLocation> const& oldLocation,
     std::optional<OreUI::RouterLocation> const& currentLocation
 ) {
+    diagnostic::recordStage0("hook", "event=router_onchange_entered");
     origin(oldLocation, currentLocation);
 }
 
@@ -179,6 +184,7 @@ LL_TYPE_INSTANCE_HOOK(
     std::string const& route,
     OreUI::Router::RouterPushMode mode
 ) {
+    diagnostic::recordStage0("hook", "event=router_push_entered\troute=" + route);
     return origin(route, mode);
 }
 
@@ -190,6 +196,7 @@ LL_TYPE_INSTANCE_HOOK(
     bool,
     std::string const& route
 ) {
+    diagnostic::recordStage0("hook", "event=router_replace_entered\troute=" + route);
     return origin(route);
 }
 
@@ -200,6 +207,7 @@ LL_TYPE_INSTANCE_HOOK(
     &OreUI::Router::goBack,
     void
 ) {
+    diagnostic::recordStage0("hook", "event=router_back_entered");
     origin();
 }
 

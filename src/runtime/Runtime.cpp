@@ -59,7 +59,7 @@ bool Runtime::enable() {
         static_cast<hook::IPageHookCallback&>(*this), mCapabilities, logger, mConfig.dataDirectory
     );
 
-    auto sourceBase = mConfig.minecraftDirectory / "gui" / "dist" / "hbui";
+    auto sourceBase = mConfig.minecraftDirectory / "data" / "gui" / "dist" / "hbui";
     mSourceReader   = std::make_unique<source::FileSystemSourceReader>(std::move(sourceBase));
     mInjector       = std::make_unique<inject::RuntimeInjector>(logger);
 
