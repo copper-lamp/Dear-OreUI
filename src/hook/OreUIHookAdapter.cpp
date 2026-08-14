@@ -1,6 +1,5 @@
 #include "hook/OreUIHookAdapter.h"
 
-#include "diagnostic/DirectFileLog.h"
 #include "diagnostic/Stage0TelemetryCompat.h"
 #include "poc/Stage1NavigationPoc.h"
 
@@ -39,22 +38,11 @@ struct AdapterState {
     std::unordered_map<OreUI::Router*, api::ContextId>  routerContexts;
     std::unordered_set<std::string>                     observed;
     IPageHookCallback*                                  callback{};
-    std::filesystem::path                               dataDirectory;
 };
 
 AdapterState& state() {
     static AdapterState value;
     return value;
-}
-
-std::filesystem::path directLogPath(std::filesystem::path const& dataDirectory, std::string_view name) {
-    return dataDirectory / "telemetry" / name;
-}
-
-void appendDirectLog(std::string_view name, std::string_view line) {
-    auto const& dataDirectory = state().dataDirectory;
-    if (dataDirectory.empty()) return;
-    diagnostic::appendLineToFile(directLogPath(dataDirectory, name), line);
 }
 
 char const* techStackName(ui::TechStack stack) {
@@ -123,9 +111,7 @@ LL_TYPE_INSTANCE_HOOK(
     ui::TechStack,
     std::string const& screenName
 ) {
-    auto result = origin(screenName);
-    recordOnce("tech_stack", "screen=" + screenName + "\tstack=" + techStackName(result));
-    return result;
+    return origin(screenName);
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -142,17 +128,6 @@ LL_TYPE_INSTANCE_HOOK(
 ) {
     auto result = origin(url, router, sceneStack, mode, location);
     poc::registerRouter(router, *sceneStack);
-    // Stage 1 navigation PoC is disabled in stage 3 to preserve original UI behavior.
-    // poc::armStage1Navigation(
-    //     router,
-    //     *sceneStack,
-    //     url == "/hbui/index.html" && location == OreUI::FacetRegistryLocation::OutOfGame
-    // );
-    recordOnce(
-        "scene",
-        "url=" + url + "\troute_mode=" + std::to_string(static_cast<int>(mode)) + "\tlocation="
-        + std::to_string(static_cast<int>(location)) + "\tcreated=" + (result ? "true" : "false")
-    );
     notifyPageCreated(router, url);
     return result;
 }
@@ -164,17 +139,9 @@ LL_TYPE_INSTANCE_HOOK(
     &OreUI::Router::$dtor,
     void
 ) {
-    appendDirectLog(
-        "router-destructor.txt",
-        "router_destructor_entered	this=" + std::to_string(reinterpret_cast<std::uintptr_t>(this))
-    );
     notifyPageDestroyed(*this);
     poc::invalidateRouter(*this);
     origin();
-    appendDirectLog(
-        "router-destructor.txt",
-        "router_destructor_exited	this=" + std::to_string(reinterpret_cast<std::uintptr_t>(this))
-    );
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -201,11 +168,6 @@ LL_TYPE_INSTANCE_HOOK(
     std::optional<OreUI::RouterLocation> const& currentLocation
 ) {
     origin(oldLocation, currentLocation);
-    recordOnce("route_change", locationFields("old", oldLocation) + "\t" + locationFields("current", currentLocation));
-    // Stage 1 navigation PoC is disabled in stage 3.
-    // if (currentLocation && currentLocation->getPath() == "/__bedrock__/start_screen") {
-    //     poc::armStage1NavigationFromStartScreen(*this);
-    // }
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -217,13 +179,7 @@ LL_TYPE_INSTANCE_HOOK(
     std::string const& route,
     OreUI::Router::RouterPushMode mode
 ) {
-    auto result = origin(route, mode);
-    recordOnce(
-        "route_push",
-        "route=" + route + "\tpush_mode=" + std::to_string(static_cast<int>(mode)) + "\tsuccess="
-        + (result ? "true" : "false")
-    );
-    return result;
+    return origin(route, mode);
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -234,9 +190,7 @@ LL_TYPE_INSTANCE_HOOK(
     bool,
     std::string const& route
 ) {
-    auto result = origin(route);
-    recordOnce("route_replace", "route=" + route + "\tsuccess=" + (result ? "true" : "false"));
-    return result;
+    return origin(route);
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -247,7 +201,6 @@ LL_TYPE_INSTANCE_HOOK(
     void
 ) {
     origin();
-    recordOnce("route_back", {});
 }
 
 bool allInstalled() {
@@ -313,10 +266,8 @@ bool OreUIHookAdapter::install() {
     auto& adapterState = state();
     {
         std::lock_guard lock{adapterState.mutex};
-        adapterState.callback     = &mCallback;
-        adapterState.dataDirectory = mDataDirectory;
+        adapterState.callback = &mCallback;
     }
-
     if (allInstalled()) {
         return true;
     }
@@ -352,16 +303,11 @@ bool OreUIHookAdapter::uninstall() {
         std::lock_guard lock{adapterState.mutex};
         remainingContexts = adapterState.routerContexts.size();
     }
-    appendDirectLog(
-        "hook-adapter.txt",
-        "uninstall_started\tremaining_contexts=" + std::to_string(remainingContexts)
-    );
     diagnostic::recordStage0(
         "hook_adapter",
         "event=uninstall_started\tremaining_contexts=" + std::to_string(remainingContexts)
     );
     destroyAllContexts();
-    appendDirectLog("hook-adapter.txt", "destroy_all_contexts_completed");
     diagnostic::recordStage0("hook_adapter", "event=destroy_all_contexts_completed");
     {
         std::lock_guard lock{adapterState.mutex};

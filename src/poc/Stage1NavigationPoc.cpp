@@ -63,25 +63,13 @@ std::atomic<std::uint64_t>& nextGeneration() {
 
 void registerRouter(OreUI::Router& router, ISceneStack& sceneStack) {
     auto const generation = nextGeneration().fetch_add(1) + 1;
-    {
-        std::lock_guard lock(mutex());
-        routers()[&router] = RouterRecord{&router, &sceneStack, generation};
-    }
-    diagnostic::recordStage0(
-        "router_lifecycle",
-        "event=registered\tgeneration=" + std::to_string(generation)
-    );
+    std::lock_guard lock(mutex());
+    routers()[&router] = RouterRecord{&router, &sceneStack, generation};
 }
 
 void invalidateRouter(OreUI::Router& router) {
     std::lock_guard lock(mutex());
-    auto const iterator = routers().find(&router);
-    if (iterator == routers().end()) return;
-    diagnostic::recordStage0(
-        "router_lifecycle",
-        "event=invalidated\treason=router_destroyed\tgeneration=" + std::to_string(iterator->second.generation)
-    );
-    routers().erase(iterator);
+    routers().erase(&router);
 }
 
 void invalidateSceneStack(ISceneStack& sceneStack) {
@@ -91,11 +79,6 @@ void invalidateSceneStack(ISceneStack& sceneStack) {
             ++iterator;
             continue;
         }
-        diagnostic::recordStage0(
-            "router_lifecycle",
-            "event=invalidated\treason=scene_stack_destroyed\tgeneration="
-                + std::to_string(iterator->second.generation)
-        );
         iterator = routers().erase(iterator);
     }
 }
