@@ -28,20 +28,16 @@ void defaultCoherentExecutor(void* gamefaceView, std::string const& script);
 // NullHostBridge. Once a view is registered the deferred scripts are flushed
 // and subsequent sendScript calls execute immediately.
 //
-// Stage 8: the bridge additionally registers the JS->C++ "dearoreui_report"
-// native binding via cohtml::View::BindCall once the script context is ready.
-// JS-side engine.call("dearoreui_report", json) reaches the native handler,
-// which parses an IpcMessage and forwards it to HostDispatcher (set via
-// setDispatcher). The concrete handler lives in the DLL (needs cohtml headers);
-// this header stays cohtml-free so the unit-test target can compile it.
+// Stage 8 note: the JS->C++ channel previously used cohtml BindCall /
+// RegisterForEvent, but BOTH crash the client on page teardown (the game's
+// xgameruntime->msxml6 XML-parse bug is triggered by any registered handler).
+// The bridge is therefore C++->JS only for now; the JS->C++ channel moves to
+// a WebSocket loopback (see DearOreUI-阶段8-WebSocket回环通道-执行设计.md).
 class CoherentHostBridge : public IHostBridge {
 public:
     CoherentHostBridge(
         CoherentViewRegistry& registry,
-        ScriptExecutor        executor = defaultCoherentExecutor,
-        bool                  disableInject = false,
-        bool                  disableBindCall = false,
-        bool                  debugUnbindImmediately = false
+        ScriptExecutor        executor = defaultCoherentExecutor
     );
     ~CoherentHostBridge() override;
 
@@ -60,43 +56,16 @@ public:
     void cancel(api::RequestId requestId) override;
     void invalidateContext(api::ContextId id) override;
 
-    // Stage 8: routes incoming JS->C++ messages to the dispatcher. Setting the
-    // dispatcher also enables registration of the native BindCall binding on
-    // the next script-context-ready signal.
-    void setDispatcher(HostDispatcher& dispatcher);
-
-    // Called by CoherentViewRegistry when a new view is registered; the handle
-    // is tracked by the registry itself, so nothing is flushed here (the page
-    // script context may not exist yet).
-    void onViewRegistered(void* gamefaceView);
-
     // Called by CoherentViewRegistry when the page signals its script context
     // is ready (OnReadyForBindings); flushes the deferred script queue into
-    // the active view via ExecuteScript and (re)registers the native binding.
+    // the active view via ExecuteScript.
     void onScriptContextReady();
-
-    // Called by CoherentViewRegistry when the owning OreUI::View is being
-    // destroyed. Unbinds the native JS->C++ handler (UnbindCall + delete) so
-    // the engine never touches a handler after the view is torn down.
-    void onViewDestroyed(void* gamefaceView);
 
 private:
     [[nodiscard]] api::Result<void> submit(void* gamefaceView, api::ContextId id, std::string const& script);
 
-    void releaseNativeBinding();
-
     CoherentViewRegistry& mRegistry;
     ScriptExecutor        mExecutor;
-    HostDispatcher*       mDispatcher{nullptr};
-    bool                  mDisableInject{false};
-    bool                  mDisableBindCall{false};
-    bool                  mDebugUnbindImmediately{false};
-
-    // Opaque cohtml::IEventHandler owned by the bridge; created/destroyed in
-    // the DLL where cohtml headers are available. mNativeBinding is the opaque
-    // handle returned by cohtml::View::BindCall (for a future UnbindCall).
-    void* mNativeHandler{nullptr};
-    void* mNativeBinding{nullptr};
 
     struct PendingScript {
         api::ContextId contextId;

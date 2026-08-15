@@ -160,42 +160,6 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    }\n";
     stream << "    dearOreUiReport('runtime_executed:context=' + "
            << escapeJsString(std::to_string(id.value())) << ");\n";
-
-    // Stage 8 network probe: verify the embedded cohtml network stack supports
-    // XHR / WebSocket before committing to the loopback channel (BindCall/
-    // RegisterForEvent both crash on page teardown). fetch is known-missing in
-    // this cohtml build. Results are reported through dearOreUiReport
-    // (js/report channel) after a delay (handler registers after script flush).
-    stream << "    try {\n";
-    stream << "        setTimeout(function(){\n";
-    stream << "            function probe(name, value) {\n";
-    stream << "                try { console.log('[DearOreUI][netprobe] ' + name + '=' + value); } catch (e) {}\n";
-    stream << "                try { dearOreUiReport('netprobe:' + name + '=' + value); } catch (e) {}\n";
-    stream << "            }\n";
-    stream << "            try {\n";
-    stream << "                if (typeof XMLHttpRequest === 'undefined') { probe('xhr', 'API_MISSING'); }\n";
-    stream << "                else {\n";
-    stream << "                    probe('xhr', 'constructed');\n";
-    stream << "                    var x = new XMLHttpRequest();\n";
-    stream << "                    x.open('GET', 'http://127.0.0.1:1/probe', true);\n";
-    stream << "                    x.onreadystatechange = function() { if (x.readyState >= 2) probe('xhr', 'state:' + x.readyState + ':' + x.status); };\n";
-    stream << "                    x.onerror = function() { probe('xhr', 'error'); };\n";
-    stream << "                    x.send(null);\n";
-    stream << "                }\n";
-    stream << "            } catch (e) { probe('xhr', 'threw:' + (e && e.message ? e.message : String(e))); }\n";
-    stream << "            try {\n";
-    stream << "                if (typeof WebSocket === 'undefined') { probe('ws', 'API_MISSING'); }\n";
-    stream << "                else {\n";
-    stream << "                    probe('ws', 'constructed');\n";
-    stream << "                    var ws = new WebSocket('ws://127.0.0.1:1/probe');\n";
-    stream << "                    ws.onopen = function() { probe('ws', 'open'); };\n";
-    stream << "                    ws.onerror = function() { probe('ws', 'error'); };\n";
-    stream << "                    ws.onclose = function(e) { probe('ws', 'close:' + (e ? e.code : '?')); };\n";
-    stream << "                    setTimeout(function() { probe('ws', 'no_callback_3s'); }, 3000);\n";
-    stream << "                }\n";
-    stream << "            } catch (e) { probe('ws', 'threw:' + (e && e.message ? e.message : String(e))); }\n";
-    stream << "        }, 800);\n";
-    stream << "    } catch (e) {}\n";
     stream << "})();\n";
     return stream.str();
 }

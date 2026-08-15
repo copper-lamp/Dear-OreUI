@@ -121,31 +121,16 @@ void describeCrash(DWORD code, void* address) {
 }
 
 LONG WINAPI crashProbeHandler(EXCEPTION_POINTERS* pointers) {
-    if (pointers == nullptr || pointers->ExceptionRecord == nullptr) {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-    DWORD code = pointers->ExceptionRecord->ExceptionCode;
-
-    // 0x40080201 = STATUS_ORIGINATE_ERROR: a WinRT "originate error"
-    // notification raised by RoOriginateError. msxml6 raises it when XSD
-    // schema validation of an XML document fails (return-to-menu XML load);
-    // the game does not catch it, so the notification becomes an unhandled
-    // crash. It is a SEVERITY_SUCCESS-class exception, so swallowing it is
-    // correct: RaiseException returns, RoOriginateError returns the HRESULT,
-    // and the caller continues its error path.
-    if (code == 0x40080201u) {
-        // Record the first occurrence (once), then resume execution.
-        if (gProbeBusy.exchange(1) == 0) {
-            describeCrash(code, pointers->ExceptionRecord->ExceptionAddress);
-        }
-        return EXCEPTION_CONTINUE_EXECUTION;
-    }
-
     // Only log once per process to keep the probe tiny and re-entrancy safe.
+    // The handler never swallows exceptions — it only records, so the game's
+    // own crash handling is untouched (swallowing STATUS_ORIGINATE_ERROR was
+    // tried in Stage 8 and did not help; the error path re-raises).
     if (gProbeBusy.exchange(1) != 0) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-    describeCrash(code, pointers->ExceptionRecord->ExceptionAddress);
+    if (pointers != nullptr && pointers->ExceptionRecord != nullptr) {
+        describeCrash(pointers->ExceptionRecord->ExceptionCode, pointers->ExceptionRecord->ExceptionAddress);
+    }
     return EXCEPTION_CONTINUE_SEARCH;
 }
 

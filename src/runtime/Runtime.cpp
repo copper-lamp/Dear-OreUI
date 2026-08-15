@@ -37,33 +37,21 @@ bool Runtime::initialize() {
 
     auto& logger = diagnostic::globalLogger();
 
-    // Stage 8 crash isolation: read <data>/stage8-switch.txt (one key=value
-    // per line). Switches live in a file, NOT an environment variable, because
-    // the game may be launched from a launcher that does not forward the env
-    // block (DEAROREUI_NO_BINDCALL was never observed to take effect).
+    // Optional test switch file <data>/stage8-switch.txt: disable_hooks=1
+    // skips every hook install (mod load + crash probe only). Other Stage 8
+    // isolation switches were removed after the crash investigation concluded
+    // (engine bindings crash the client; JS->C++ moves to a WS loopback).
     auto switchPath = mConfig.dataDirectory / "stage8-switch.txt";
     if (std::filesystem::exists(switchPath)) {
         std::ifstream in(switchPath);
         std::string   line;
         while (std::getline(in, line)) {
-            if (line.rfind("disable_inject=1", 0) == 0) {
-                mConfig.disableInject = true;
-            }
-            if (line.rfind("disable_bindcall=1", 0) == 0) {
-                mConfig.disableBindCall = true;
-            }
-            if (line.rfind("debug_unbind_immediately=1", 0) == 0) {
-                mConfig.debugUnbindImmediately = true;
-            }
             if (line.rfind("disable_hooks=1", 0) == 0) {
                 mConfig.enableHooks = false;
             }
         }
     }
     logger.info("stage8", "switch_loaded")
-        .withField("disable_inject", mConfig.disableInject ? "1" : "0")
-        .withField("disable_bindcall", mConfig.disableBindCall ? "1" : "0")
-        .withField("debug_unbind_immediately", mConfig.debugUnbindImmediately ? "1" : "0")
         .withField("disable_hooks", mConfig.enableHooks ? "0" : "1")
         .emit();
 
@@ -150,19 +138,15 @@ bool Runtime::enable() {
     mPageTransformer  = std::make_unique<transform::PageTransformer>();
 
     mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(
-        *mViewRegistry,
-        ipc::defaultCoherentExecutor,
-        mConfig.disableInject,
-        mConfig.disableBindCall,
-        mConfig.debugUnbindImmediately
+        *mViewRegistry, ipc::defaultCoherentExecutor
     );
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
-    // Stage 8: wire the JS->C++ channel. CoherentHostBridge registers the
-    // "dearoreui_report" BindCall once the script context is ready and routes
-    // incoming messages through HostDispatcher.
-    static_cast<ipc::CoherentHostBridge&>(*mHostBridge).setDispatcher(*mHostDispatcher);
+    // Stage 8: the JS->C++ channel (previously BindCall/RegisterForEvent on
+    // CoherentHostBridge) was removed — both engine bindings crash the client
+    // on page teardown. The replacement WebSocket loopback is planned; until
+    // then the bridge is C++->JS only (ExecuteScript).
     mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
     mUiPlanner      = std::make_unique<ui::UiPlanner>(*mRegistry);
     mMountHost      = std::make_unique<ui::NullMountHost>();

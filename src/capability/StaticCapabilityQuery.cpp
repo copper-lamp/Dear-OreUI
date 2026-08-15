@@ -144,7 +144,7 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
         CapabilityEntry{
             .capability = Capability::JsToNativeCall,
             .level      = SupportLevel::Experimental,
-            .note       = "cohtml BindCall(dearoreui_report) -> HostDispatcher JS->C++ channel",
+            .note       = "JS->C++ channel: engine bindings (BindCall/RegisterForEvent) crash the client; WebSocket loopback pending",
         }
     );
 }

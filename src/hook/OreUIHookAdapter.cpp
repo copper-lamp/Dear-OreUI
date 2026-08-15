@@ -485,31 +485,6 @@ LL_TYPE_INSTANCE_HOOK(
         "event=router_onchange_entered\t" + locationFields("old", oldLocation) + "\t"
             + locationFields("cur", currentLocation)
     );
-
-    // Stage 8 fix: leaving an OreUI route tears the cohtml view down. The view
-    // is recreated on every /play/all entry (view_ptr changes each time), and
-    // the engine frees BindCall handlers during teardown — a handler we `new`ed
-    // on the mod's debug CRT heap gets freed on the game's release CRT heap,
-    // which corrupts the heap and later surfaces as the msxml6/COM
-    // E_CHANGED_STATE crash on return to the menu. None of the view lifecycle
-    // hooks ($dtor/$OnBindingsReleased/$removeScene/_unload) fire, so the
-    // router change (which reliably fires ~600ms before the crash) is the
-    // unbind point: notifyBindingsReleased() -> bridge.onViewDestroyed() ->
-    // UnbindCall + release the handler before the engine tears the view down.
-    bool leavingOreUi = true;
-    if (oldLocation && currentLocation) {
-        auto oldPath = oldLocation->getPath();
-        auto curPath = currentLocation->getPath();
-        leavingOreUi = oldPath.rfind("/play/", 0) == 0 && curPath.rfind("/play/", 0) != 0;
-    }
-    if (leavingOreUi) {
-        std::lock_guard lock{state().mutex};
-        if (state().viewRegistry != nullptr) {
-            state().viewRegistry->notifyBindingsReleased();
-        }
-        diagnostic::recordStage0("hook", "event=bindings_released_router");
-    }
-
     origin(oldLocation, currentLocation);
 }
 
