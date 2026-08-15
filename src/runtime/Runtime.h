@@ -12,6 +12,7 @@
 #include "ipc/HostMethodRegistry.h"
 #include "ipc/IHostBridge.h"
 #include "ipc/LoopbackWsServer.h"
+#include "ipc/OreUIFacetBridge.h"
 #include "page/PageContextManager.h"
 #include "registry/ModRegistry.h"
 #include "resource/IResourceIndex.h"
@@ -72,6 +73,7 @@ private:
     std::unique_ptr<ipc::IHostBridge>           mHostBridge;
     std::unique_ptr<ipc::CoherentViewRegistry>  mViewRegistry;
     std::unique_ptr<ipc::LoopbackWsServer>      mWsServer; // Stage 8 JS->C++ channel
+    std::unique_ptr<ipc::OreUIFacetBridge>      mOreUIFacetBridge; // Stage 8-A native facet JS->C++ channel
     bool                                        mInitialized{false};
     bool                                        mEnabled{false};
 };

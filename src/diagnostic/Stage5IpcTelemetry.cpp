@@ -157,4 +157,56 @@ void recordStage5ScriptPreview(api::ContextId id, std::string_view phase, std::s
         .emit();
 }
 
+void recordStage5FacetRegistered(std::string_view facetName, std::string_view reason, std::uintptr_t registryPtr) {
+    globalLogger()
+        .info("facet", "registered")
+        .withField("facet_name", std::string{facetName})
+        .withField("reason", std::string{reason})
+        .withField("registry_ptr", std::to_string(registryPtr))
+        .emit();
+}
+
+void recordStage5FacetProbe(std::string_view method, std::string_view summary) {
+    globalLogger()
+        .info("facet", "probe")
+        .withField("method", std::string{method})
+        .withField("summary", std::string{summary})
+        .emit();
+}
+
+void recordStage5FacetActivated(std::string_view facetName, bool hasParams, std::size_t payloadSize) {
+    globalLogger()
+        .info("facet", "activated")
+        .withField("facet_name", std::string{facetName})
+        .withField("has_params", boolString(hasParams))
+        .withField("payload_size", std::to_string(payloadSize))
+        .emit();
+}
+
+void recordStage5FacetPayload(api::RequestId requestId, api::ContextId contextId, std::string_view method) {
+    globalLogger()
+        .info("facet", "payload")
+        .withContext(contextId)
+        .withField("request_id", std::to_string(requestId.value()))
+        .withField("method", std::string{method})
+        .emit();
+}
+
+void recordStage5FacetResponse(api::RequestId requestId, std::size_t responseSize) {
+    globalLogger()
+        .info("facet", "response")
+        .withField("request_id", std::to_string(requestId.value()))
+        .withField("response_size", std::to_string(responseSize))
+        .emit();
+}
+
+void recordStage5FacetError(api::RequestId requestId, api::ErrorCode code, std::string_view message) {
+    globalLogger()
+        .warning("facet", "error")
+        .withError(code)
+        .withField("request_id", std::to_string(requestId.value()))
+        .withMessage(std::string{message})
+        .emit();
+}
+
 } // namespace dearoreui::diagnostic

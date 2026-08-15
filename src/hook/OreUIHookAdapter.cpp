@@ -279,6 +279,10 @@ LL_TYPE_INSTANCE_HOOK(
         std::lock_guard lock{state().mutex};
         if (state().viewRegistry != nullptr) {
             state().viewRegistry->registerView(&gamefaceView);
+            // Stage 8-A: expose the OreUI::View wrapper (this) so the facet
+            // bridge can register the "dearoreui" facet into its native
+            // IFacetRegistry (JS->C++ channel without engine bindings).
+            state().viewRegistry->registerOreUIView(this);
         }
         if (state().probe != nullptr) {
             state().probe->onViewInitialized(&gamefaceView);

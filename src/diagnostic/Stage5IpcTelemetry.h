@@ -66,4 +66,21 @@ void recordStage5ScriptFailed(api::ContextId id, std::string_view message);
 // Script content preview for troubleshooting: phase is "submit"|"defer"|"flush".
 void recordStage5ScriptPreview(api::ContextId id, std::string_view phase, std::string_view script);
 
+// Stage 8-A: native OreUI facet JS->C++ channel telemetry.
+// reason: "ok" | "layout_mismatch" | "registry_null" | "already_registered"
+void recordStage5FacetRegistered(std::string_view facetName, std::string_view reason, std::uintptr_t registryPtr);
+
+// Layout probe detail: method is "registry_vftable" | "listener_vftable" |
+// "gameface_scan" | "none"; summary is a qword dump of the view prefix or the
+// failure reason (helps iterate the OreUI::View layout without guessing).
+void recordStage5FacetProbe(std::string_view method, std::string_view summary);
+
+void recordStage5FacetActivated(std::string_view facetName, bool hasParams, std::size_t payloadSize);
+
+void recordStage5FacetPayload(api::RequestId requestId, api::ContextId contextId, std::string_view method);
+
+void recordStage5FacetResponse(api::RequestId requestId, std::size_t responseSize);
+
+void recordStage5FacetError(api::RequestId requestId, api::ErrorCode code, std::string_view message);
+
 } // namespace dearoreui::diagnostic

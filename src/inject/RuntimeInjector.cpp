@@ -113,32 +113,63 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    window.__DearOreUI__.protocolVersion = 1;\n";
     stream << "    window.__DearOreUI__.stage = 8;\n";
     stream << "    window.__DearOreUI__.contextId = \"" << std::to_string(id.value()) << "\";\n";
-    // Stage 8 observe-the-game: JS->C++ goes through the engine event channel
-    // (engine.trigger("dearoreui_report", json)) exactly like the vanilla hbui
-    // JS calls the game via "facet:request". The native side registers the
-    // "dearoreui_report" handler at view_initialize (early, like the game).
-    stream << "    var hasEngine = (typeof engine !== 'undefined') && engine && engine.trigger;\n";
+    // Stage 8-A: JS->C++ runs over the vanilla facet protocol. The page
+    // triggers engine.trigger("facet:request", "dearoreui", id, {params}),
+    // which the game's PRE-REGISTERED native facet:request handler dispatches
+    // into the "dearoreui" facet the mod registered into the view's
+    // IFacetRegistry (no engine binding registration involved — those crash
+    // this client). Responses come back through the page bus
+    // (window.__DearOreUI__.bus.push) driven by C++ ExecuteScript.
+    stream << "    var hasFacet = (typeof engine !== 'undefined') && engine && engine.trigger;\n";
+    stream << "    window.__DearOreUI__.bus = window.__DearOreUI__.bus || (function() {\n";
+    stream << "        var pending = {};\n";
+    stream << "        return {\n";
+    stream << "            on: function(id, cb) { pending[id] = cb; },\n";
+    stream << "            off: function(id) { delete pending[id]; },\n";
+    stream << "            push: function(id, jsonString) {\n";
+    stream << "                var cb = pending[id];\n";
+    stream << "                if (!cb) return;\n";
+    stream << "                delete pending[id];\n";
+    stream << "                var resp = null;\n";
+    stream << "                try { resp = JSON.parse(jsonString); } catch (e) { resp = { type: 'response', id: id, error: 1, payload: 'bad response json' }; }\n";
+    stream << "                cb(resp);\n";
+    stream << "            }\n";
+    stream << "        };\n";
+    stream << "    })();\n";
+    stream << "    function dearOreUiFacetTrigger(params) {\n";
+    stream << "        try {\n";
+    stream << "            if (!hasFacet) return false;\n";
+    stream << "            engine.trigger('facet:request', 'dearoreui', 'dearoreui', { params: params });\n";
+    stream << "            return true;\n";
+    stream << "        } catch (e) { return false; }\n";
+    stream << "    }\n";
     stream << "    window.__DearOreUI__.ipc = {\n";
-    stream << "        isAvailable: function() { return hasEngine; },\n";
+    stream << "        isAvailable: function() { return hasFacet; },\n";
     stream << "        callHost: function(method, args) {\n";
     stream << "            return new Promise(function(resolve, reject) {\n";
     stream << "                try {\n";
-    stream << "                    if (!hasEngine) throw new Error('HostBridgeUnavailable');\n";
+    stream << "                    if (!hasFacet) throw new Error('HostBridgeUnavailable');\n";
+    stream << "                    var id = (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId || 0) + 1);\n";
     stream << "                    var request = {\n";
     stream << "                        type: 'request',\n";
-    stream << "                        id: (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId || 0) + 1),\n";
+    stream << "                        id: id,\n";
     stream << "                        ctx: Number(window.__DearOreUI__.contextId || 0),\n";
     stream << "                        method: method,\n";
     stream << "                        payload: (typeof args === 'string' ? args : JSON.stringify(args || {}))\n";
     stream << "                    };\n";
-    stream << "                    engine.trigger('dearoreui_report', JSON.stringify(request));\n";
-    stream << "                    resolve(null);\n";
+    stream << "                    var timer = setTimeout(function() { window.__DearOreUI__.bus.off(id); reject(new Error('HostCallTimeout')); }, 5000);\n";
+    stream << "                    window.__DearOreUI__.bus.on(id, function(resp) { clearTimeout(timer); resolve(resp); });\n";
+    stream << "                    if (!dearOreUiFacetTrigger(JSON.stringify(request))) {\n";
+    stream << "                        clearTimeout(timer);\n";
+    stream << "                        window.__DearOreUI__.bus.off(id);\n";
+    stream << "                        throw new Error('FacetUnavailable');\n";
+    stream << "                    }\n";
     stream << "                } catch (e) { reject(e); }\n";
     stream << "            });\n";
     stream << "        },\n";
     stream << "        report: function(msg) {\n";
     stream << "            try {\n";
-    stream << "                if (hasEngine) engine.trigger('dearoreui_report', (typeof msg === 'string') ? msg : JSON.stringify(msg));\n";
+    stream << "                dearOreUiFacetTrigger((typeof msg === 'string') ? msg : JSON.stringify(msg));\n";
     stream << "            } catch (e) {}\n";
     stream << "        },\n";
     stream << "        send: function(msg) { return this.report(msg); }\n";
@@ -153,7 +184,7 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
     stream << "        console.log('[DearOreUI] stage8 runtime injected, contextId="
            << escapeJsString(std::to_string(id.value())) << ", bridge="
-           << (bridgeAvailable ? "true" : "false") << ", engine=' + (hasEngine ? 'yes' : 'no') + '');\n";
+           << (bridgeAvailable ? "true" : "false") << ", facet=' + (hasFacet ? 'yes' : 'no') + '');\n";
     stream << "    }\n";
     stream << "    dearOreUiReport('runtime_executed:context=' + "
            << escapeJsString(std::to_string(id.value())) << ");\n";

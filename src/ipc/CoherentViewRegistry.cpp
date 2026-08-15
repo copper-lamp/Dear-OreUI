@@ -19,6 +19,20 @@ void CoherentViewRegistry::registerView(void* gamefaceView) {
     }
 }
 
+void CoherentViewRegistry::registerOreUIView(void* oreuiView) {
+    std::function<void(void*)> observer;
+    {
+        std::lock_guard lock{mMutex};
+        if (oreuiView != nullptr) {
+            mOreUIView = oreuiView;
+        }
+        observer = mOnOreUIViewRegistered;
+    }
+    if (observer && oreuiView != nullptr) {
+        observer(oreuiView);
+    }
+}
+
 void CoherentViewRegistry::markScriptContextReady() {
     std::function<void()> observer;
     {
@@ -88,6 +102,7 @@ void CoherentViewRegistry::clear() {
     {
         std::lock_guard lock{mMutex};
         mActiveView         = nullptr;
+        mOreUIView          = nullptr;
         mScriptContextReady = false;
         observer            = mOnViewDestroyed;
     }
@@ -100,6 +115,11 @@ void CoherentViewRegistry::clear() {
 void CoherentViewRegistry::setOnViewRegistered(std::function<void(void*)> observer) {
     std::lock_guard lock{mMutex};
     mOnViewRegistered = std::move(observer);
+}
+
+void CoherentViewRegistry::setOnOreUIViewRegistered(std::function<void(void*)> observer) {
+    std::lock_guard lock{mMutex};
+    mOnOreUIViewRegistered = std::move(observer);
 }
 
 void CoherentViewRegistry::setOnScriptContextReady(std::function<void()> observer) {
