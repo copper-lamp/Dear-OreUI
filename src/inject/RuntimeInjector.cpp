@@ -3,6 +3,8 @@
 #include "api/types/Error.h"
 #include "diagnostic/Stage5IpcTelemetry.h"
 #include "diagnostic/Stage7UiTelemetry.h"
+#include "render/DomScriptSerializer.h"
+#include "render/HtmlDomParser.h"
 #include "resource/ResourceUri.h"
 #include "ui/UiManifest.h"
 
@@ -221,14 +223,19 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
             continue;
         }
         auto const& spec = item.spec;
+        // Stage 8: parse the Mod-provided htmlBody into a DomNode forest and
+        // serialize it as a compact JS node array. The bootstrap renderer
+        // (dearOreUiBuildDom) builds the DOM through CSSOM only, because cohtml
+        // drops style="" attributes injected via innerHTML.
+        auto domNodes = render::parseHtmlFragment(spec.htmlBody);
         stream << "        {\n";
         stream << "            containerId: \"" << escapeJsString(spec.containerId) << "\",\n";
         stream << "            modNamespace: \"" << escapeJsString(spec.modNamespace) << "\",\n";
         stream << "            uiId: \"" << escapeJsString(spec.uiId) << "\",\n";
         stream << "            kind: \"" << escapeJsString(std::string(api::uiKindName(spec.kind))) << "\",\n";
-        stream << "            htmlBody: \"" << escapeJsString(spec.htmlBody) << "\",\n";
         stream << "            anchorStyle: \"" << escapeJsString(anchorStyle(spec.anchor)) << "\",\n";
         stream << "            pointerEvents: " << (spec.pointerEvents ? "true" : "false") << ",\n";
+        stream << "            body: " << render::serializeDomForest(domNodes) << ",\n";
         stream << "            scripts: [";
         for (std::size_t index = 0; index < spec.scripts.size(); ++index) {
             if (index > 0) {
@@ -254,6 +261,34 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        window.__DearOreUI__.ui.debug.push(msg);\n";
     stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', 'dbg:' + msg); } catch (e) {}\n";
     stream << "    };\n";
+    // Stage 8: universal renderer — build the Mod's DOM tree purely through
+    // CSSOM. cohtml's HTML parser DROPS style="" attributes entirely
+    // (innerHTML + getAttribute('style') both failed in Stage 7.1 probes), so
+    // every element is created via createElement and styled via
+    // element.style.cssText, which the disk probe proved works.
+    // The spec.body array was produced by the C++ DomScriptSerializer from the
+    // Mod's htmlBody (stage 8 replaces the old hard-coded 'demo' branch).
+    stream << "    function dearOreUiBuildDom(parent, nodes) {\n";
+    stream << "        for (var i = 0; i < nodes.length; i++) {\n";
+    stream << "            var n = nodes[i];\n";
+    stream << "            var el = document.createElement(n.t || 'div');\n";
+    stream << "            if (n.s) {\n";
+    stream << "                try { el.style.cssText = n.s; } catch (e) { window.__DearOreUI__.ui.dbg('style_err:' + (e && e.message)); }\n";
+    stream << "            }\n";
+    stream << "            if (n.a) {\n";
+    stream << "                for (var j = 0; j < n.a.length; j++) {\n";
+    stream << "                    try { el.setAttribute(n.a[j][0], n.a[j][1]); } catch (e) {}\n";
+    stream << "                }\n";
+    stream << "            }\n";
+    stream << "            if (n.x) {\n";
+    stream << "                el.textContent = n.x;\n";
+    stream << "            }\n";
+    stream << "            if (n.c && n.c.length) {\n";
+    stream << "                dearOreUiBuildDom(el, n.c);\n";
+    stream << "            }\n";
+    stream << "            parent.appendChild(el);\n";
+    stream << "        }\n";
+    stream << "    }\n";
     stream << "    window.__DearOreUI__.ui.mount = function(spec) {\n";
     stream << "        window.__DearOreUI__.ui.dbg('mount_enter:' + spec.containerId);\n";
     stream << "        var container = document.getElementById(spec.containerId);\n";
@@ -284,46 +319,15 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "                throw new Error('no document.body or documentElement');\n";
     stream << "            }\n";
     stream << "        }\n";
-    // Stage 7.1 fix: cohtml's HTML parser DROPS style=\"\" attributes entirely
-    // (innerHTML + getAttribute('style') both failed). The only reliable way
-    // to style elements is CSSOM (element.style.cssText), which the disk probe
-    // proved works. Build the demo overlay fully through CSSOM.
+    // Stage 8: clear previous content, then build the Mod's DOM tree with the
+    // universal CSSOM renderer (replaces the former 'demo' special case).
     stream << "        container.innerHTML = '';\n";
-    stream << "        if (spec.uiId === 'demo') {\n";
-    stream << "            try {\n";
-    stream << "                var layer = document.createElement('div');\n";
-    // absolute against the full-screen container (right:0/bottom:0 avoids any
-    // percentage-of-ancestor resolution issue).
-    stream << "                layer.style.cssText =\n";
-    stream << "                    'position:absolute;top:0;left:0;right:0;bottom:0;' +\n";
-    stream << "                    'background:rgba(255,0,0,0.30);z-index:2147483647;' +\n";
-    stream << "                    'pointer-events:none;display:flex;align-items:center;' +\n";
-    stream << "                    'justify-content:center;font-family:sans-serif;';\n";
-    stream << "                var text = document.createElement('div');\n";
-    stream << "                text.textContent = 'DearOreUI DEMO';\n";
-    stream << "                text.style.cssText =\n";
-    stream << "                    'padding:24px 40px;background:rgba(0,0,0,0.85);' +\n";
-    stream << "                    'color:#4caf50;font-size:48px;font-weight:bold;' +\n";
-    stream << "                    'border:4px solid #4caf50;border-radius:8px;';\n";
-    stream << "                layer.appendChild(text);\n";
-    stream << "                container.appendChild(layer);\n";
-    stream << "                window.__DearOreUI__.ui.dbg('layer_appended');\n";
-    stream << "                function dearOreUiRectOf(el) {\n";
-    stream << "                    try {\n";
-    stream << "                        var r = el.getBoundingClientRect();\n";
-    stream << "                        return 'l=' + r.left + ',t=' + r.top + ',w=' + r.width + ',h=' + r.height;\n";
-    stream << "                    } catch (e) { return 'rect_err:' + (e && e.message); }\n";
-    stream << "                }\n";
-    stream << "                window.__DearOreUI__.ui.dbg('layer_rect:' + dearOreUiRectOf(layer));\n";
-    stream << "                window.__DearOreUI__.ui.dbg('text_rect:' + dearOreUiRectOf(text));\n";
-    stream << "                window.__DearOreUI__.ui.dbg('text_style:' + text.style.cssText);\n";
-    stream << "                window.__DearOreUI__.ui.dbg('body_children=' + (document.body ? document.body.childElementCount : -1));\n";
-    stream << "            } catch (e) {\n";
-    stream << "                window.__DearOreUI__.ui.dbg('demo_build_err:' + (e && e.message));\n";
-    stream << "                window.__DearOreUI__.ui.report('mount_error:' + (e && e.message));\n";
-    stream << "            }\n";
-    stream << "        } else {\n";
-    stream << "            container.innerHTML = spec.htmlBody;\n";
+    stream << "        try {\n";
+    stream << "            dearOreUiBuildDom(container, spec.body);\n";
+    stream << "            window.__DearOreUI__.ui.dbg('body_built:' + spec.containerId);\n";
+    stream << "        } catch (e) {\n";
+    stream << "            window.__DearOreUI__.ui.dbg('body_build_err:' + (e && e.message));\n";
+    stream << "            window.__DearOreUI__.ui.report('mount_error:' + (e && e.message));\n";
     stream << "        }\n";
     stream << "        for (var i = 0; i < spec.styles.length; i++) {\n";
     stream << "            var link = document.createElement('link');\n";
