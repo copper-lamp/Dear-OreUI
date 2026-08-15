@@ -2,36 +2,6 @@ add_rules("mode.debug", "mode.release")
 
 add_repositories("levimc-repo https://github.com/LiteLDev/xmake-repo.git")
 
--- ============================================================
--- 自动使用 LLVM (clang-cl) 优化工具链
--- 条件：检测到 LLVM 安装目录 且 其 bin 已在 PATH 中（工具链按 PATH 发现 clang-cl）
--- 满足时全局使用 clang-cl[llvm]（clang-cl + lld-link/llvm-rc/llvm-ar），
--- 否则保持默认 MSVC 工具链（过期终端/CI/其他机器不受影响）。
--- ============================================================
-local _use_clang_cl = false
-if is_plat("windows") then
-    local candidates = {}
-    local llvm_home = os.getenv("LLVM_HOME") or os.getenv("LLVM_ROOT") or os.getenv("LLVM")
-    if llvm_home then
-        table.insert(candidates, llvm_home)
-    end
-    table.insert(candidates, "D:/LLVM")
-    table.insert(candidates, "C:/Program Files/LLVM")
-    table.insert(candidates, "C:/Program Files (x86)/LLVM")
-    local pathenv = (os.getenv("PATH") or ""):lower()
-    for _, p in ipairs(candidates) do
-        if os.isdir(p) and os.isfile(path.join(p, "bin/clang-cl.exe")) then
-            -- 本机 LLVM 已加入系统 PATH，新开终端自动生效
-            _use_clang_cl = pathenv:find(path.join(p, "bin"):lower(), 1, true) ~= nil
-            break
-        end
-    end
-end
-
-if _use_clang_cl then
-    set_toolchains("clang-cl[llvm]")
-end
-
 option("target_type")
     set_default("client")
     set_showmenu(true)
