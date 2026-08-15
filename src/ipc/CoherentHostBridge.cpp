@@ -12,6 +12,8 @@
 #include "mc/external/gameface/cohtml/View.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <string_view>
 #include <windows.h>
 
 namespace cohtml {
@@ -80,6 +82,19 @@ class CoherentJsHandler final : public ::cohtml::IEventHandler {
 public:
     explicit CoherentJsHandler(HostDispatcher& dispatcher) : mDispatcher(dispatcher) {}
 
+    // The engine owns a bound handler for the view's lifetime and may delete
+    // it during teardown (default config) or during UnbindCall (F/B1c). We
+    // `new` it from static storage and make operator delete a no-op, so the
+    // engine's delete — which runs on the game's release CRT against our
+    // debug CRT allocation — degrades to a harmless destructor instead of a
+    // cross-heap free that corrupts the process heap (the msxml6/COM
+    // E_CHANGED_STATE crash on page teardown).
+    static void* operator new(std::size_t) noexcept {
+        static alignas(CoherentJsHandler) unsigned char storage[sizeof(CoherentJsHandler)];
+        return storage;
+    }
+    static void operator delete(void*) noexcept {}
+
     void Invoke(::cohtml::ArgumentsBinder* binder) override {
         char const*   text   = nullptr;
         std::uint64_t length = 0;
@@ -104,13 +119,14 @@ private:
     HostDispatcher& mDispatcher;
 };
 
-// Raw SEH-wrapped BindCall invocation. No C++ automatic objects here, so
-// __try is permitted (C2712 forbids object unwinding next to __try). The
-// handler is passed as an opaque pointer and re-cast inside.
-void rawBindCall(void* view, void* handler, void*& bindingOut) {
+// Raw SEH-wrapped RegisterForEvent invocation (H1 event channel). No C++
+// automatic objects here, so __try is permitted (C2712 forbids object
+// unwinding next to __try). The handler is passed as an opaque pointer and
+// re-cast inside.
+void rawRegisterEvent(void* view, void* handler, void*& bindingOut) {
     bindingOut = nullptr;
     __try {
-        bindingOut = static_cast<cohtml::View*>(view)->BindCall(
+        bindingOut = static_cast<cohtml::View*>(view)->RegisterForEvent(
             "dearoreui_report",
             static_cast<CoherentJsHandler*>(handler)
         );
@@ -119,14 +135,23 @@ void rawBindCall(void* view, void* handler, void*& bindingOut) {
     }
 }
 
-// Registration of the "dearoreui_report" native binding. On engine-layout
-// mismatch the binding is skipped so the JS->C++ channel degrades to
-// diagnostics instead of crashing the client (BindCall previously corrupted
-// the heap at crash 11:38).
-bool bindNativeCall(void* view, HostDispatcher& dispatcher, void*& handlerOut, void*& bindingOut) {
+// Raw SEH-wrapped UnregisterFromEvent invocation (same C2712 constraint).
+void rawUnregisterEvent(void* view, void* binding) {
+    __try {
+        if (view != nullptr && binding != nullptr) {
+            static_cast<cohtml::View*>(view)->UnregisterFromEvent(binding);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+}
+
+// Registration of the "dearoreui_report" native event handler. On engine-layout
+// mismatch the registration is skipped so the JS->C++ channel degrades to
+// diagnostics instead of crashing the client.
+bool registerNativeEvent(void* view, HostDispatcher& dispatcher, void*& handlerOut, void*& bindingOut) {
     auto* handler = new CoherentJsHandler(dispatcher);
     void* binding = nullptr;
-    rawBindCall(view, handler, binding);
+    rawRegisterEvent(view, handler, binding);
     if (binding == nullptr) {
         delete handler;
         return false;
@@ -145,9 +170,16 @@ void defaultCoherentExecutor(void* gamefaceView, std::string const& script) {
 
 CoherentHostBridge::CoherentHostBridge(
     CoherentViewRegistry& registry,
-    ScriptExecutor        executor
+    ScriptExecutor        executor,
+    bool                  disableInject,
+    bool                  disableBindCall,
+    bool                  debugUnbindImmediately
 )
-: mRegistry(registry), mExecutor(executor) {
+: mRegistry(registry)
+, mExecutor(executor)
+, mDisableInject(disableInject)
+, mDisableBindCall(disableBindCall)
+, mDebugUnbindImmediately(debugUnbindImmediately) {
     mRegistry.setOnViewRegistered(
         [this](void* gamefaceView) { onViewRegistered(gamefaceView); }
     );
@@ -233,13 +265,10 @@ void CoherentHostBridge::onViewRegistered(void* gamefaceView) {
     void* previous = mRegistry.activeView();
     if (mNativeHandler != nullptr && previous != nullptr && previous != gamefaceView) {
         if (mNativeBinding != nullptr) {
-            __try {
-                static_cast<cohtml::View*>(previous)->UnbindCall(mNativeBinding);
-            } __except (EXCEPTION_EXECUTE_HANDLER) {
-            }
+            rawUnregisterEvent(previous, mNativeBinding);
         }
         releaseNativeBinding();
-        diagnostic::recordStage0("js", "event=bindcall_rebound\tname=dearoreui_report");
+        diagnostic::recordStage0("js", "event=event_rebound\tname=dearoreui_report");
     }
     // The view handle is tracked by the registry. Scripts are NOT flushed
     // here: the page's script context may not exist yet (ExecuteScript would
@@ -248,6 +277,13 @@ void CoherentHostBridge::onViewRegistered(void* gamefaceView) {
 }
 
 void CoherentHostBridge::onScriptContextReady() {
+    // Stage 8 crash isolation: disable_inject=1 (stage8-switch.txt) skips BOTH
+    // the ExecuteScript flush and the BindCall registration while keeping every
+    // hook installed. This attributes the page-exit crash to the injection chain.
+    if (mDisableInject) {
+        diagnostic::recordStage0("js", "event=inject_disabled");
+        return;
+    }
     void* view = mRegistry.activeView();
     if (view == nullptr) {
         return;
@@ -262,29 +298,36 @@ void CoherentHostBridge::onScriptContextReady() {
         static_cast<void>(submit(view, item.contextId, item.script));
     }
 
-    // Stage 8: register the JS->C++ native binding (once, per view lifetime).
-    // BindCall is only legal after the script context exists — the same gate
-    // ExecuteScript uses. The binding routes engine.call("dearoreui_report",
-    // json) to HostDispatcher via CoherentJsHandler.
-    if (mDispatcher != nullptr && mNativeHandler == nullptr) {
+    // Stage 8 (H1 event channel): register the JS->C++ native event handler
+    // (once, per view lifetime). RegisterForEvent is only legal after the
+    // script context exists — the same gate ExecuteScript uses. The handler
+    // routes JS engine.trigger("dearoreui_report", json) to HostDispatcher
+    // via CoherentJsHandler (no return value; fire-and-forget reports).
+    static bool const noBindCall = [] {
+        char const* env = std::getenv("DEAROREUI_NO_BINDCALL");
+        return env != nullptr && std::string_view{env} == "1";
+    }();
+    if (mDisableBindCall) {
+        diagnostic::recordStage0("js", "event=bindcall_disabled");
+    } else if (!noBindCall && mDispatcher != nullptr && mNativeHandler == nullptr) {
         void* handler = nullptr;
         void* binding = nullptr;
-        if (bindNativeCall(view, *mDispatcher, handler, binding)) {
+        if (registerNativeEvent(view, *mDispatcher, handler, binding)) {
             mNativeHandler = handler;
             mNativeBinding = binding;
             diagnostic::recordStage5BridgeState(
                 api::ContextId{},
                 true,
-                "CoherentHostBridge + BindCall(dearoreui_report)"
+                "CoherentHostBridge + RegisterForEvent(dearoreui_report)"
             );
-            diagnostic::recordStage0("js", "event=bindcall_registered\tname=dearoreui_report");
+            diagnostic::recordStage0("js", "event=event_registered\tname=dearoreui_report");
         } else {
             diagnostic::recordStage5HostError(
                 api::ContextId{},
                 api::RequestId{},
                 "dearoreui_report",
                 api::ErrorCode::NotSupported,
-                "cohtml BindCall registration failed; JS->C++ channel unavailable"
+                "cohtml RegisterForEvent failed; JS->C++ channel unavailable"
             );
         }
     }
@@ -294,6 +337,9 @@ void CoherentHostBridge::releaseNativeBinding() {
     if (mNativeHandler == nullptr) {
         return;
     }
+    // The handler lives in static storage (no-op operator delete), so this
+    // delete is a harmless destructor call. The static buffer is reused by
+    // the next BindCall registration.
     delete static_cast<CoherentJsHandler*>(mNativeHandler);
     mNativeHandler = nullptr;
     mNativeBinding = nullptr;
@@ -309,14 +355,10 @@ void CoherentHostBridge::onViewDestroyed(void* gamefaceView) {
     }
     void* view = gamefaceView != nullptr ? gamefaceView : mRegistry.activeView();
     if (view != nullptr && mNativeBinding != nullptr) {
-        __try {
-            static_cast<cohtml::View*>(view)->UnbindCall(mNativeBinding);
-        } __except (EXCEPTION_EXECUTE_HANDLER) {
-            // UnbindCall on a torn-down view may fault; ignore and continue.
-        }
+        rawUnregisterEvent(view, mNativeBinding);
     }
     releaseNativeBinding();
-    diagnostic::recordStage0("js", "event=bindcall_unbound\tname=dearoreui_report");
+    diagnostic::recordStage0("js", "event=event_unregistered\tname=dearoreui_report");
 }
 
 api::Result<void> CoherentHostBridge::submit(void* gamefaceView, api::ContextId id, std::string const& script) {

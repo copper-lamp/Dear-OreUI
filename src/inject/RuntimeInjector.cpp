@@ -110,15 +110,17 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    window.__DearOreUI__.stage = 8;\n";
     stream << "    window.__DearOreUI__.contextId = \"" << std::to_string(id.value()) << "\";\n";
     if (bridgeAvailable) {
-        // Stage 8: real JS->C++ channel. engine.call("dearoreui_report", json)
-        // reaches the native BindCall handler, which dispatches the request to
-        // HostDispatcher and returns the serialized response synchronously.
+        // Stage 8 (H1 event channel): JS->C++ reports go through the native
+        // RegisterForEvent handler via engine.trigger("dearoreui_report",
+        // json). The event channel has no synchronous return value, so
+        // callHost sends fire-and-forget and resolves null; synchronous
+        // request/response is delivered later via ExecuteScript callbacks.
         stream << "    window.__DearOreUI__.ipc = {\n";
         stream << "        isAvailable: function() { return true; },\n";
         stream << "        callHost: function(method, args) {\n";
         stream << "            return new Promise(function(resolve, reject) {\n";
         stream << "                try {\n";
-        stream << "                    if (typeof engine === 'undefined' || !engine.call) {\n";
+        stream << "                    if (typeof engine === 'undefined' || !engine.trigger) {\n";
         stream << "                        throw new Error('HostBridgeUnavailable');\n";
         stream << "                    }\n";
         stream << "                    var request = {\n";
@@ -128,16 +130,8 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
         stream << "                        method: method,\n";
         stream << "                        payload: (typeof args === 'string' ? args : JSON.stringify(args || {}))\n";
         stream << "                    };\n";
-        stream << "                    var raw = engine.call('dearoreui_report', JSON.stringify(request));\n";
-        stream << "                    if (!raw) { resolve(null); return; }\n";
-        stream << "                    var response = JSON.parse(raw);\n";
-        stream << "                    if (response && response.error) {\n";
-        stream << "                        var err = new Error(response.payload || ('HostError:' + response.error));\n";
-        stream << "                        err.code = response.error;\n";
-        stream << "                        reject(err);\n";
-        stream << "                    } else {\n";
-        stream << "                        resolve(response ? response.payload : null);\n";
-        stream << "                    }\n";
+        stream << "                    engine.trigger('dearoreui_report', JSON.stringify(request));\n";
+        stream << "                    resolve(null);\n";
         stream << "                } catch (e) {\n";
         stream << "                    reject(e);\n";
         stream << "                }\n";
@@ -157,7 +151,7 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
         stream << "    };\n";
     }
     stream << "    function dearOreUiReport(msg) {\n";
-    stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', msg); } catch (e) {}\n";
+    stream << "        try { if (typeof engine !== 'undefined' && engine.trigger) engine.trigger('dearoreui_report', msg); } catch (e) {}\n";
     stream << "    }\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
     stream << "        console.log('[DearOreUI] stage8 runtime injected, contextId="
@@ -166,6 +160,42 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    }\n";
     stream << "    dearOreUiReport('runtime_executed:context=' + "
            << escapeJsString(std::to_string(id.value())) << ");\n";
+
+    // Stage 8 network probe: verify the embedded cohtml network stack supports
+    // XHR / WebSocket before committing to the loopback channel (BindCall/
+    // RegisterForEvent both crash on page teardown). fetch is known-missing in
+    // this cohtml build. Results are reported through dearOreUiReport
+    // (js/report channel) after a delay (handler registers after script flush).
+    stream << "    try {\n";
+    stream << "        setTimeout(function(){\n";
+    stream << "            function probe(name, value) {\n";
+    stream << "                try { console.log('[DearOreUI][netprobe] ' + name + '=' + value); } catch (e) {}\n";
+    stream << "                try { dearOreUiReport('netprobe:' + name + '=' + value); } catch (e) {}\n";
+    stream << "            }\n";
+    stream << "            try {\n";
+    stream << "                if (typeof XMLHttpRequest === 'undefined') { probe('xhr', 'API_MISSING'); }\n";
+    stream << "                else {\n";
+    stream << "                    probe('xhr', 'constructed');\n";
+    stream << "                    var x = new XMLHttpRequest();\n";
+    stream << "                    x.open('GET', 'http://127.0.0.1:1/probe', true);\n";
+    stream << "                    x.onreadystatechange = function() { if (x.readyState >= 2) probe('xhr', 'state:' + x.readyState + ':' + x.status); };\n";
+    stream << "                    x.onerror = function() { probe('xhr', 'error'); };\n";
+    stream << "                    x.send(null);\n";
+    stream << "                }\n";
+    stream << "            } catch (e) { probe('xhr', 'threw:' + (e && e.message ? e.message : String(e))); }\n";
+    stream << "            try {\n";
+    stream << "                if (typeof WebSocket === 'undefined') { probe('ws', 'API_MISSING'); }\n";
+    stream << "                else {\n";
+    stream << "                    probe('ws', 'constructed');\n";
+    stream << "                    var ws = new WebSocket('ws://127.0.0.1:1/probe');\n";
+    stream << "                    ws.onopen = function() { probe('ws', 'open'); };\n";
+    stream << "                    ws.onerror = function() { probe('ws', 'error'); };\n";
+    stream << "                    ws.onclose = function(e) { probe('ws', 'close:' + (e ? e.code : '?')); };\n";
+    stream << "                    setTimeout(function() { probe('ws', 'no_callback_3s'); }, 3000);\n";
+    stream << "                }\n";
+    stream << "            } catch (e) { probe('ws', 'threw:' + (e && e.message ? e.message : String(e))); }\n";
+    stream << "        }, 800);\n";
+    stream << "    } catch (e) {}\n";
     stream << "})();\n";
     return stream.str();
 }
@@ -299,7 +329,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "    window.__DearOreUI__.ui.debug = [];\n";
     stream << "    window.__DearOreUI__.ui.dbg = function(msg) {\n";
     stream << "        window.__DearOreUI__.ui.debug.push(msg);\n";
-    stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', 'dbg:' + msg); } catch (e) {}\n";
+    stream << "        try { if (typeof engine !== 'undefined' && engine.trigger) engine.trigger('dearoreui_report', 'dbg:' + msg); } catch (e) {}\n";
     stream << "    };\n";
     // Stage 8: universal renderer — build the Mod's DOM tree purely through
     // CSSOM. cohtml's HTML parser DROPS style="" attributes entirely

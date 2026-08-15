@@ -43,6 +43,9 @@ struct AdapterState {
     bool viewInitialize{};
     bool onReadyForBindings{};
     bool viewDestructor{};
+    bool bindingsReleased{};
+    bool viewRemoveScene{};
+    bool viewUnload{};
 
     std::mutex                                         mutex;
     std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
@@ -343,10 +346,47 @@ void dumpViewVtable(void* gamefaceView) {
     diagnostic::recordStage0("js", hexLine);
 }
 
-// Stage 8 fix: hook OreUI::View destruction so we can unbind the native
-// JS->C++ handler (and drop the registry's view pointer) BEFORE cohtml tears
-// down the view. Previously the handler survived view teardown, and returning
-// to the main menu (JsonUI) crashed while the engine destroyed the view.
+// Stage 8 fix (round 3): the OreUI view is REUSED across page switches, so
+// neither $dtor nor $OnBindingsReleased fire when leaving /play/all. The
+// engine instead removes the page scene from the view (removeScene) and then
+// tears down the cohtml document — freeing our BindCall handler on its own
+// thread, which corrupts the heap. Unbind at removeScene/_unload so the engine
+// never touches the handler afterwards.
+LL_TYPE_INSTANCE_HOOK(
+    Stage7ViewRemoveSceneHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::$removeScene,
+    void,
+    ::OreUI::IScene const& scene
+) {
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            state().viewRegistry->notifyBindingsReleased();
+        }
+    }
+    diagnostic::recordStage0("js", "event=view_remove_scene");
+    origin(scene);
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    Stage7ViewUnloadHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::_unload,
+    void
+) {
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            state().viewRegistry->notifyBindingsReleased();
+        }
+    }
+    diagnostic::recordStage0("js", "event=view_unload");
+    origin();
+}
+
 LL_TYPE_INSTANCE_HOOK(
     Stage7ViewDestructorHook,
     ll::memory::HookPriority::Normal,
@@ -363,6 +403,28 @@ LL_TYPE_INSTANCE_HOOK(
         }
     }
     diagnostic::recordStage0("js", "event=view_destroyed");
+    origin();
+}
+
+// Stage 8 fix: when the OreUI page is unloaded, the engine releases the page's
+// bindings by calling IViewListener::OnBindingsReleased. The cohtml view is
+// often REUSED (not destroyed), so the $dtor hook never fires. We must unbind
+// our native BindCall handler here, otherwise the engine frees the bindings
+// while our handler is still registered -> crash when returning to the menu.
+LL_TYPE_INSTANCE_HOOK(
+    Stage7BindingsReleasedHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::$OnBindingsReleased,
+    void
+) {
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            state().viewRegistry->notifyBindingsReleased();
+        }
+    }
+    diagnostic::recordStage0("js", "event=bindings_released");
     origin();
 }
 
@@ -423,6 +485,31 @@ LL_TYPE_INSTANCE_HOOK(
         "event=router_onchange_entered\t" + locationFields("old", oldLocation) + "\t"
             + locationFields("cur", currentLocation)
     );
+
+    // Stage 8 fix: leaving an OreUI route tears the cohtml view down. The view
+    // is recreated on every /play/all entry (view_ptr changes each time), and
+    // the engine frees BindCall handlers during teardown — a handler we `new`ed
+    // on the mod's debug CRT heap gets freed on the game's release CRT heap,
+    // which corrupts the heap and later surfaces as the msxml6/COM
+    // E_CHANGED_STATE crash on return to the menu. None of the view lifecycle
+    // hooks ($dtor/$OnBindingsReleased/$removeScene/_unload) fire, so the
+    // router change (which reliably fires ~600ms before the crash) is the
+    // unbind point: notifyBindingsReleased() -> bridge.onViewDestroyed() ->
+    // UnbindCall + release the handler before the engine tears the view down.
+    bool leavingOreUi = true;
+    if (oldLocation && currentLocation) {
+        auto oldPath = oldLocation->getPath();
+        auto curPath = currentLocation->getPath();
+        leavingOreUi = oldPath.rfind("/play/", 0) == 0 && curPath.rfind("/play/", 0) != 0;
+    }
+    if (leavingOreUi) {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            state().viewRegistry->notifyBindingsReleased();
+        }
+        diagnostic::recordStage0("hook", "event=bindings_released_router");
+    }
+
     origin(oldLocation, currentLocation);
 }
 
@@ -466,18 +553,23 @@ bool allInstalled() {
     auto const& value = state();
     return value.techStack && value.scene && value.routeChange && value.routePush && value.routeReplace
         && value.routeBack && value.routerDestructorThunk && value.clientUpdate && value.viewInitialize
-        && value.onReadyForBindings && value.viewDestructor;
+        && value.onReadyForBindings && value.viewDestructor && value.bindingsReleased && value.viewRemoveScene
+        && value.viewUnload;
 }
 
 bool noneInstalled() {
     auto const& value = state();
     return !value.techStack && !value.scene && !value.routeChange && !value.routePush && !value.routeReplace
         && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate && !value.viewInitialize
-        && !value.onReadyForBindings && !value.viewDestructor;
+        && !value.onReadyForBindings && !value.viewDestructor && !value.bindingsReleased && !value.viewRemoveScene
+        && !value.viewUnload;
 }
 
 bool removeInstalled() {
     auto& value = state();
+    if (value.viewUnload && Stage7ViewUnloadHook::unhook()) value.viewUnload = false;
+    if (value.viewRemoveScene && Stage7ViewRemoveSceneHook::unhook()) value.viewRemoveScene = false;
+    if (value.bindingsReleased && Stage7BindingsReleasedHook::unhook()) value.bindingsReleased = false;
     if (value.onReadyForBindings && Stage7OnReadyForBindingsHook::unhook()) value.onReadyForBindings = false;
     if (value.viewDestructor && Stage7ViewDestructorHook::unhook()) value.viewDestructor = false;
     if (value.routeBack && Stage0RouterBackHook::unhook()) value.routeBack = false;
@@ -553,6 +645,9 @@ bool OreUIHookAdapter::install() {
     if (adapterState.clientUpdate) adapterState.viewInitialize = Stage7ViewInitializeHook::hook() == 0;
     if (adapterState.viewInitialize) adapterState.onReadyForBindings = Stage7OnReadyForBindingsHook::hook() == 0;
     if (adapterState.onReadyForBindings) adapterState.viewDestructor = Stage7ViewDestructorHook::hook() == 0;
+    if (adapterState.viewDestructor) adapterState.bindingsReleased = Stage7BindingsReleasedHook::hook() == 0;
+    if (adapterState.bindingsReleased) adapterState.viewRemoveScene = Stage7ViewRemoveSceneHook::hook() == 0;
+    if (adapterState.viewRemoveScene) adapterState.viewUnload = Stage7ViewUnloadHook::hook() == 0;
 
     // Stage 7.1: triggerEvent is a diagnostic-only hook; its failure must not
     // block the mod (the ODS and vtable diagnostics already cover the rest).
@@ -572,6 +667,9 @@ bool OreUIHookAdapter::install() {
         .withField("view_initialize", adapterState.viewInitialize ? "ok" : "fail")
         .withField("ready_for_bindings", adapterState.onReadyForBindings ? "ok" : "fail")
         .withField("view_destructor", adapterState.viewDestructor ? "ok" : "fail")
+        .withField("bindings_released", adapterState.bindingsReleased ? "ok" : "fail")
+        .withField("view_remove_scene", adapterState.viewRemoveScene ? "ok" : "fail")
+        .withField("view_unload", adapterState.viewUnload ? "ok" : "fail")
         .withField("trigger_event", triggerEventInstalled ? "ok" : "fail")
         .emit();
 

@@ -38,7 +38,10 @@ class CoherentHostBridge : public IHostBridge {
 public:
     CoherentHostBridge(
         CoherentViewRegistry& registry,
-        ScriptExecutor        executor = defaultCoherentExecutor
+        ScriptExecutor        executor = defaultCoherentExecutor,
+        bool                  disableInject = false,
+        bool                  disableBindCall = false,
+        bool                  debugUnbindImmediately = false
     );
     ~CoherentHostBridge() override;
 
@@ -85,6 +88,9 @@ private:
     CoherentViewRegistry& mRegistry;
     ScriptExecutor        mExecutor;
     HostDispatcher*       mDispatcher{nullptr};
+    bool                  mDisableInject{false};
+    bool                  mDisableBindCall{false};
+    bool                  mDebugUnbindImmediately{false};
 
     // Opaque cohtml::IEventHandler owned by the bridge; created/destroyed in
     // the DLL where cohtml headers are available. mNativeBinding is the opaque

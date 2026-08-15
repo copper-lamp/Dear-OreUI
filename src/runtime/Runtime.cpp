@@ -4,6 +4,7 @@
 #include "capability/ICapabilityQuery.h"
 #include "component/ComponentRenderer.h"
 #include "component/ComponentSpec.h"
+#include "diagnostic/CrashProbe.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "diagnostic/FileDiagnosticSink.h"
 #include "diagnostic/Stage0TelemetryCompat.h"
@@ -22,6 +23,9 @@
 #include "ui/NullMountHost.h"
 #include "ui/UiPlanner.h"
 
+#include <filesystem>
+#include <fstream>
+#include <string>
 #include <utility>
 
 namespace dearoreui::runtime {
@@ -32,6 +36,36 @@ bool Runtime::initialize() {
     if (mInitialized) return true;
 
     auto& logger = diagnostic::globalLogger();
+
+    // Stage 8 crash isolation: read <data>/stage8-switch.txt (one key=value
+    // per line). Switches live in a file, NOT an environment variable, because
+    // the game may be launched from a launcher that does not forward the env
+    // block (DEAROREUI_NO_BINDCALL was never observed to take effect).
+    auto switchPath = mConfig.dataDirectory / "stage8-switch.txt";
+    if (std::filesystem::exists(switchPath)) {
+        std::ifstream in(switchPath);
+        std::string   line;
+        while (std::getline(in, line)) {
+            if (line.rfind("disable_inject=1", 0) == 0) {
+                mConfig.disableInject = true;
+            }
+            if (line.rfind("disable_bindcall=1", 0) == 0) {
+                mConfig.disableBindCall = true;
+            }
+            if (line.rfind("debug_unbind_immediately=1", 0) == 0) {
+                mConfig.debugUnbindImmediately = true;
+            }
+            if (line.rfind("disable_hooks=1", 0) == 0) {
+                mConfig.enableHooks = false;
+            }
+        }
+    }
+    logger.info("stage8", "switch_loaded")
+        .withField("disable_inject", mConfig.disableInject ? "1" : "0")
+        .withField("disable_bindcall", mConfig.disableBindCall ? "1" : "0")
+        .withField("debug_unbind_immediately", mConfig.debugUnbindImmediately ? "1" : "0")
+        .withField("disable_hooks", mConfig.enableHooks ? "0" : "1")
+        .emit();
 
     if (mConfig.enableFileDiagnostics) {
         logger.addSink(
@@ -46,6 +80,10 @@ bool Runtime::initialize() {
         diagnostic::startStage0Session();
     }
     diagnostic::initializeStage3FileSink(mConfig.dataDirectory, diagnostic::currentStage0SessionId());
+    // Stage 8 crash probe: records the faulting module+RVA on ANY unhandled
+    // exception (including cohtml engine threads) to data/crash/crash-last.txt.
+    // This is how the page-exit crash gets pinpointed instead of guessed at.
+    diagnostic::installCrashProbe(mConfig.dataDirectory);
 
     mRegistry           = std::make_unique<registry::ModRegistry>();
     mHostMethodRegistry = std::make_unique<ipc::HostMethodRegistry>();
@@ -111,7 +149,13 @@ bool Runtime::enable() {
     mChangePlanner    = std::make_unique<transform::ChangePlanner>(*mRegistry);
     mPageTransformer  = std::make_unique<transform::PageTransformer>();
 
-    mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(*mViewRegistry);
+    mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(
+        *mViewRegistry,
+        ipc::defaultCoherentExecutor,
+        mConfig.disableInject,
+        mConfig.disableBindCall,
+        mConfig.debugUnbindImmediately
+    );
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
@@ -165,6 +209,8 @@ bool Runtime::disable() {
     if (!mInitialized) return true;
 
     auto& logger = diagnostic::globalLogger();
+
+    diagnostic::uninstallCrashProbe();
 
     if (mApi != nullptr) {
         mApi->setReady(false);

@@ -36,6 +36,14 @@ public:
     // (used by the bridge to unbind native JS->C++ handlers).
     void onViewDestroyed(void* gamefaceView);
 
+    // Called when the engine releases the page's bindings (IViewListener::
+    // OnBindingsReleased) — typically when the OreUI page is unloaded while
+    // the cohtml view itself is reused, NOT destroyed. Resets the script-context
+    // flag (the page context is gone until OnReadyForBindings fires again) and
+    // notifies the destroy observer so the bridge unbinds its native handler
+    // BEFORE the engine frees the bindings.
+    void notifyBindingsReleased();
+
     // Most recently registered non-null view handle, or nullptr.
     [[nodiscard]] void* activeView() const;
 

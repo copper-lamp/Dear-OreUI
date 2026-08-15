@@ -48,6 +48,21 @@ void CoherentViewRegistry::onViewDestroyed(void* gamefaceView) {
     }
 }
 
+void CoherentViewRegistry::notifyBindingsReleased() {
+    std::function<void(void*)> observer;
+    {
+        std::lock_guard lock{mMutex};
+        mScriptContextReady = false;
+        observer            = mOnViewDestroyed;
+    }
+    // The view handle itself is kept (the view is reused, not destroyed), but
+    // the bridge must unbind its native handler before the engine frees the
+    // page's bindings. Pass the active view so UnbindCall targets it.
+    if (observer) {
+        observer(mActiveView);
+    }
+}
+
 void* CoherentViewRegistry::activeView() const {
     std::lock_guard lock{mMutex};
     return mActiveView;
