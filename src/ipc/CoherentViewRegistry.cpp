@@ -31,6 +31,23 @@ void CoherentViewRegistry::markScriptContextReady() {
     }
 }
 
+void CoherentViewRegistry::onViewDestroyed(void* gamefaceView) {
+    std::function<void(void*)> observer;
+    {
+        std::lock_guard lock{mMutex};
+        if (mActiveView != nullptr && (gamefaceView == nullptr || gamefaceView == mActiveView)) {
+            mActiveView         = nullptr;
+            mScriptContextReady = false;
+        }
+        observer = mOnViewDestroyed;
+    }
+    // Notify the bridge (if any) so it can unbind native handlers before the
+    // engine tears the view down.
+    if (observer) {
+        observer(gamefaceView);
+    }
+}
+
 void* CoherentViewRegistry::activeView() const {
     std::lock_guard lock{mMutex};
     return mActiveView;
@@ -52,9 +69,17 @@ std::size_t CoherentViewRegistry::count() const {
 }
 
 void CoherentViewRegistry::clear() {
-    std::lock_guard lock{mMutex};
-    mActiveView         = nullptr;
-    mScriptContextReady = false;
+    std::function<void(void*)> observer;
+    {
+        std::lock_guard lock{mMutex};
+        mActiveView         = nullptr;
+        mScriptContextReady = false;
+        observer            = mOnViewDestroyed;
+    }
+    // Runtime::disable path: release the native handler too.
+    if (observer) {
+        observer(nullptr);
+    }
 }
 
 void CoherentViewRegistry::setOnViewRegistered(std::function<void(void*)> observer) {
@@ -65,6 +90,11 @@ void CoherentViewRegistry::setOnViewRegistered(std::function<void(void*)> observ
 void CoherentViewRegistry::setOnScriptContextReady(std::function<void()> observer) {
     std::lock_guard lock{mMutex};
     mOnScriptContextReady = std::move(observer);
+}
+
+void CoherentViewRegistry::setOnViewDestroyed(std::function<void(void*)> observer) {
+    std::lock_guard lock{mMutex};
+    mOnViewDestroyed = std::move(observer);
 }
 
 } // namespace dearoreui::ipc

@@ -42,6 +42,7 @@ struct AdapterState {
     bool clientUpdate{};
     bool viewInitialize{};
     bool onReadyForBindings{};
+    bool viewDestructor{};
 
     std::mutex                                         mutex;
     std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
@@ -342,6 +343,29 @@ void dumpViewVtable(void* gamefaceView) {
     diagnostic::recordStage0("js", hexLine);
 }
 
+// Stage 8 fix: hook OreUI::View destruction so we can unbind the native
+// JS->C++ handler (and drop the registry's view pointer) BEFORE cohtml tears
+// down the view. Previously the handler survived view teardown, and returning
+// to the main menu (JsonUI) crashed while the engine destroyed the view.
+LL_TYPE_INSTANCE_HOOK(
+    Stage7ViewDestructorHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::$dtor,
+    void
+) {
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            // mGamefaceView is typed as cohtml::View* (TypedStorage scalar
+            // specialization), so it converts directly.
+            state().viewRegistry->onViewDestroyed(this->mGamefaceView);
+        }
+    }
+    diagnostic::recordStage0("js", "event=view_destroyed");
+    origin();
+}
+
 LL_TYPE_INSTANCE_HOOK(
     Stage7OnReadyForBindingsHook,
     ll::memory::HookPriority::Normal,
@@ -442,19 +466,20 @@ bool allInstalled() {
     auto const& value = state();
     return value.techStack && value.scene && value.routeChange && value.routePush && value.routeReplace
         && value.routeBack && value.routerDestructorThunk && value.clientUpdate && value.viewInitialize
-        && value.onReadyForBindings;
+        && value.onReadyForBindings && value.viewDestructor;
 }
 
 bool noneInstalled() {
     auto const& value = state();
     return !value.techStack && !value.scene && !value.routeChange && !value.routePush && !value.routeReplace
         && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate && !value.viewInitialize
-        && !value.onReadyForBindings;
+        && !value.onReadyForBindings && !value.viewDestructor;
 }
 
 bool removeInstalled() {
     auto& value = state();
     if (value.onReadyForBindings && Stage7OnReadyForBindingsHook::unhook()) value.onReadyForBindings = false;
+    if (value.viewDestructor && Stage7ViewDestructorHook::unhook()) value.viewDestructor = false;
     if (value.routeBack && Stage0RouterBackHook::unhook()) value.routeBack = false;
     if (value.routerDestructorThunk && Stage1RouterDestructorThunkHook::unhook()) value.routerDestructorThunk = false;
     if (value.clientUpdate && Stage1ClientUpdateHook::unhook()) value.clientUpdate = false;
@@ -527,6 +552,7 @@ bool OreUIHookAdapter::install() {
     if (adapterState.routerDestructorThunk) adapterState.clientUpdate = Stage1ClientUpdateHook::hook() == 0;
     if (adapterState.clientUpdate) adapterState.viewInitialize = Stage7ViewInitializeHook::hook() == 0;
     if (adapterState.viewInitialize) adapterState.onReadyForBindings = Stage7OnReadyForBindingsHook::hook() == 0;
+    if (adapterState.onReadyForBindings) adapterState.viewDestructor = Stage7ViewDestructorHook::hook() == 0;
 
     // Stage 7.1: triggerEvent is a diagnostic-only hook; its failure must not
     // block the mod (the ODS and vtable diagnostics already cover the rest).
@@ -545,6 +571,7 @@ bool OreUIHookAdapter::install() {
         .withField("client_update", adapterState.clientUpdate ? "ok" : "fail")
         .withField("view_initialize", adapterState.viewInitialize ? "ok" : "fail")
         .withField("ready_for_bindings", adapterState.onReadyForBindings ? "ok" : "fail")
+        .withField("view_destructor", adapterState.viewDestructor ? "ok" : "fail")
         .withField("trigger_event", triggerEventInstalled ? "ok" : "fail")
         .emit();
 

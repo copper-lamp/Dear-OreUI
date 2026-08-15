@@ -30,6 +30,12 @@ public:
     // (OreUI::View::OnReadyForBindings). Notifies the script-context observer.
     void markScriptContextReady();
 
+    // Called when the owning OreUI::View is being destroyed (before the
+    // engine tears down the cohtml view). Clears the tracked handle so no code
+    // can later use a dangling view pointer, and notifies the destroy observer
+    // (used by the bridge to unbind native JS->C++ handlers).
+    void onViewDestroyed(void* gamefaceView);
+
     // Most recently registered non-null view handle, or nullptr.
     [[nodiscard]] void* activeView() const;
 
@@ -50,11 +56,17 @@ public:
     // scripts at the correct moment.
     void setOnScriptContextReady(std::function<void()> observer);
 
+    // Single observer invoked (on the game thread) when the active view is
+    // being destroyed. Used by the bridge to release native BindCall handlers
+    // before the engine tears the view down.
+    void setOnViewDestroyed(std::function<void(void*)> observer);
+
 private:
     void*                            mActiveView{nullptr};
     bool                             mScriptContextReady{false};
     std::function<void(void*)>       mOnViewRegistered;
     std::function<void()>            mOnScriptContextReady;
+    std::function<void(void*)>       mOnViewDestroyed;
     mutable std::mutex               mMutex;
 };
 

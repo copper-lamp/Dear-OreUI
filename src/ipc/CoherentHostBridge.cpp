@@ -154,6 +154,9 @@ CoherentHostBridge::CoherentHostBridge(
     mRegistry.setOnScriptContextReady(
         [this]() { onScriptContextReady(); }
     );
+    mRegistry.setOnViewDestroyed(
+        [this](void* gamefaceView) { onViewDestroyed(gamefaceView); }
+    );
 }
 
 CoherentHostBridge::~CoherentHostBridge() { releaseNativeBinding(); }
@@ -224,7 +227,20 @@ void CoherentHostBridge::setDispatcher(HostDispatcher& dispatcher) {
 }
 
 void CoherentHostBridge::onViewRegistered(void* gamefaceView) {
-    static_cast<void>(gamefaceView);
+    // A view may be re-initialized (reused across pages). If the engine hands
+    // us a different view object, unbind the handler bound to the previous
+    // one; the registry updates its active handle separately.
+    void* previous = mRegistry.activeView();
+    if (mNativeHandler != nullptr && previous != nullptr && previous != gamefaceView) {
+        if (mNativeBinding != nullptr) {
+            __try {
+                static_cast<cohtml::View*>(previous)->UnbindCall(mNativeBinding);
+            } __except (EXCEPTION_EXECUTE_HANDLER) {
+            }
+        }
+        releaseNativeBinding();
+        diagnostic::recordStage0("js", "event=bindcall_rebound\tname=dearoreui_report");
+    }
     // The view handle is tracked by the registry. Scripts are NOT flushed
     // here: the page's script context may not exist yet (ExecuteScript would
     // be silently dropped). Flushing happens in onScriptContextReady().
@@ -281,6 +297,26 @@ void CoherentHostBridge::releaseNativeBinding() {
     delete static_cast<CoherentJsHandler*>(mNativeHandler);
     mNativeHandler = nullptr;
     mNativeBinding = nullptr;
+}
+
+// Stage 8 fix: when the owning OreUI::View is destroyed, cohtml tears down
+// every registered binding. We must UnbindCall and delete our handler BEFORE
+// the engine destroys the view, otherwise the engine either calls a dangling
+// handler (Invoke on freed memory) or frees the handler itself. Both crash.
+void CoherentHostBridge::onViewDestroyed(void* gamefaceView) {
+    if (mNativeHandler == nullptr) {
+        return;
+    }
+    void* view = gamefaceView != nullptr ? gamefaceView : mRegistry.activeView();
+    if (view != nullptr && mNativeBinding != nullptr) {
+        __try {
+            static_cast<cohtml::View*>(view)->UnbindCall(mNativeBinding);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            // UnbindCall on a torn-down view may fault; ignore and continue.
+        }
+    }
+    releaseNativeBinding();
+    diagnostic::recordStage0("js", "event=bindcall_unbound\tname=dearoreui_report");
 }
 
 api::Result<void> CoherentHostBridge::submit(void* gamefaceView, api::ContextId id, std::string const& script) {

@@ -72,6 +72,11 @@ public:
     // the active view via ExecuteScript and (re)registers the native binding.
     void onScriptContextReady();
 
+    // Called by CoherentViewRegistry when the owning OreUI::View is being
+    // destroyed. Unbinds the native JS->C++ handler (UnbindCall + delete) so
+    // the engine never touches a handler after the view is torn down.
+    void onViewDestroyed(void* gamefaceView);
+
 private:
     [[nodiscard]] api::Result<void> submit(void* gamefaceView, api::ContextId id, std::string const& script);
 
