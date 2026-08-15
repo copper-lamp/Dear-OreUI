@@ -23,9 +23,6 @@
 #include "ui/NullMountHost.h"
 #include "ui/UiPlanner.h"
 
-#include "mc/client/gui/oreui/binding/FacetRegistry.h"
-#include "mc/client/gui/oreui/views/View.h"
-
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -169,22 +166,16 @@ bool Runtime::enable() {
             .emit();
     }
     mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge, wsUrl);
-    // Stage 8-A: native facet JS->C++ channel. Each OreUI::View owns an
-    // IFacetRegistry; the bridge registers the "dearoreui" facet into it
-    // (wired through the view registry observer) and pushes responses back
-    // through the C++->JS bridge.
+    // Stage 8-A: native facet JS->C++ channel. The createFacetRegistry hook
+    // hands every fresh IFacetRegistry to the bridge, which registers the
+    // "dearoreui" facet (game-native dispatch, no engine bindings) and pushes
+    // responses back through the C++->JS bridge.
     mOreUIFacetBridge = std::make_unique<ipc::OreUIFacetBridge>(
-        *mHostDispatcher, *mViewRegistry, *mHostBridge
+        *mHostDispatcher, *mHostBridge
     );
-    // Wire the game's exported vftable addresses so the bridge can locate the
-    // view's IFacetRegistry by identity (no hardcoded member offsets).
-    mOreUIFacetBridge->setVftableProviders(
-        []() -> void* { return reinterpret_cast<void*>(OreUI::FacetRegistry::$vftable()); },
-        []() -> void* { return reinterpret_cast<void*>(OreUI::View::$vftableForIViewListener()); }
-    );
-    mViewRegistry->setOnOreUIViewRegistered([this](void* oreuiView) {
+    mHookAdapter->setOnFacetRegistryCreated([this](void* registryPtr) {
         if (mOreUIFacetBridge != nullptr) {
-            mOreUIFacetBridge->onOreUIViewRegistered(oreuiView);
+            mOreUIFacetBridge->onFacetRegistryCreated(registryPtr);
         }
     });
     mUiPlanner      = std::make_unique<ui::UiPlanner>(*mRegistry);

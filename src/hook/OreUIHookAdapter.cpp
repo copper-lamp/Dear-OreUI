@@ -12,7 +12,9 @@
 #include "mc/client/gui/ScreenTechStackSelector.h"
 #include "mc/client/gui/TechStack.h"
 #include "mc/client/gui/oreui/SceneProvider.h"
+#include "mc/client/gui/oreui/binding/FacetRegistryFactory.h"
 #include "mc/client/gui/oreui/input/ViewInputHandler.h"
+#include "mc/client/gui/oreui/interface/IFacetRegistry.h"
 #include "mc/client/gui/oreui/routing/Router.h"
 #include "mc/client/gui/oreui/views/View.h"
 #include "mc/client/gui/oreui/views/ViewRenderer.h"
@@ -20,6 +22,7 @@
 #include <atomic>
 #include <cctype>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -47,6 +50,7 @@ struct AdapterState {
     bool bindingsReleased{};
     bool viewRemoveScene{};
     bool viewUnload{};
+    bool facetRegistryFactory{}; // Stage 8-A: createFacetRegistry hook (optional)
 
     std::mutex                                         mutex;
     std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
@@ -55,6 +59,10 @@ struct AdapterState {
     Stage5CoherentProbe*                               probe{};
     capability::ICapabilityQuery*                      capabilities{};
     ipc::CoherentViewRegistry*                         viewRegistry{};
+    // Stage 8-A: invoked by the createFacetRegistry hook for every fresh
+    // IFacetRegistry so the "dearoreui" facet can be registered (JS->C++
+    // channel). Wired by Runtime to OreUIFacetBridge.
+    std::function<void(void*)> onFacetRegistryCreated{};
 };
 
 AdapterState& state() {
@@ -279,10 +287,6 @@ LL_TYPE_INSTANCE_HOOK(
         std::lock_guard lock{state().mutex};
         if (state().viewRegistry != nullptr) {
             state().viewRegistry->registerView(&gamefaceView);
-            // Stage 8-A: expose the OreUI::View wrapper (this) so the facet
-            // bridge can register the "dearoreui" facet into its native
-            // IFacetRegistry (JS->C++ channel without engine bindings).
-            state().viewRegistry->registerOreUIView(this);
         }
         if (state().probe != nullptr) {
             state().probe->onViewInitialized(&gamefaceView);
@@ -395,6 +399,30 @@ LL_TYPE_INSTANCE_HOOK(
     }
     diagnostic::recordStage0("js", "event=view_unload");
     origin();
+}
+
+// Stage 8-A: intercept OreUI::FacetRegistryFactory::createFacetRegistry (an
+// exported, non-virtual MCAPI method — same hook pattern as View::initialize).
+// The returned registry is handed to the facet bridge so the "dearoreui"
+// facet can be registered into EVERY registry the game creates, with NO
+// member-offset guessing. Optional hook: if it fails the mod still runs
+// C++->JS only.
+LL_TYPE_INSTANCE_HOOK(
+    Stage8AFacetRegistryFactoryHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::FacetRegistryFactory,
+    &OreUI::FacetRegistryFactory::createFacetRegistry,
+    std::unique_ptr<OreUI::IFacetRegistry>,
+    OreUI::FacetRegistryLocation location
+) {
+    auto registry = origin(location);
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().onFacetRegistryCreated && registry) {
+            state().onFacetRegistryCreated(registry.get());
+        }
+    }
+    return registry;
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -560,6 +588,7 @@ bool removeInstalled() {
     if (value.bindingsReleased && Stage7BindingsReleasedHook::unhook()) value.bindingsReleased = false;
     if (value.onReadyForBindings && Stage7OnReadyForBindingsHook::unhook()) value.onReadyForBindings = false;
     if (value.viewDestructor && Stage7ViewDestructorHook::unhook()) value.viewDestructor = false;
+    if (value.facetRegistryFactory && Stage8AFacetRegistryFactoryHook::unhook()) value.facetRegistryFactory = false;
     if (value.routeBack && Stage0RouterBackHook::unhook()) value.routeBack = false;
     if (value.routerDestructorThunk && Stage1RouterDestructorThunkHook::unhook()) value.routerDestructorThunk = false;
     if (value.clientUpdate && Stage1ClientUpdateHook::unhook()) value.clientUpdate = false;
@@ -609,6 +638,11 @@ OreUIHookAdapter::OreUIHookAdapter(
 
 OreUIHookAdapter::~OreUIHookAdapter() { static_cast<void>(uninstall()); }
 
+void OreUIHookAdapter::setOnFacetRegistryCreated(std::function<void(void*)> callback) {
+    std::lock_guard lock{state().mutex};
+    state().onFacetRegistryCreated = std::move(callback);
+}
+
 bool OreUIHookAdapter::install() {
     auto& adapterState = state();
     {
@@ -637,6 +671,11 @@ bool OreUIHookAdapter::install() {
     if (adapterState.bindingsReleased) adapterState.viewRemoveScene = Stage7ViewRemoveSceneHook::hook() == 0;
     if (adapterState.viewRemoveScene) adapterState.viewUnload = Stage7ViewUnloadHook::hook() == 0;
 
+    // Stage 8-A: optional createFacetRegistry hook — its failure must not
+    // block the mod (the mod still delivers C++->JS without it).
+    bool const facetRegistryFactoryInstalled = Stage8AFacetRegistryFactoryHook::hook() == 0;
+    adapterState.facetRegistryFactory         = facetRegistryFactoryInstalled;
+
     // Stage 7.1: triggerEvent is a diagnostic-only hook; its failure must not
     // block the mod (the ODS and vtable diagnostics already cover the rest).
     bool const triggerEventInstalled = Stage7TriggerEventHook::hook() == 0;
@@ -659,6 +698,7 @@ bool OreUIHookAdapter::install() {
         .withField("view_remove_scene", adapterState.viewRemoveScene ? "ok" : "fail")
         .withField("view_unload", adapterState.viewUnload ? "ok" : "fail")
         .withField("trigger_event", triggerEventInstalled ? "ok" : "fail")
+        .withField("facet_registry_factory", facetRegistryFactoryInstalled ? "ok" : "fail")
         .emit();
 
     if (allInstalled()) {
@@ -694,10 +734,11 @@ bool OreUIHookAdapter::uninstall() {
     diagnostic::recordStage0("hook_adapter", "event=destroy_all_contexts_completed");
     {
         std::lock_guard lock{adapterState.mutex};
-        adapterState.callback       = nullptr;
-        adapterState.probe          = nullptr;
-        adapterState.capabilities   = nullptr;
-        adapterState.viewRegistry   = nullptr;
+        adapterState.callback               = nullptr;
+        adapterState.probe                  = nullptr;
+        adapterState.capabilities           = nullptr;
+        adapterState.viewRegistry           = nullptr;
+        adapterState.onFacetRegistryCreated = nullptr;
     }
 
     if (noneInstalled()) return true;

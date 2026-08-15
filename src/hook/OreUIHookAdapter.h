@@ -7,6 +7,7 @@
 #include "ipc/CoherentViewRegistry.h"
 
 #include <filesystem>
+#include <functional>
 
 namespace dearoreui::hook {
 
@@ -25,6 +26,11 @@ public:
     [[nodiscard]] bool uninstall();
 
     [[nodiscard]] bool isInstalled() const;
+
+    // Stage 8-A: invoked by the createFacetRegistry hook for every fresh
+    // IFacetRegistry (void* = OreUI::IFacetRegistry*). Runtime wires this to
+    // OreUIFacetBridge so the "dearoreui" facet can be registered.
+    void setOnFacetRegistryCreated(std::function<void(void*)> callback);
 
 private:
     IPageHookCallback&            mCallback;

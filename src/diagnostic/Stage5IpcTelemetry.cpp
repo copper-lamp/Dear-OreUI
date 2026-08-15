@@ -166,14 +166,6 @@ void recordStage5FacetRegistered(std::string_view facetName, std::string_view re
         .emit();
 }
 
-void recordStage5FacetProbe(std::string_view method, std::string_view summary) {
-    globalLogger()
-        .info("facet", "probe")
-        .withField("method", std::string{method})
-        .withField("summary", std::string{summary})
-        .emit();
-}
-
 void recordStage5FacetActivated(std::string_view facetName, bool hasParams, std::size_t payloadSize) {
     globalLogger()
         .info("facet", "activated")

@@ -26,13 +26,6 @@ public:
     // Called on the game thread when a gameface view becomes available.
     void registerView(void* gamefaceView);
 
-    // Stage 8-A: called on the game thread when the owning OreUI::View wrapper
-    // is initialized (OreUI::View::initialize hook). The handle is the opaque
-    // OreUI::View* (kept as void* so this registry stays cohtml/game-header
-    // free). OreUIFacetBridge subscribes to this observer to register the
-    // "dearoreui" facet into the view's native IFacetRegistry.
-    void registerOreUIView(void* oreuiView);
-
     // Called when the engine signals the page script context is ready
     // (OreUI::View::OnReadyForBindings). Notifies the script-context observer.
     void markScriptContextReady();
@@ -66,10 +59,6 @@ public:
     // Single observer invoked on the calling thread after each registerView.
     void setOnViewRegistered(std::function<void(void*)> observer);
 
-    // Single observer invoked on the calling thread after each
-    // registerOreUIView. Used by OreUIFacetBridge (Stage 8-A).
-    void setOnOreUIViewRegistered(std::function<void(void*)> observer);
-
     // Single observer invoked (on the game thread) when the active view's
     // script context becomes ready. Used by the bridge to flush deferred
     // scripts at the correct moment.
@@ -82,10 +71,8 @@ public:
 
 private:
     void*                            mActiveView{nullptr};
-    void*                            mOreUIView{nullptr};
     bool                             mScriptContextReady{false};
     std::function<void(void*)>       mOnViewRegistered;
-    std::function<void(void*)>       mOnOreUIViewRegistered;
     std::function<void()>            mOnScriptContextReady;
     std::function<void(void*)>       mOnViewDestroyed;
     mutable std::mutex               mMutex;

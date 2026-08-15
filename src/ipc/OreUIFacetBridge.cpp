@@ -8,9 +8,6 @@
 #include "mc/client/gui/oreui/interface/IFacet.h"
 #include "mc/client/gui/oreui/interface/IFacetRegistry.h"
 #include "mc/client/gui/oreui/interface/Status.h"
-#include "mc/client/gui/oreui/views/View.h"
-
-#include <windows.h>
 
 #include <chrono>
 #include <cstdint>
@@ -50,42 +47,6 @@ constexpr std::chrono::milliseconds kFacetDispatchTimeout{3000};
     return stream.str();
 }
 
-// Reads a pointer-sized member at a byte offset, guarded by SEH so the layout
-// probe can never crash the client. C-style only (no C++ objects with
-// destructors) so MSVC allows __try with /EHa.
-bool tryReadPointer(void const* object, std::size_t offset, std::uintptr_t& out) {
-    if (object == nullptr) {
-        return false;
-    }
-    __try {
-        out = *reinterpret_cast<std::uintptr_t const*>(static_cast<char const*>(object) + offset);
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        return false;
-    }
-}
-
-// Reads the vptr of the object a candidate pointer references, guarded by SEH.
-bool tryReadObjectVptr(void const* object, std::uintptr_t& vptrOut) {
-    if (object == nullptr) {
-        return false;
-    }
-    __try {
-        vptrOut = *reinterpret_cast<std::uintptr_t const*>(object);
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        return false;
-    }
-}
-
-constexpr std::size_t kProbeScanBytes  = 256;
-constexpr std::size_t kProbeQwordDump  = 16;  // first N qwords logged on failure
-// Member chain from mGamefaceView to mFacetRegistry (declaration order in the
-// levimc header, all 8-aligned): mRenderer 8 + mInputHandler 8 + mUrl 32 +
-// mScenes 24 + mBedrockInputSource 8 + mClientInstance 24 + mKeyboardManager 8
-// + mFacetBinder 8 = 128.
-constexpr std::size_t kGamefaceToFacetRegistryChain = 128;
-
 // The native facet activated when the page triggers
 // engine.trigger("facet:request", "dearoreui", id, {params: ...}).
 // Owned by the game's FacetRegistry (unique_ptr) — the bridge must outlive it.
@@ -113,118 +74,22 @@ private:
 
 } // namespace
 
-OreUIFacetBridge::OreUIFacetBridge(HostDispatcher& dispatcher, CoherentViewRegistry& viewRegistry, IHostBridge& bridge)
-: mDispatcher(dispatcher), mViewRegistry(viewRegistry), mBridge(bridge) {}
+OreUIFacetBridge::OreUIFacetBridge(HostDispatcher& dispatcher, IHostBridge& bridge)
+: mDispatcher(dispatcher), mBridge(bridge) {}
 
 OreUIFacetBridge::~OreUIFacetBridge() = default;
 
-void OreUIFacetBridge::setVftableProviders(VftableProvider facetRegistryProvider, VftableProvider iViewListenerProvider) {
-    mFacetRegistryVftableProvider = facetRegistryProvider;
-    mIViewListenerVftableProvider = iViewListenerProvider;
-}
-
 char const* OreUIFacetBridge::facetName() const { return kFacetName; }
 
-void* OreUIFacetBridge::locateFacetRegistry(void* oreuiView, std::string& probeMethod) {
-    // Probe 1: registry vftable identity scan. The view owns the registry via
-    // unique_ptr<IFacetRegistry>; scan its prefix for a pointer whose target
-    // vtable == OreUI::FacetRegistry::$vftable(). Deterministic — does not
-    // depend on when mGamefaceView is assigned.
-    if (mFacetRegistryVftableProvider != nullptr) {
-        auto* vftable = mFacetRegistryVftableProvider();
-        for (std::size_t off = 0; off + sizeof(void*) <= kProbeScanBytes; off += sizeof(void*)) {
-            std::uintptr_t candidate = 0;
-            if (!tryReadPointer(oreuiView, off, candidate)) {
-                break;
-            }
-            if (candidate == 0) {
-                continue;
-            }
-            std::uintptr_t vptr = 0;
-            if (tryReadObjectVptr(reinterpret_cast<void*>(candidate), vptr)
-                && vftable != nullptr
-                && vptr == reinterpret_cast<std::uintptr_t>(vftable)) {
-                probeMethod = "registry_vftable";
-                return reinterpret_cast<void*>(candidate);
-            }
-        }
-    }
-
-    // Probe 2: locate the IViewListener subobject via its vftable, then
-    // mFacetRegistry = listenerOffset + 8 (mGamefaceView) + chain.
-    if (mIViewListenerVftableProvider != nullptr) {
-        auto* listenerVftable = mIViewListenerVftableProvider();
-        for (std::size_t off = 0; off + sizeof(void*) <= kProbeScanBytes; off += sizeof(void*)) {
-            std::uintptr_t candidate = 0;
-            if (!tryReadPointer(oreuiView, off, candidate)) {
-                break;
-            }
-            if (listenerVftable != nullptr && candidate == reinterpret_cast<std::uintptr_t>(listenerVftable)) {
-                std::uintptr_t registryPtr = 0;
-                if (tryReadPointer(oreuiView, off + sizeof(void*) + kGamefaceToFacetRegistryChain, registryPtr)
-                    && registryPtr != 0) {
-                    probeMethod = "listener_vftable";
-                    return reinterpret_cast<void*>(registryPtr);
-                }
-                break;
-            }
-        }
-    }
-
-    // Probe 3: scan for the captured cohtml::View pointer (== activeView),
-    // then use the same +128 member chain.
-    void* activeView = mViewRegistry.activeView();
-    if (activeView != nullptr) {
-        for (std::size_t off = 0; off + sizeof(void*) <= kProbeScanBytes; off += sizeof(void*)) {
-            std::uintptr_t candidate = 0;
-            if (!tryReadPointer(oreuiView, off, candidate)) {
-                break;
-            }
-            if (candidate == reinterpret_cast<std::uintptr_t>(activeView)) {
-                std::uintptr_t registryPtr = 0;
-                if (tryReadPointer(oreuiView, off + kGamefaceToFacetRegistryChain, registryPtr)
-                    && registryPtr != 0) {
-                    probeMethod = "gameface_scan";
-                    return reinterpret_cast<void*>(registryPtr);
-                }
-                break;
-            }
-        }
-    }
-
-    probeMethod = "none";
-    return nullptr;
-}
-
-void OreUIFacetBridge::onOreUIViewRegistered(void* oreuiView) {
-    if (oreuiView == nullptr) {
-        return;
-    }
-
-    std::string probeMethod;
-    void*       registryPtr = locateFacetRegistry(oreuiView, probeMethod);
-
+void OreUIFacetBridge::onFacetRegistryCreated(void* registryPtr) {
     if (registryPtr == nullptr) {
-        std::string dump;
-        for (std::size_t i = 0; i < kProbeQwordDump; ++i) {
-            std::uintptr_t value = 0;
-            if (!tryReadPointer(oreuiView, i * sizeof(void*), value)) {
-                break;
-            }
-            if (i > 0) {
-                dump += ",";
-            }
-            dump += std::to_string(value);
-        }
-        diagnostic::recordStage5FacetProbe(probeMethod, dump);
-        diagnostic::recordStage5FacetRegistered(kFacetName, "layout_mismatch", 0);
+        diagnostic::recordStage5FacetRegistered(kFacetName, "registry_null", 0);
         return;
     }
-
     std::lock_guard lock{mMutex};
     if (mRegistered && registryPtr == mRegisteredRegistry) {
-        // Same registry (reused view or duplicate initialize) — already wired.
-        diagnostic::recordStage5FacetRegistered(kFacetName, "already_registered", 0);
+        // Same registry instance re-exposed (registry factory call again) —
+        // already wired.
         return;
     }
     registerIntoRegistry(registryPtr);
