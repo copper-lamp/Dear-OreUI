@@ -51,4 +51,9 @@ void recordStage7UiUnmounted(
     std::string_view uiId
 );
 
+// Stage 7.1: JS-side feedback reported through cohtml::View::BindCall.
+// The report is a plain text string the bootstrap script sends back to prove
+// that ExecuteScript actually ran inside the Coherent engine.
+void recordStage7JsReport(std::string_view report);
+
 } // namespace dearoreui::diagnostic

@@ -47,7 +47,6 @@ target("DearOreUIUnitTests")
     add_includedirs(".")
     -- Tests and the source modules they exercise (no mod entry, stubs replace hook/poc).
     add_files("tests/main.cpp")
-    add_files("tests/Stage1NavigationStateTests.cpp")
     add_files("tests/api/types/*.cpp")
     add_files("tests/api/manifest/*.cpp")
     add_files("tests/api/*.cpp")

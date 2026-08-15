@@ -438,15 +438,14 @@ void Runtime::registerDemoOverlay() {
     auto uiResult = mApi->registerOverlay(
         api::ModId{"dearoreui"},
         uiManifest,
-        "<div id=\"dearoreui-demo-text\" style=\"padding:8px 12px;"
-        "background:rgba(0,0,0,0.75);"
-        "color:#ffffff;"
-        "font-family:sans-serif;"
-        "font-size:14px;"
-        "border:2px solid #4caf50;"
-        "border-radius:4px;"
-        "box-shadow:0 2px 8px rgba(0,0,0,0.5);\">"
-        "DearOreUI Demo Overlay</div>"
+        "<div id=\"dearoreui-demo-text\" style=\"position:fixed;top:0;left:0;width:100%;"
+        "height:100%;background:rgba(255,0,0,0.30);z-index:2147483647;"
+        "display:flex;align-items:center;justify-content:center;"
+        "font-family:sans-serif;\">"
+        "<div style=\"padding:24px 40px;background:rgba(0,0,0,0.85);"
+        "color:#4caf50;font-size:48px;font-weight:bold;"
+        "border:4px solid #4caf50;border-radius:8px;\">"
+        "DearOreUI DEMO</div></div>"
     );
     if (uiResult.isErr()) {
         logger.warning("demo", "overlay_registration_failed")

@@ -5,6 +5,8 @@
 
 #include "ll/api/memory/Hook.h"
 
+#include <windows.h>
+
 #include "mc/client/game/ClientInstance.h"
 #include "mc/client/gui/ScreenTechStackSelector.h"
 #include "mc/client/gui/TechStack.h"
@@ -15,6 +17,8 @@
 #include "mc/client/gui/oreui/views/ViewRenderer.h"
 
 #include <atomic>
+#include <cctype>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -50,6 +54,73 @@ struct AdapterState {
 AdapterState& state() {
     static AdapterState value;
     return value;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 7.1 JS feedback via OutputDebugString.
+// Coherent's log handler and JS console messages are routed through
+// OutputDebugStringA/W on Windows. Hooking these kernel32 exports is safe (no
+// unverified vtable ABI) and lets us see whether the injected bootstrap script
+// actually ran inside the engine: its console.log lines carry the
+// "[DearOreUI]" prefix and its engine.call('dearoreui_report', ...) probe
+// produces a "no such method" message when no binding is registered.
+// ---------------------------------------------------------------------------
+
+bool containsDearOreUi(std::string_view text) {
+    if (text.size() < 9) return false;
+    std::string lower;
+    lower.reserve(text.size());
+    for (char c : text) {
+        lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    return lower.find("dearoreui") != std::string::npos;
+}
+
+void recordOdsLine(std::string_view line) {
+    std::string sanitized{line};
+    while (!sanitized.empty() && (sanitized.back() == '\n' || sanitized.back() == '\r')) {
+        sanitized.pop_back();
+    }
+    diagnostic::recordStage0("js", "event=ods\tmsg=" + sanitized);
+}
+
+void dumpViewVtable(void* gamefaceView);
+
+LL_AUTO_STATIC_HOOK(
+    Stage7OutputDebugStringAHook,
+    ll::memory::HookPriority::Low,
+    &::OutputDebugStringA,
+    void,
+    const char* lpOutputString
+) {
+    if (lpOutputString != nullptr && containsDearOreUi(lpOutputString)) {
+        recordOdsLine(lpOutputString);
+    }
+    origin(lpOutputString);
+}
+
+LL_AUTO_STATIC_HOOK(
+    Stage7OutputDebugStringWHook,
+    ll::memory::HookPriority::Low,
+    &::OutputDebugStringW,
+    void,
+    const wchar_t* lpOutputString
+) {
+    if (lpOutputString != nullptr) {
+        int const length = ::WideCharToMultiByte(
+            CP_UTF8, 0, lpOutputString, -1, nullptr, 0, nullptr, nullptr
+        );
+        if (length > 0) {
+            std::string utf8(static_cast<std::size_t>(length), '\0');
+            ::WideCharToMultiByte(
+                CP_UTF8, 0, lpOutputString, -1, utf8.data(), length, nullptr, nullptr
+            );
+            if (containsDearOreUi(utf8)) {
+                recordOdsLine(utf8);
+            }
+        }
+    }
+    origin(lpOutputString);
 }
 
 char const* techStackName(ui::TechStack stack) {
@@ -208,7 +279,87 @@ LL_TYPE_INSTANCE_HOOK(
                 "cohtml::View::ExecuteScript captured via OreUI::View::initialize"
             ));
         }
+        // Stage 7.1: dump the real cohtml::View vtable so we can map the engine's
+        // actual method slots (the mcmeta vtable layout is NOT reliable — the
+        // BindCall slot caused heap corruption, see crash trace 11:38).
+        dumpViewVtable(&gamefaceView);
     }
+}
+
+// Reads 32 bytes of machine code at fn into a 64-char hex buffer. Kept free of
+// C++ objects with destructors so MSVC allows SEH (__try) inside it.
+bool readCodeBytesHex(void const* fn, char out[64]) {
+    if (fn == nullptr) return false;
+    __try {
+        auto const* bytes = static_cast<std::uint8_t const*>(fn);
+        static constexpr char kHex[] = "0123456789abcdef";
+        for (int b = 0; b < 32; ++b) {
+            std::uint8_t const byte = bytes[b];
+            out[b * 2]     = kHex[(byte >> 4) & 0xF];
+            out[b * 2 + 1] = kHex[byte & 0xF];
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+void dumpViewVtable(void* gamefaceView) {
+    auto* vtable = *reinterpret_cast<void***>(gamefaceView);
+    if (vtable == nullptr) {
+        diagnostic::recordStage0("js", "event=vtable_null");
+        return;
+    }
+    std::string line = "event=vtable\tptr=";
+    line += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
+    line += "\tvtable=";
+    line += std::to_string(reinterpret_cast<std::uintptr_t>(vtable));
+    line += "\tslots=";
+    for (int i = 0; i < 24; ++i) {
+        if (i > 0) line += ",";
+        line += std::to_string(reinterpret_cast<std::uintptr_t>(vtable[i]));
+    }
+    diagnostic::recordStage0("js", line);
+
+    // Stage 7.1 calibration: dump the first 32 bytes of machine code of each
+    // vtable slot. Function-prologue fingerprints let us identify simple
+    // getters (GetId/GetWidth/GetHeight/IsReadyForBindings return a member
+    // quickly) and correlate them with the real engine's vtable order, without
+    // ever invoking an unverified slot (the BindCall slot corrupted the heap).
+    std::string hexLine = "event=vtable_bytes\tptr=";
+    hexLine += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
+    for (int i = 0; i < 24; ++i) {
+        hexLine += "\tslot" + std::to_string(i) + "=";
+        char buffer[64];
+        if (readCodeBytesHex(vtable[i], buffer)) {
+            hexLine.append(buffer, 64);
+        } else {
+            hexLine += vtable[i] == nullptr ? "-" : "unreadable";
+        }
+    }
+    diagnostic::recordStage0("js", hexLine);
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    Stage7TriggerEventHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::$triggerEvent,
+    void,
+    std::string const& eventName,
+    std::string const& eventData
+) {
+    // Diagnostic-only: cap volume so the event stream stays readable. Record
+    // the first events plus anything that looks like a page/navigation event.
+    static std::atomic<int> triggerCount{0};
+    int const               n = triggerCount.fetch_add(1);
+    bool const              interesting = eventName.find("Navigation") != std::string::npos
+        || eventName.find("Ready") != std::string::npos || eventName.find("Load") != std::string::npos
+        || eventName.find("Scene") != std::string::npos;
+    if (n < 40 || interesting) {
+        diagnostic::recordStage0("js", "event=trigger_entered\tname=" + eventName);
+    }
+    origin(eventName, eventData);
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -352,6 +503,10 @@ bool OreUIHookAdapter::install() {
     if (adapterState.routerDestructorThunk) adapterState.clientUpdate = Stage1ClientUpdateHook::hook() == 0;
     if (adapterState.clientUpdate) adapterState.viewInitialize = Stage7ViewInitializeHook::hook() == 0;
 
+    // Stage 7.1: triggerEvent is a diagnostic-only hook; its failure must not
+    // block the mod (the ODS and vtable diagnostics already cover the rest).
+    bool const triggerEventInstalled = Stage7TriggerEventHook::hook() == 0;
+
     // Stage 7.1 troubleshooting: log the result of every hook installation so a
     // failed view hook is immediately visible in diagnostics.
     mLogger.info("hook", "install_step")
@@ -364,6 +519,7 @@ bool OreUIHookAdapter::install() {
         .withField("router_dtor", adapterState.routerDestructorThunk ? "ok" : "fail")
         .withField("client_update", adapterState.clientUpdate ? "ok" : "fail")
         .withField("view_initialize", adapterState.viewInitialize ? "ok" : "fail")
+        .withField("trigger_event", triggerEventInstalled ? "ok" : "fail")
         .emit();
 
     if (allInstalled()) {

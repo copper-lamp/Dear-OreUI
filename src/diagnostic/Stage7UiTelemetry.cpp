@@ -108,11 +108,18 @@ void recordStage7UiUnmounted(
     std::string_view modNamespace,
     std::string_view uiId
 ) {
-    auto& logger = globalLogger();
-    logger.info("ui", "unmounted")
+    globalLogger()
+        .info("ui", "unmounted")
         .withContext(contextId)
-        .withField("namespace", std::string(modNamespace))
-        .withField("ui_id", std::string(uiId))
+        .withField("namespace", std::string{modNamespace})
+        .withField("ui_id", std::string{uiId})
+        .emit();
+}
+
+void recordStage7JsReport(std::string_view report) {
+    globalLogger()
+        .info("js", "report")
+        .withField("report", std::string{report})
         .emit();
 }
 

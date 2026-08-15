@@ -115,10 +115,15 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "            });\n";
     stream << "        }\n";
     stream << "    };\n";
+    stream << "    function dearOreUiReport(msg) {\n";
+    stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', msg); } catch (e) {}\n";
+    stream << "    }\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
     stream << "        console.log('[DearOreUI] stage5 runtime injected, contextId="
            << escapeJsString(std::to_string(id.value())) << ", bridge=false');\n";
     stream << "    }\n";
+    stream << "    dearOreUiReport('runtime_executed:context=' + "
+           << escapeJsString(std::to_string(id.value())) << ");\n";
     stream << "})();\n";
     return stream.str();
 }
@@ -207,6 +212,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "(function(){\n";
     stream << "    window.__DearOreUI__ = window.__DearOreUI__ || {};\n";
     stream << "    window.__DearOreUI__.ui = window.__DearOreUI__.ui || {};\n";
+    stream << "    window.__DearOreUI__.ui.executed = true;\n";
     stream << "    window.__DearOreUI__.ui.contextId = \"" << std::to_string(id.value()) << "\";\n";
     stream << "    window.__DearOreUI__.ui.specs = [\n";
 
@@ -285,6 +291,10 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            container.parentNode.removeChild(container);\n";
     stream << "        }\n";
     stream << "    };\n";
+    stream << "    window.__DearOreUI__.ui.report = function(msg) {\n";
+    stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', msg); } catch (e) {}\n";
+    stream << "    };\n";
+    stream << "    window.__DearOreUI__.ui.report('bootstrap_executed');\n";
     // Stage 7.1 fix: defer mounting until the document body exists. ExecuteScript
     // can run while the Coherent document is still loading; appending to a
     // missing body would silently fail inside the engine. Poll with setInterval
@@ -292,10 +302,13 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     // the script actually ran.
     stream << "    window.__DearOreUI__.ui.mountAll = function() {\n";
     stream << "        for (var i = 0; i < window.__DearOreUI__.ui.specs.length; i++) {\n";
+    stream << "            var spec = window.__DearOreUI__.ui.specs[i];\n";
     stream << "            try {\n";
-    stream << "                window.__DearOreUI__.ui.mount(window.__DearOreUI__.ui.specs[i]);\n";
-    stream << "                if (window.console && console.log) console.log('[DearOreUI] mounted ' + window.__DearOreUI__.ui.specs[i].containerId);\n";
+    stream << "                window.__DearOreUI__.ui.mount(spec);\n";
+    stream << "                window.__DearOreUI__.ui.report('mounted:' + spec.containerId);\n";
+    stream << "                if (window.console && console.log) console.log('[DearOreUI] mounted ' + spec.containerId);\n";
     stream << "            } catch (e) {\n";
+    stream << "                window.__DearOreUI__.ui.report('mount_error:' + spec.containerId + ':' + (e && e.message));\n";
     stream << "                if (window.console && console.error) console.error('[DearOreUI] mount failed: ' + (e && e.message));\n";
     stream << "            }\n";
     stream << "        }\n";
@@ -308,6 +321,8 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "    function dearOreUiReadyMount() {\n";
     stream << "        if (document.body) {\n";
     stream << "            window.__DearOreUI__.ui.mountAll();\n";
+    stream << "            window.__DearOreUI__.ui.mounted = true;\n";
+    stream << "            window.__DearOreUI__.ui.report('mount_all_done');\n";
     stream << "            return true;\n";
     stream << "        }\n";
     stream << "        return false;\n";
