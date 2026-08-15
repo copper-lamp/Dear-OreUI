@@ -41,6 +41,7 @@ struct AdapterState {
     bool routerDestructorThunk{};
     bool clientUpdate{};
     bool viewInitialize{};
+    bool onReadyForBindings{};
 
     std::mutex                                         mutex;
     std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
@@ -315,7 +316,7 @@ void dumpViewVtable(void* gamefaceView) {
     line += "\tvtable=";
     line += std::to_string(reinterpret_cast<std::uintptr_t>(vtable));
     line += "\tslots=";
-    for (int i = 0; i < 24; ++i) {
+    for (int i = 0; i < 72; ++i) {
         if (i > 0) line += ",";
         line += std::to_string(reinterpret_cast<std::uintptr_t>(vtable[i]));
     }
@@ -326,9 +327,10 @@ void dumpViewVtable(void* gamefaceView) {
     // getters (GetId/GetWidth/GetHeight/IsReadyForBindings return a member
     // quickly) and correlate them with the real engine's vtable order, without
     // ever invoking an unverified slot (the BindCall slot corrupted the heap).
+    // 72 slots covers the full SDK interface (up to TriggerEvent at index 75).
     std::string hexLine = "event=vtable_bytes\tptr=";
     hexLine += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
-    for (int i = 0; i < 24; ++i) {
+    for (int i = 0; i < 72; ++i) {
         hexLine += "\tslot" + std::to_string(i) + "=";
         char buffer[64];
         if (readCodeBytesHex(vtable[i], buffer)) {
@@ -338,6 +340,25 @@ void dumpViewVtable(void* gamefaceView) {
         }
     }
     diagnostic::recordStage0("js", hexLine);
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    Stage7OnReadyForBindingsHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::$OnReadyForBindings,
+    void
+) {
+    origin();
+    // The engine has created the page's script context: ExecuteScript is now
+    // accepted. Release the deferred script queue in the host bridge.
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            state().viewRegistry->markScriptContextReady();
+        }
+    }
+    diagnostic::recordStage0("js", "event=on_ready_for_bindings");
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -420,17 +441,20 @@ LL_TYPE_INSTANCE_HOOK(
 bool allInstalled() {
     auto const& value = state();
     return value.techStack && value.scene && value.routeChange && value.routePush && value.routeReplace
-        && value.routeBack && value.routerDestructorThunk && value.clientUpdate && value.viewInitialize;
+        && value.routeBack && value.routerDestructorThunk && value.clientUpdate && value.viewInitialize
+        && value.onReadyForBindings;
 }
 
 bool noneInstalled() {
     auto const& value = state();
     return !value.techStack && !value.scene && !value.routeChange && !value.routePush && !value.routeReplace
-        && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate && !value.viewInitialize;
+        && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate && !value.viewInitialize
+        && !value.onReadyForBindings;
 }
 
 bool removeInstalled() {
     auto& value = state();
+    if (value.onReadyForBindings && Stage7OnReadyForBindingsHook::unhook()) value.onReadyForBindings = false;
     if (value.routeBack && Stage0RouterBackHook::unhook()) value.routeBack = false;
     if (value.routerDestructorThunk && Stage1RouterDestructorThunkHook::unhook()) value.routerDestructorThunk = false;
     if (value.clientUpdate && Stage1ClientUpdateHook::unhook()) value.clientUpdate = false;
@@ -502,6 +526,7 @@ bool OreUIHookAdapter::install() {
     if (adapterState.routeBack) adapterState.routerDestructorThunk = Stage1RouterDestructorThunkHook::hook() == 0;
     if (adapterState.routerDestructorThunk) adapterState.clientUpdate = Stage1ClientUpdateHook::hook() == 0;
     if (adapterState.clientUpdate) adapterState.viewInitialize = Stage7ViewInitializeHook::hook() == 0;
+    if (adapterState.viewInitialize) adapterState.onReadyForBindings = Stage7OnReadyForBindingsHook::hook() == 0;
 
     // Stage 7.1: triggerEvent is a diagnostic-only hook; its failure must not
     // block the mod (the ODS and vtable diagnostics already cover the rest).
@@ -519,6 +544,7 @@ bool OreUIHookAdapter::install() {
         .withField("router_dtor", adapterState.routerDestructorThunk ? "ok" : "fail")
         .withField("client_update", adapterState.clientUpdate ? "ok" : "fail")
         .withField("view_initialize", adapterState.viewInitialize ? "ok" : "fail")
+        .withField("ready_for_bindings", adapterState.onReadyForBindings ? "ok" : "fail")
         .withField("trigger_event", triggerEventInstalled ? "ok" : "fail")
         .emit();
 

@@ -249,29 +249,82 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     }
 
     stream << "    ];\n";
+    stream << "    window.__DearOreUI__.ui.debug = [];\n";
+    stream << "    window.__DearOreUI__.ui.dbg = function(msg) {\n";
+    stream << "        window.__DearOreUI__.ui.debug.push(msg);\n";
+    stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', 'dbg:' + msg); } catch (e) {}\n";
+    stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.mount = function(spec) {\n";
+    stream << "        window.__DearOreUI__.ui.dbg('mount_enter:' + spec.containerId);\n";
     stream << "        var container = document.getElementById(spec.containerId);\n";
+    stream << "        window.__DearOreUI__.ui.dbg('container_exists=' + !!container);\n";
     stream << "        if (!container) {\n";
     stream << "            container = document.createElement('div');\n";
     stream << "            container.id = spec.containerId;\n";
-    // Stage 7.1 fix: build the entire inline style in one string. Coherent's
-    // getAttribute('style') may not reflect properties set via container.style.*,
-    // so concatenating after-the-fact can drop position:fixed / z-index or
-    // prefix the attribute with the literal string "null".
-    stream << "            container.setAttribute('style',\n";
-    stream << "                'position:fixed;' +\n";
-    stream << "                'z-index:9999;' +\n";
-    stream << "                'pointer-events:' + (spec.pointerEvents ? 'auto' : 'none') + ';' +\n";
-    stream << "                spec.anchorStyle\n";
-    stream << "            );\n";
+    // Stage 7.1 fix: use CSSOM (style.cssText) instead of setAttribute/setting
+    // individual style.* properties — cohtml is inconsistent about reflecting
+    // the style attribute, and the disk probe proved cssText works.
+    // The container must itself be full-screen: cohtml resolves width:100% of
+    // a position:fixed element against its nearest positioned ancestor, not
+    // the viewport, so a nested 100% layer inside an unsized container
+    // collapses to 0x0 (verified: layer_rect w=0,h=0).
+    stream << "            try {\n";
+    stream << "                container.style.cssText =\n";
+    stream << "                    'position:fixed;top:0;left:0;width:100%;height:100%;' +\n";
+    stream << "                    'z-index:2147483647;' +\n";
+    stream << "                    'pointer-events:' + (spec.pointerEvents ? 'auto' : 'none') + ';';\n";
+    stream << "                window.__DearOreUI__.ui.dbg('container_style_ok');\n";
+    stream << "            } catch (e) { window.__DearOreUI__.ui.dbg('container_style_err:' + (e && e.message)); }\n";
     stream << "            var parent = document.body || document.documentElement;\n";
+    stream << "            window.__DearOreUI__.ui.dbg('parent=' + (parent ? parent.tagName : 'null'));\n";
     stream << "            if (parent) {\n";
     stream << "                parent.appendChild(container);\n";
+    stream << "                window.__DearOreUI__.ui.dbg('container_appended');\n";
     stream << "            } else {\n";
     stream << "                throw new Error('no document.body or documentElement');\n";
     stream << "            }\n";
     stream << "        }\n";
-    stream << "        container.innerHTML = spec.htmlBody;\n";
+    // Stage 7.1 fix: cohtml's HTML parser DROPS style=\"\" attributes entirely
+    // (innerHTML + getAttribute('style') both failed). The only reliable way
+    // to style elements is CSSOM (element.style.cssText), which the disk probe
+    // proved works. Build the demo overlay fully through CSSOM.
+    stream << "        container.innerHTML = '';\n";
+    stream << "        if (spec.uiId === 'demo') {\n";
+    stream << "            try {\n";
+    stream << "                var layer = document.createElement('div');\n";
+    // absolute against the full-screen container (right:0/bottom:0 avoids any
+    // percentage-of-ancestor resolution issue).
+    stream << "                layer.style.cssText =\n";
+    stream << "                    'position:absolute;top:0;left:0;right:0;bottom:0;' +\n";
+    stream << "                    'background:rgba(255,0,0,0.30);z-index:2147483647;' +\n";
+    stream << "                    'pointer-events:none;display:flex;align-items:center;' +\n";
+    stream << "                    'justify-content:center;font-family:sans-serif;';\n";
+    stream << "                var text = document.createElement('div');\n";
+    stream << "                text.textContent = 'DearOreUI DEMO';\n";
+    stream << "                text.style.cssText =\n";
+    stream << "                    'padding:24px 40px;background:rgba(0,0,0,0.85);' +\n";
+    stream << "                    'color:#4caf50;font-size:48px;font-weight:bold;' +\n";
+    stream << "                    'border:4px solid #4caf50;border-radius:8px;';\n";
+    stream << "                layer.appendChild(text);\n";
+    stream << "                container.appendChild(layer);\n";
+    stream << "                window.__DearOreUI__.ui.dbg('layer_appended');\n";
+    stream << "                function dearOreUiRectOf(el) {\n";
+    stream << "                    try {\n";
+    stream << "                        var r = el.getBoundingClientRect();\n";
+    stream << "                        return 'l=' + r.left + ',t=' + r.top + ',w=' + r.width + ',h=' + r.height;\n";
+    stream << "                    } catch (e) { return 'rect_err:' + (e && e.message); }\n";
+    stream << "                }\n";
+    stream << "                window.__DearOreUI__.ui.dbg('layer_rect:' + dearOreUiRectOf(layer));\n";
+    stream << "                window.__DearOreUI__.ui.dbg('text_rect:' + dearOreUiRectOf(text));\n";
+    stream << "                window.__DearOreUI__.ui.dbg('text_style:' + text.style.cssText);\n";
+    stream << "                window.__DearOreUI__.ui.dbg('body_children=' + (document.body ? document.body.childElementCount : -1));\n";
+    stream << "            } catch (e) {\n";
+    stream << "                window.__DearOreUI__.ui.dbg('demo_build_err:' + (e && e.message));\n";
+    stream << "                window.__DearOreUI__.ui.report('mount_error:' + (e && e.message));\n";
+    stream << "            }\n";
+    stream << "        } else {\n";
+    stream << "            container.innerHTML = spec.htmlBody;\n";
+    stream << "        }\n";
     stream << "        for (var i = 0; i < spec.styles.length; i++) {\n";
     stream << "            var link = document.createElement('link');\n";
     stream << "            link.rel = 'stylesheet';\n";

@@ -11,8 +11,10 @@ namespace dearoreui::ipc {
 // registry stays free of mc/cohtml headers and remains unit-testable.
 //
 // A view may be re-initialized when reused across pages; registerView keeps
-// the most recent handle and notifies the registered observer (used by
-// CoherentHostBridge to flush deferred scripts).
+// the most recent handle. The script context is NOT usable the moment a view
+// is created — cohtml only accepts ExecuteScript after the page's script
+// context exists (IViewListener::OnReadyForBindings / OnScriptContextCreated).
+// The bridge defers scripts until markScriptContextReady() flips the flag.
 class CoherentViewRegistry {
 public:
     CoherentViewRegistry() = default;
@@ -24,8 +26,15 @@ public:
     // Called on the game thread when a gameface view becomes available.
     void registerView(void* gamefaceView);
 
+    // Called when the engine signals the page script context is ready
+    // (OreUI::View::OnReadyForBindings). Notifies the script-context observer.
+    void markScriptContextReady();
+
     // Most recently registered non-null view handle, or nullptr.
     [[nodiscard]] void* activeView() const;
+
+    // Whether the active view's script context is ready to accept scripts.
+    [[nodiscard]] bool isScriptContextReady() const;
 
     [[nodiscard]] bool hasActiveView() const;
 
@@ -36,9 +45,16 @@ public:
     // Single observer invoked on the calling thread after each registerView.
     void setOnViewRegistered(std::function<void(void*)> observer);
 
+    // Single observer invoked (on the game thread) when the active view's
+    // script context becomes ready. Used by the bridge to flush deferred
+    // scripts at the correct moment.
+    void setOnScriptContextReady(std::function<void()> observer);
+
 private:
     void*                            mActiveView{nullptr};
+    bool                             mScriptContextReady{false};
     std::function<void(void*)>       mOnViewRegistered;
+    std::function<void()>            mOnScriptContextReady;
     mutable std::mutex               mMutex;
 };
 

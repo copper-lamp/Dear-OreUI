@@ -22,15 +22,20 @@ CoherentHostBridge::CoherentHostBridge(
     mRegistry.setOnViewRegistered(
         [this](void* gamefaceView) { onViewRegistered(gamefaceView); }
     );
+    mRegistry.setOnScriptContextReady(
+        [this]() { onScriptContextReady(); }
+    );
 }
 
 bool CoherentHostBridge::isAvailable() const { return mRegistry.hasActiveView(); }
 
 api::Result<void> CoherentHostBridge::sendScript(api::ContextId id, std::string_view script) {
     void* view = mRegistry.activeView();
-    if (view == nullptr) {
-        // No live view yet (e.g. PageCreated fired before view initialization):
-        // defer into a bounded queue flushed on the next registerView.
+    if (view == nullptr || !mRegistry.isScriptContextReady()) {
+        // No live view yet (e.g. PageCreated fired before view initialization)
+        // or the page's script context is not ready yet: defer into a bounded
+        // queue. It is flushed when the engine signals OnReadyForBindings —
+        // ExecuteScript is silently dropped if called before the context exists.
         std::lock_guard lock{mQueueMutex};
         if (mPending.size() >= kMaxPending) {
             mPending.erase(mPending.begin());
@@ -79,7 +84,15 @@ void CoherentHostBridge::invalidateContext(api::ContextId id) {
 }
 
 void CoherentHostBridge::onViewRegistered(void* gamefaceView) {
-    if (gamefaceView == nullptr) {
+    static_cast<void>(gamefaceView);
+    // The view handle is tracked by the registry. Scripts are NOT flushed
+    // here: the page's script context may not exist yet (ExecuteScript would
+    // be silently dropped). Flushing happens in onScriptContextReady().
+}
+
+void CoherentHostBridge::onScriptContextReady() {
+    void* view = mRegistry.activeView();
+    if (view == nullptr) {
         return;
     }
     std::vector<PendingScript> pending;
@@ -89,7 +102,7 @@ void CoherentHostBridge::onViewRegistered(void* gamefaceView) {
     }
     for (auto const& item : pending) {
         diagnostic::recordStage5ScriptPreview(item.contextId, "flush", item.script);
-        static_cast<void>(submit(gamefaceView, item.contextId, item.script));
+        static_cast<void>(submit(view, item.contextId, item.script));
     }
 }
 

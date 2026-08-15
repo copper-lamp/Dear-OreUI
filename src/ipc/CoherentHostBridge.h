@@ -47,9 +47,15 @@ public:
     void cancel(api::RequestId requestId) override;
     void invalidateContext(api::ContextId id) override;
 
-    // Called by CoherentViewRegistry when a new view is registered; flushes
-    // the deferred script queue.
+    // Called by CoherentViewRegistry when a new view is registered; the handle
+    // is tracked by the registry itself, so nothing is flushed here (the page
+    // script context may not exist yet).
     void onViewRegistered(void* gamefaceView);
+
+    // Called by CoherentViewRegistry when the page signals its script context
+    // is ready (OnReadyForBindings); flushes the deferred script queue into
+    // the active view via ExecuteScript.
+    void onScriptContextReady();
 
 private:
     [[nodiscard]] api::Result<void> submit(void* gamefaceView, api::ContextId id, std::string const& script);
