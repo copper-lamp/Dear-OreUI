@@ -123,6 +123,22 @@ bool Runtime::enable() {
     }
     logger.info("status", result ? "hooks_installed" : "hooks_unavailable").emit();
 
+    // Stage 7.1 troubleshooting: summarize the real-display chain setup so a
+    // broken gate is immediately visible in diagnostics.jsonl.
+    auto hbuiRoot = mConfig.minecraftDirectory / "data" / "gui" / "dist" / "hbui";
+    logger.info("stage7", "chain_setup")
+        .withField("data_directory", mConfig.dataDirectory.string())
+        .withField("minecraft_directory", mConfig.minecraftDirectory.string())
+        .withField("hbui_root_exists", std::filesystem::exists(hbuiRoot) ? "true" : "false")
+        .withField("hooks_installed", result ? "true" : "false")
+        .withField(
+            "bridge_available",
+            mHostBridge != nullptr && mHostBridge->isAvailable() ? "true" : "false"
+        )
+        .withField("view_registry_has_view", mViewRegistry != nullptr && mViewRegistry->hasActiveView() ? "true" : "false")
+        .withField("enable_demo_overlay", mConfig.enableDemoOverlay ? "true" : "false")
+        .emit();
+
     if (mApi != nullptr) {
         mApi->setReady(result);
     }
@@ -235,6 +251,13 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
 
     auto& logger = diagnostic::globalLogger();
 
+    // Stage 7.1 troubleshooting: trace entry into the page injection chain.
+    logger.info("stage7", "injection_entered")
+        .withContext(id)
+        .withField("scope", std::to_string(static_cast<int>(info.scope)))
+        .withField("ui_entries", std::to_string(mRegistry != nullptr ? mRegistry->listUiEntries().size() : 0))
+        .emit();
+
     auto snapshotResult = mSourceReader->capture(info);
     if (snapshotResult.isErr()) {
         logger.warning("source", "capture_failed")
@@ -289,17 +312,44 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
 
     // Stage 7: plan and mount UI overlays for this page scope.
     if (mUiPlanner != nullptr && mMountManager != nullptr && mInjector != nullptr) {
-        auto uiPlan        = mUiPlanner->plan(id, info.scope);
-        auto mountResult   = mMountManager->mountPage(id, std::move(uiPlan));
+        auto uiPlan      = mUiPlanner->plan(id, info.scope);
+        auto mountResult = mMountManager->mountPage(id, std::move(uiPlan));
         if (mountResult.isOk()) {
-            auto uiInjectResult = mInjector->injectUi(id, mountResult.value());
+            auto const& mountedPlan = mountResult.value();
+            logger.info("stage7", "ui_plan_result")
+                .withContext(id)
+                .withField("mounted", std::to_string(mountedPlan.mounted))
+                .withField("skipped", std::to_string(mountedPlan.skipped))
+                .withField("blocked", std::to_string(mountedPlan.blocked))
+                .withField(
+                    "bridge_available",
+                    mHostBridge != nullptr && mHostBridge->isAvailable() ? "true" : "false"
+                )
+                .emit();
+
+            auto uiInjectResult = mInjector->injectUi(id, mountedPlan);
             if (uiInjectResult.isErr()) {
                 logger.warning("inject", "ui_bootstrap_failed")
                     .withContext(id)
                     .withError(uiInjectResult.error().code)
                     .withMessage(uiInjectResult.error().message)
                     .emit();
+            } else {
+                logger.info("stage7", "ui_inject_result")
+                    .withContext(id)
+                    .withField("ui_count", std::to_string(uiInjectResult.value().uiCount))
+                    .withField(
+                        "submitted",
+                        uiInjectResult.value().hostBridgeAvailable ? "true" : "false"
+                    )
+                    .emit();
             }
+        } else {
+            logger.warning("stage7", "ui_mount_failed")
+                .withContext(id)
+                .withError(mountResult.error().code)
+                .withMessage(mountResult.error().message)
+                .emit();
         }
     }
 
@@ -358,6 +408,10 @@ void Runtime::registerDemoOverlay() {
         return;
     }
     auto& logger = diagnostic::globalLogger();
+    logger.info("demo", "register_attempt")
+        .withField("mod_id", "dearoreui")
+        .withField("ui_id", "demo")
+        .emit();
 
     api::ModManifest modManifest;
     modManifest.id           = api::ModId{"dearoreui"};
@@ -385,11 +439,13 @@ void Runtime::registerDemoOverlay() {
         api::ModId{"dearoreui"},
         uiManifest,
         "<div id=\"dearoreui-demo-text\" style=\"padding:8px 12px;"
-        "background:var(--colorsBackground,rgba(0,0,0,0.75));"
-        "color:var(--colorsText,#ffffff);"
-        "font-family:var(--fontsUi,sans-serif);"
+        "background:rgba(0,0,0,0.75);"
+        "color:#ffffff;"
+        "font-family:sans-serif;"
         "font-size:14px;"
-        "border:1px solid var(--colorsPrimary,#4caf50);\">"
+        "border:2px solid #4caf50;"
+        "border-radius:4px;"
+        "box-shadow:0 2px 8px rgba(0,0,0,0.5);\">"
         "DearOreUI Demo Overlay</div>"
     );
     if (uiResult.isErr()) {

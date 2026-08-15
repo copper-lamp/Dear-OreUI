@@ -37,6 +37,7 @@ api::Result<void> CoherentHostBridge::sendScript(api::ContextId id, std::string_
         }
         mPending.push_back(PendingScript{id, std::string{script}});
         diagnostic::recordStage5ScriptDeferred(id, mPending.size());
+        diagnostic::recordStage5ScriptPreview(id, "defer", script);
         return api::Result<void>::success();
     }
     return submit(view, id, std::string{script});
@@ -87,6 +88,7 @@ void CoherentHostBridge::onViewRegistered(void* gamefaceView) {
         pending.swap(mPending);
     }
     for (auto const& item : pending) {
+        diagnostic::recordStage5ScriptPreview(item.contextId, "flush", item.script);
         static_cast<void>(submit(gamefaceView, item.contextId, item.script));
     }
 }
@@ -99,6 +101,7 @@ api::Result<void> CoherentHostBridge::submit(void* gamefaceView, api::ContextId 
         return api::Error{api::ErrorCode::InternalError, "coherent ExecuteScript threw an exception"};
     }
     diagnostic::recordStage5ScriptSubmitted(id, script.size());
+    diagnostic::recordStage5ScriptPreview(id, "submit", script);
     return api::Result<void>::success();
 }
 

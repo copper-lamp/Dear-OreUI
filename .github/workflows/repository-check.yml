@@ -44,8 +44,14 @@ jobs:
           $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json
           $tooth = Get-Content tooth.json -Raw | ConvertFrom-Json
           if ($manifest.version -ne $tooth.version) { throw 'manifest.json and tooth.json versions differ' }
-          if ($manifest.platform -ne 'win-x64') { throw 'manifest platform must be win-x64' }
+          # manifest.json "platform" is the LeviLamina target type ("client"/"server"),
+          # injected by the levibuildscript modpacker from the ${modPlatform} placeholder.
+          if ($manifest.platform -notin @('${modPlatform}', 'client', 'server')) { throw 'manifest platform must be the ${modPlatform} placeholder or a target type (client/server)' }
           if ($manifest.entry -ne 'DearOreUI.dll') { throw 'manifest entry must be DearOreUI.dll' }
+          # tooth.json "platform" is the lip packaging platform (win-x64).
+          foreach ($variant in $tooth.variants) {
+            if ($variant.platform -ne 'win-x64') { throw 'tooth.json variant platform must be win-x64' }
+          }
 
       - name: Check documentation policy
         shell: pwsh

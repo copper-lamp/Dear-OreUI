@@ -220,7 +220,13 @@ LL_TYPE_INSTANCE_HOOK(
     std::optional<OreUI::RouterLocation> const& oldLocation,
     std::optional<OreUI::RouterLocation> const& currentLocation
 ) {
-    diagnostic::recordStage0("hook", "event=router_onchange_entered");
+    // Stage 7.1 troubleshooting: record the route transition so we can see
+    // which screens the game actually shows.
+    diagnostic::recordStage0(
+        "hook",
+        "event=router_onchange_entered\t" + locationFields("old", oldLocation) + "\t"
+            + locationFields("cur", currentLocation)
+    );
     origin(oldLocation, currentLocation);
 }
 
@@ -345,6 +351,20 @@ bool OreUIHookAdapter::install() {
     if (adapterState.routeBack) adapterState.routerDestructorThunk = Stage1RouterDestructorThunkHook::hook() == 0;
     if (adapterState.routerDestructorThunk) adapterState.clientUpdate = Stage1ClientUpdateHook::hook() == 0;
     if (adapterState.clientUpdate) adapterState.viewInitialize = Stage7ViewInitializeHook::hook() == 0;
+
+    // Stage 7.1 troubleshooting: log the result of every hook installation so a
+    // failed view hook is immediately visible in diagnostics.
+    mLogger.info("hook", "install_step")
+        .withField("tech_stack", adapterState.techStack ? "ok" : "fail")
+        .withField("scene", adapterState.scene ? "ok" : "fail")
+        .withField("route_change", adapterState.routeChange ? "ok" : "fail")
+        .withField("route_push", adapterState.routePush ? "ok" : "fail")
+        .withField("route_replace", adapterState.routeReplace ? "ok" : "fail")
+        .withField("route_back", adapterState.routeBack ? "ok" : "fail")
+        .withField("router_dtor", adapterState.routerDestructorThunk ? "ok" : "fail")
+        .withField("client_update", adapterState.clientUpdate ? "ok" : "fail")
+        .withField("view_initialize", adapterState.viewInitialize ? "ok" : "fail")
+        .emit();
 
     if (allInstalled()) {
         diagnostic::recordStage0("status", "event=hooks_installed");

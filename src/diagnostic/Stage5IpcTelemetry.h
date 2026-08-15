@@ -63,4 +63,7 @@ void recordStage5ScriptDeferred(api::ContextId id, std::size_t queueLength);
 
 void recordStage5ScriptFailed(api::ContextId id, std::string_view message);
 
+// Script content preview for troubleshooting: phase is "submit"|"defer"|"flush".
+void recordStage5ScriptPreview(api::ContextId id, std::string_view phase, std::string_view script);
+
 } // namespace dearoreui::diagnostic

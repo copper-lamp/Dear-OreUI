@@ -248,24 +248,35 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        if (!container) {\n";
     stream << "            container = document.createElement('div');\n";
     stream << "            container.id = spec.containerId;\n";
-    stream << "            container.style.position = 'fixed';\n";
-    stream << "            container.style.zIndex = '9999';\n";
-    stream << "            container.style.pointerEvents = spec.pointerEvents ? 'auto' : 'none';\n";
-    stream << "            container.setAttribute('style', container.getAttribute('style') + spec.anchorStyle);\n";
-    stream << "            document.body.appendChild(container);\n";
+    // Stage 7.1 fix: build the entire inline style in one string. Coherent's
+    // getAttribute('style') may not reflect properties set via container.style.*,
+    // so concatenating after-the-fact can drop position:fixed / z-index or
+    // prefix the attribute with the literal string "null".
+    stream << "            container.setAttribute('style',\n";
+    stream << "                'position:fixed;' +\n";
+    stream << "                'z-index:9999;' +\n";
+    stream << "                'pointer-events:' + (spec.pointerEvents ? 'auto' : 'none') + ';' +\n";
+    stream << "                spec.anchorStyle\n";
+    stream << "            );\n";
+    stream << "            var parent = document.body || document.documentElement;\n";
+    stream << "            if (parent) {\n";
+    stream << "                parent.appendChild(container);\n";
+    stream << "            } else {\n";
+    stream << "                throw new Error('no document.body or documentElement');\n";
+    stream << "            }\n";
     stream << "        }\n";
     stream << "        container.innerHTML = spec.htmlBody;\n";
     stream << "        for (var i = 0; i < spec.styles.length; i++) {\n";
     stream << "            var link = document.createElement('link');\n";
     stream << "            link.rel = 'stylesheet';\n";
     stream << "            link.href = spec.styles[i];\n";
-    stream << "            document.head.appendChild(link);\n";
+    stream << "            if (document.head) document.head.appendChild(link);\n";
     stream << "        }\n";
     stream << "        for (var i = 0; i < spec.scripts.length; i++) {\n";
     stream << "            var script = document.createElement('script');\n";
     stream << "            script.src = spec.scripts[i];\n";
     stream << "            script.async = true;\n";
-    stream << "            document.body.appendChild(script);\n";
+    stream << "            if (document.body) document.body.appendChild(script);\n";
     stream << "        }\n";
     stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.unmount = function(containerId) {\n";
@@ -274,9 +285,49 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            container.parentNode.removeChild(container);\n";
     stream << "        }\n";
     stream << "    };\n";
-    stream << "    window.__DearOreUI__.ui.specs.forEach(function(spec) {\n";
-    stream << "        window.__DearOreUI__.ui.mount(spec);\n";
-    stream << "    });\n";
+    // Stage 7.1 fix: defer mounting until the document body exists. ExecuteScript
+    // can run while the Coherent document is still loading; appending to a
+    // missing body would silently fail inside the engine. Poll with setInterval
+    // instead of a single setTimeout, and log readyState so we can tell whether
+    // the script actually ran.
+    stream << "    window.__DearOreUI__.ui.mountAll = function() {\n";
+    stream << "        for (var i = 0; i < window.__DearOreUI__.ui.specs.length; i++) {\n";
+    stream << "            try {\n";
+    stream << "                window.__DearOreUI__.ui.mount(window.__DearOreUI__.ui.specs[i]);\n";
+    stream << "                if (window.console && console.log) console.log('[DearOreUI] mounted ' + window.__DearOreUI__.ui.specs[i].containerId);\n";
+    stream << "            } catch (e) {\n";
+    stream << "                if (window.console && console.error) console.error('[DearOreUI] mount failed: ' + (e && e.message));\n";
+    stream << "            }\n";
+    stream << "        }\n";
+    stream << "    };\n";
+    stream << "    function dearOreUiLogReadyState(label) {\n";
+    stream << "        if (window.console && console.log) {\n";
+    stream << "            console.log('[DearOreUI] ' + (label || 'check') + ' readyState=' + document.readyState + ' body=' + !!document.body);\n";
+    stream << "        }\n";
+    stream << "    }\n";
+    stream << "    function dearOreUiReadyMount() {\n";
+    stream << "        if (document.body) {\n";
+    stream << "            window.__DearOreUI__.ui.mountAll();\n";
+    stream << "            return true;\n";
+    stream << "        }\n";
+    stream << "        return false;\n";
+    stream << "    }\n";
+    stream << "    dearOreUiLogReadyState('start');\n";
+    stream << "    if (!dearOreUiReadyMount()) {\n";
+    stream << "        var dearOreUiIntervalId = setInterval(function() {\n";
+    stream << "            dearOreUiLogReadyState('poll');\n";
+    stream << "            if (dearOreUiReadyMount()) {\n";
+    stream << "                clearInterval(dearOreUiIntervalId);\n";
+    stream << "            }\n";
+    stream << "        }, 100);\n";
+    stream << "        document.addEventListener('DOMContentLoaded', function() {\n";
+    stream << "            dearOreUiLogReadyState('domready');\n";
+    stream << "            if (dearOreUiReadyMount()) {\n";
+    stream << "                clearInterval(dearOreUiIntervalId);\n";
+    stream << "            }\n";
+    stream << "        });\n";
+    stream << "        setTimeout(function() { clearInterval(dearOreUiIntervalId); }, 10000);\n";
+    stream << "    }\n";
     stream << "})();\n";
     return stream.str();
 }

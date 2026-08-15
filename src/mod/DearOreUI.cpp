@@ -64,6 +64,13 @@ DearOreUI& DearOreUI::getInstance() {
 bool DearOreUI::load() {
     getSelf().getLogger().debug("Loading...");
 
+    // Stage 7.1 troubleshooting: print the data directory so diagnostics.jsonl
+    // and the stage0 telemetry file can be located in the game instance.
+    getSelf().getLogger().info(
+        "DearOreUI data dir: {}",
+        getSelf().getDataDir().string()
+    );
+
     runtime::RuntimeConfig config;
     config.dataDirectory      = getSelf().getDataDir();
     config.minecraftDirectory = detectMinecraftDirectory();

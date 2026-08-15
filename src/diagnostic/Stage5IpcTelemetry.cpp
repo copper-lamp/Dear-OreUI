@@ -2,6 +2,8 @@
 
 #include "diagnostic/DiagnosticLogger.h"
 
+#include <algorithm>
+
 namespace dearoreui::diagnostic {
 
 namespace {
@@ -141,6 +143,17 @@ void recordStage5ScriptFailed(api::ContextId id, std::string_view message) {
         .warning("stage5", "script_failed")
         .withContext(id)
         .withMessage(std::string{message})
+        .emit();
+}
+
+void recordStage5ScriptPreview(api::ContextId id, std::string_view phase, std::string_view script) {
+    auto const previewLength = std::min<std::size_t>(script.size(), 200);
+    globalLogger()
+        .info("stage5", "script_preview")
+        .withContext(id)
+        .withField("phase", std::string{phase})
+        .withField("script_length", std::to_string(script.size()))
+        .withField("preview", std::string{script.substr(0, previewLength)})
         .emit();
 }
 
