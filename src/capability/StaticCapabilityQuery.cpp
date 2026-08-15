@@ -144,7 +144,7 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
         CapabilityEntry{
             .capability = Capability::JsToNativeCall,
             .level      = SupportLevel::Experimental,
-            .note       = "JS->C++ channel: engine bindings (BindCall/RegisterForEvent) crash the client; WebSocket loopback pending",
+            .note       = "JS->C++ via WebSocket loopback (ws://127.0.0.1:port/dearoreui?token=...); engine bindings avoided; real-client verification pending",
         }
     );
 }

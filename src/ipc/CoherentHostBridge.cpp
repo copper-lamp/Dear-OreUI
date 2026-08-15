@@ -58,17 +58,18 @@ api::Result<IpcMessage> CoherentHostBridge::callHost(
         return api::Error{api::ErrorCode::NotSupported, "host bridge is not available"};
     }
 
-    // Stage 8: JS->C++ channel is temporarily unavailable. cohtml BindCall /
-    // RegisterForEvent both crash the client on page teardown; the WebSocket
-    // loopback replacement is pending (see WebSocket回环通道-执行设计).
+    // Stage 8: C++-side callHost is intentionally unused — the JS->C++ path
+    // runs over the WebSocket loopback (LoopbackWsServer -> handleJsPayload ->
+    // HostDispatcher), which bypasses this bridge entirely. The bridge remains
+    // C++->JS only (ExecuteScript + defer queue).
     diagnostic::recordStage5HostError(
         contextId,
         api::RequestId{},
         method,
         api::ErrorCode::NotSupported,
-        "JS->C++ channel pending WebSocket loopback (engine bindings crash the client)"
+        "C++-side callHost is not used; JS->C++ calls go through the WebSocket loopback"
     );
-    return api::Error{api::ErrorCode::NotSupported, "JS->C++ channel not yet available"};
+    return api::Error{api::ErrorCode::NotSupported, "C++-side callHost is not used; JS->C++ calls go through the WebSocket loopback"};
 }
 
 void CoherentHostBridge::cancel(api::RequestId /*requestId*/) {}

@@ -143,11 +143,25 @@ bool Runtime::enable() {
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
-    // Stage 8: the JS->C++ channel (previously BindCall/RegisterForEvent on
-    // CoherentHostBridge) was removed — both engine bindings crash the client
-    // on page teardown. The replacement WebSocket loopback is planned; until
-    // then the bridge is C++->JS only (ExecuteScript).
-    mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
+    // Stage 8: the JS->C++ channel moves off the cohtml engine bindings
+    // entirely (BindCall/RegisterForEvent both crash the client on page
+    // teardown). It now runs over the WebSocket loopback: a local server
+    // routes JS frames through handleJsPayload into HostDispatcher. The
+    // bridge stays C++->JS only (ExecuteScript + defer queue).
+    std::string wsUrl;
+    mWsServer = std::make_unique<ipc::LoopbackWsServer>();
+    auto wsResult = mWsServer->start(*mHostDispatcher);
+    if (wsResult.isOk()) {
+        auto const& info = wsResult.value();
+        wsUrl = "ws://127.0.0.1:" + std::to_string(info.port) + "/dearoreui?token=" + info.token;
+        logger.info("ws", "url_ready").withField("url", wsUrl).emit();
+    } else {
+        logger.warning("ws", "start_failed")
+            .withError(wsResult.error().code)
+            .withMessage(wsResult.error().message)
+            .emit();
+    }
+    mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge, wsUrl);
     mUiPlanner      = std::make_unique<ui::UiPlanner>(*mRegistry);
     mMountHost      = std::make_unique<ui::NullMountHost>();
     mMountManager   = std::make_unique<ui::MountManager>(*mMountHost);
@@ -198,6 +212,13 @@ bool Runtime::disable() {
 
     if (mApi != nullptr) {
         mApi->setReady(false);
+    }
+
+    // Stop the WS loopback FIRST: its threads reference the host dispatcher,
+    // page manager and logger below, which are torn down next.
+    if (mWsServer != nullptr) {
+        mWsServer->stop();
+        mWsServer.reset();
     }
 
     bool hooksRemoved = true;
