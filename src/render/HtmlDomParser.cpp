@@ -154,7 +154,9 @@ bool parseNode(Cursor& cursor, DomNode& node, bool allowTextOnly) {
     for (;;) {
         cursor.skipWhitespace();
         if (cursor.eof()) {
-            return false; // missing closing tag
+            // Unclosed tag (e.g. truncated fragment): be lenient like HTML
+            // parsers and keep what has been built so far.
+            return true;
         }
         if (cursor.peek() == '<' && cursor.peek(1) == '/') {
             cursor.advance(2);
@@ -172,7 +174,11 @@ bool parseNode(Cursor& cursor, DomNode& node, bool allowTextOnly) {
         if (!parseNode(cursor, child, true)) {
             return false;
         }
-        if (child.tag.empty() && child.text.empty()) {
+        if (child.tag.empty()) {
+            // Plain text child: fold into the parent's text content. The
+            // DomNode model keeps one text field per element plus element
+            // children, so consecutive text runs merge into `text`.
+            node.text += child.text;
             continue;
         }
         node.children.push_back(std::move(child));

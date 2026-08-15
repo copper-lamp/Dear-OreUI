@@ -1,6 +1,7 @@
 #include "api/DearOreUIApi.h"
 
 #include "api/manifest/ManifestValidator.h"
+#include "component/ComponentRenderer.h"
 #include "diagnostic/Stage6TransformTelemetry.h"
 #include "diagnostic/Stage7UiTelemetry.h"
 #include "registry/ModRecord.h"
@@ -397,6 +398,23 @@ DearOreUIApi::registerButton(ModId owner, UiManifest const& manifest, std::strin
 Result<RegistrationHandle>
 DearOreUIApi::registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) {
     return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Page, mRegistry, mLogger);
+}
+
+Result<RegistrationHandle>
+DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, component::ComponentSpec const& spec) {
+    // Stage 8: render the declarative component into an htmlBody through the
+    // component renderer, then reuse the standard overlay registration path.
+    // The htmlBody is later parsed back into a DomNode forest by the universal
+    // CSSOM renderer at injection time.
+    std::string htmlBody = component::renderComponentToHtml(spec);
+
+    mLogger.info("ui", "component_registered")
+        .withMod(owner)
+        .withField("component", std::string(component::componentKindName(spec.kind)))
+        .withField("html_body_length", std::to_string(htmlBody.size()))
+        .emit();
+
+    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Overlay, mRegistry, mLogger);
 }
 
 Result<void> DearOreUIApi::unregisterUi(RegistrationHandle handle) {

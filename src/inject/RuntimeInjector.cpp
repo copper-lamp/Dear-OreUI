@@ -101,28 +101,68 @@ api::Result<InjectionReport> RuntimeInjector::inject(api::ContextId id, resource
 std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::IResourceIndex const& index) const {
     static_cast<void>(index);
 
+    bool const bridgeAvailable = mBridge.isAvailable();
+
     std::ostringstream stream;
     stream << "(function(){\n";
     stream << "    window.__DearOreUI__ = window.__DearOreUI__ || {};\n";
     stream << "    window.__DearOreUI__.protocolVersion = 1;\n";
-    stream << "    window.__DearOreUI__.stage = 5;\n";
+    stream << "    window.__DearOreUI__.stage = 8;\n";
     stream << "    window.__DearOreUI__.contextId = \"" << std::to_string(id.value()) << "\";\n";
-    stream << "    window.__DearOreUI__.ipc = {\n";
-    stream << "        isAvailable: function() { return false; },\n";
-    stream << "        callHost: function(method, args) {\n";
-    stream << "            return new Promise(function(resolve, reject) {\n";
-    stream << "                var err = new Error('HostBridgeUnavailable');\n";
-    stream << "                err.code = 'HostBridgeUnavailable';\n";
-    stream << "                reject(err);\n";
-    stream << "            });\n";
-    stream << "        }\n";
-    stream << "    };\n";
+    if (bridgeAvailable) {
+        // Stage 8: real JS->C++ channel. engine.call("dearoreui_report", json)
+        // reaches the native BindCall handler, which dispatches the request to
+        // HostDispatcher and returns the serialized response synchronously.
+        stream << "    window.__DearOreUI__.ipc = {\n";
+        stream << "        isAvailable: function() { return true; },\n";
+        stream << "        callHost: function(method, args) {\n";
+        stream << "            return new Promise(function(resolve, reject) {\n";
+        stream << "                try {\n";
+        stream << "                    if (typeof engine === 'undefined' || !engine.call) {\n";
+        stream << "                        throw new Error('HostBridgeUnavailable');\n";
+        stream << "                    }\n";
+        stream << "                    var request = {\n";
+        stream << "                        type: 'request',\n";
+        stream << "                        id: (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId || 0) + 1),\n";
+        stream << "                        ctx: Number(window.__DearOreUI__.contextId || 0),\n";
+        stream << "                        method: method,\n";
+        stream << "                        payload: (typeof args === 'string' ? args : JSON.stringify(args || {}))\n";
+        stream << "                    };\n";
+        stream << "                    var raw = engine.call('dearoreui_report', JSON.stringify(request));\n";
+        stream << "                    if (!raw) { resolve(null); return; }\n";
+        stream << "                    var response = JSON.parse(raw);\n";
+        stream << "                    if (response && response.error) {\n";
+        stream << "                        var err = new Error(response.payload || ('HostError:' + response.error));\n";
+        stream << "                        err.code = response.error;\n";
+        stream << "                        reject(err);\n";
+        stream << "                    } else {\n";
+        stream << "                        resolve(response ? response.payload : null);\n";
+        stream << "                    }\n";
+        stream << "                } catch (e) {\n";
+        stream << "                    reject(e);\n";
+        stream << "                }\n";
+        stream << "            });\n";
+        stream << "        }\n";
+        stream << "    };\n";
+    } else {
+        stream << "    window.__DearOreUI__.ipc = {\n";
+        stream << "        isAvailable: function() { return false; },\n";
+        stream << "        callHost: function(method, args) {\n";
+        stream << "            return new Promise(function(resolve, reject) {\n";
+        stream << "                var err = new Error('HostBridgeUnavailable');\n";
+        stream << "                err.code = 'HostBridgeUnavailable';\n";
+        stream << "                reject(err);\n";
+        stream << "            });\n";
+        stream << "        }\n";
+        stream << "    };\n";
+    }
     stream << "    function dearOreUiReport(msg) {\n";
     stream << "        try { if (typeof engine !== 'undefined' && engine.call) engine.call('dearoreui_report', msg); } catch (e) {}\n";
     stream << "    }\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
-    stream << "        console.log('[DearOreUI] stage5 runtime injected, contextId="
-           << escapeJsString(std::to_string(id.value())) << ", bridge=false');\n";
+    stream << "        console.log('[DearOreUI] stage8 runtime injected, contextId="
+           << escapeJsString(std::to_string(id.value())) << ", bridge="
+           << (bridgeAvailable ? "true" : "false") << "');\n";
     stream << "    }\n";
     stream << "    dearOreUiReport('runtime_executed:context=' + "
            << escapeJsString(std::to_string(id.value())) << ");\n";

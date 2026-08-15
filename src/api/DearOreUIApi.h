@@ -64,6 +64,9 @@ public:
     [[nodiscard]] Result<RegistrationHandle>
     registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) override;
 
+    [[nodiscard]] Result<RegistrationHandle>
+    registerComponent(ModId owner, UiManifest const& manifest, component::ComponentSpec const& spec) override;
+
     [[nodiscard]] Result<void> unregisterUi(RegistrationHandle handle) override;
 
     void setReady(bool ready);

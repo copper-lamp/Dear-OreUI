@@ -1,6 +1,9 @@
 #include "runtime/Runtime.h"
 
+#include "api/manifest/ManifestValidator.h"
 #include "capability/ICapabilityQuery.h"
+#include "component/ComponentRenderer.h"
+#include "component/ComponentSpec.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "diagnostic/FileDiagnosticSink.h"
 #include "diagnostic/Stage0TelemetryCompat.h"
@@ -112,6 +115,10 @@ bool Runtime::enable() {
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
+    // Stage 8: wire the JS->C++ channel. CoherentHostBridge registers the
+    // "dearoreui_report" BindCall once the script context is ready and routes
+    // incoming messages through HostDispatcher.
+    static_cast<ipc::CoherentHostBridge&>(*mHostBridge).setDispatcher(*mHostDispatcher);
     mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
     mUiPlanner      = std::make_unique<ui::UiPlanner>(*mRegistry);
     mMountHost      = std::make_unique<ui::NullMountHost>();
@@ -435,18 +442,27 @@ void Runtime::registerDemoOverlay() {
     uiManifest.pointerEvents = false;
     uiManifest.fingerprint   = "demo-overlay-v1";
 
-    auto uiResult = mApi->registerOverlay(
-        api::ModId{"dearoreui"},
-        uiManifest,
-        "<div id=\"dearoreui-demo-text\" style=\"position:fixed;top:0;left:0;width:100%;"
-        "height:100%;background:rgba(255,0,0,0.30);z-index:2147483647;"
-        "display:flex;align-items:center;justify-content:center;"
-        "font-family:sans-serif;\">"
-        "<div style=\"padding:24px 40px;background:rgba(0,0,0,0.85);"
-        "color:#4caf50;font-size:48px;font-weight:bold;"
-        "border:4px solid #4caf50;border-radius:8px;\">"
-        "DearOreUI DEMO</div></div>"
-    );
+    // Stage 8: build the demo overlay from declarative components. The panel
+    // + button tree is rendered by ComponentRenderer and flows through the
+    // same register/plan/mount/inject pipeline as any Mod UI.
+    component::ComponentSpec demoPanel;
+    demoPanel.kind  = component::ComponentKind::Panel;
+    demoPanel.label = "DearOreUI";
+
+    component::ComponentSpec demoText;
+    demoText.kind    = component::ComponentKind::Text;
+    demoText.variant = "heading";
+    demoText.label   = "DEMO";
+
+    component::ComponentSpec demoButton;
+    demoButton.kind    = component::ComponentKind::Button;
+    demoButton.variant = "primary";
+    demoButton.label   = "OK";
+
+    demoPanel.children.push_back(demoText);
+    demoPanel.children.push_back(demoButton);
+
+    auto uiResult = mApi->registerComponent(api::ModId{"dearoreui"}, uiManifest, demoPanel);
     if (uiResult.isErr()) {
         logger.warning("demo", "overlay_registration_failed")
             .withError(uiResult.error().code)

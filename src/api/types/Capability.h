@@ -27,6 +27,9 @@ enum class Capability {
     OverlayRegistration,
     UiMount,
     DeclarativeOverlay,
+    ComponentLibrary,
+    ComponentRegistration,
+    JsToNativeCall,
 };
 
 enum class SupportLevel {

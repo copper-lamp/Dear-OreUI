@@ -126,6 +126,27 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
             .note       = "Independent DOM overlay bootstrap script generation",
         }
     );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::ComponentLibrary,
+            .level      = SupportLevel::Experimental,
+            .note       = "Declarative component specs + menus-theme tokens + component renderer",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::ComponentRegistration,
+            .level      = SupportLevel::Experimental,
+            .note       = "registerComponent renders component specs through the UI registration pipeline",
+        }
+    );
+    mCapabilities.set(
+        CapabilityEntry{
+            .capability = Capability::JsToNativeCall,
+            .level      = SupportLevel::Experimental,
+            .note       = "cohtml BindCall(dearoreui_report) -> HostDispatcher JS->C++ channel",
+        }
+    );
 }
 
 api::SupportLevel StaticCapabilityQuery::query(api::Capability capability) const {
