@@ -132,6 +132,14 @@ api::SupportLevel StaticCapabilityQuery::query(api::Capability capability) const
     return mCapabilities.query(capability);
 }
 
+void StaticCapabilityQuery::setLevel(api::Capability capability, api::SupportLevel level, std::string note) {
+    mCapabilities.set(api::CapabilityEntry{
+        .capability = capability,
+        .level      = level,
+        .note       = std::move(note),
+    });
+}
+
 api::CapabilitySet StaticCapabilityQuery::all() const { return mCapabilities; }
 
 } // namespace dearoreui::capability

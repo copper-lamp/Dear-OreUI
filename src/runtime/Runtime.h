@@ -6,6 +6,8 @@
 #include "hook/IPageHookCallback.h"
 #include "hook/OreUIHookAdapter.h"
 #include "inject/IPageInjector.h"
+#include "ipc/CoherentHostBridge.h"
+#include "ipc/CoherentViewRegistry.h"
 #include "ipc/HostDispatcher.h"
 #include "ipc/HostMethodRegistry.h"
 #include "ipc/IHostBridge.h"
@@ -46,6 +48,10 @@ private:
 
     void runStage4Injection(api::ContextId id, api::PageInfo const& info);
 
+    // Stage 7.1: register the built-in demo overlay for real-client display
+    // verification. Gated by RuntimeConfig::enableDemoOverlay.
+    void registerDemoOverlay();
+
     RuntimeConfig                             mConfig;
     capability::StaticCapabilityQuery         mCapabilities;
     std::unique_ptr<registry::ModRegistry>    mRegistry;
@@ -63,6 +69,7 @@ private:
     std::unique_ptr<ui::IMountHost>             mMountHost;
     std::unique_ptr<ipc::HostDispatcher>        mHostDispatcher;
     std::unique_ptr<ipc::IHostBridge>           mHostBridge;
+    std::unique_ptr<ipc::CoherentViewRegistry>  mViewRegistry;
     bool                                      mInitialized{false};
     bool                                      mEnabled{false};
 };

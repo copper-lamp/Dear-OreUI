@@ -112,4 +112,36 @@ void recordStage5HostInvalidContext(
         .emit();
 }
 
+void recordStage5ViewInitialized(std::uintptr_t viewPtr, bool executeScriptFound) {
+    globalLogger()
+        .info("stage5", "view_initialized")
+        .withField("view_ptr", std::to_string(viewPtr))
+        .withField("execute_script_found", boolString(executeScriptFound))
+        .emit();
+}
+
+void recordStage5ScriptSubmitted(api::ContextId id, std::size_t scriptLength) {
+    globalLogger()
+        .info("stage5", "script_submitted")
+        .withContext(id)
+        .withField("script_length", std::to_string(scriptLength))
+        .emit();
+}
+
+void recordStage5ScriptDeferred(api::ContextId id, std::size_t queueLength) {
+    globalLogger()
+        .info("stage5", "script_deferred")
+        .withContext(id)
+        .withField("queue_length", std::to_string(queueLength))
+        .emit();
+}
+
+void recordStage5ScriptFailed(api::ContextId id, std::string_view message) {
+    globalLogger()
+        .warning("stage5", "script_failed")
+        .withContext(id)
+        .withMessage(std::string{message})
+        .emit();
+}
+
 } // namespace dearoreui::diagnostic

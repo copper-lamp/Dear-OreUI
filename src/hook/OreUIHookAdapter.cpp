@@ -9,7 +9,10 @@
 #include "mc/client/gui/ScreenTechStackSelector.h"
 #include "mc/client/gui/TechStack.h"
 #include "mc/client/gui/oreui/SceneProvider.h"
+#include "mc/client/gui/oreui/input/ViewInputHandler.h"
 #include "mc/client/gui/oreui/routing/Router.h"
+#include "mc/client/gui/oreui/views/View.h"
+#include "mc/client/gui/oreui/views/ViewRenderer.h"
 
 #include <atomic>
 #include <memory>
@@ -33,12 +36,15 @@ struct AdapterState {
     bool routeBack{};
     bool routerDestructorThunk{};
     bool clientUpdate{};
+    bool viewInitialize{};
 
     std::mutex                                         mutex;
     std::unordered_map<OreUI::Router*, api::ContextId> routerContexts;
     std::unordered_set<std::string>                    observed;
     IPageHookCallback*                                 callback{};
     Stage5CoherentProbe*                               probe{};
+    capability::ICapabilityQuery*                      capabilities{};
+    ipc::CoherentViewRegistry*                         viewRegistry{};
 };
 
 AdapterState& state() {
@@ -169,6 +175,42 @@ LL_TYPE_INSTANCE_HOOK(
     return result;
 }
 
+// Stage 7.1: capture the real Coherent gameface view. OreUI::View::initialize
+// is an exported MCAPI symbol that receives the cohtml::View& exactly once per
+// view setup, giving us the JS execution entry (cohtml::View::ExecuteScript)
+// without any class-layout assumptions. The hook is read-only: origin runs
+// unchanged and we only register the view handle.
+LL_TYPE_INSTANCE_HOOK(
+    Stage7ViewInitializeHook,
+    ll::memory::HookPriority::Normal,
+    OreUI::View,
+    &OreUI::View::initialize,
+    void,
+    ::cohtml::View&                          gamefaceView,
+    std::unique_ptr<OreUI::ViewRenderer>     renderer,
+    std::unique_ptr<OreUI::ViewInputHandler> inputHandler,
+    OreUI::Detail::ViewContextFactory&       contextFactory,
+    ::IOptions&                              options
+) {
+    origin(gamefaceView, std::move(renderer), std::move(inputHandler), contextFactory, options);
+    {
+        std::lock_guard lock{state().mutex};
+        if (state().viewRegistry != nullptr) {
+            state().viewRegistry->registerView(&gamefaceView);
+        }
+        if (state().probe != nullptr) {
+            state().probe->onViewInitialized(&gamefaceView);
+        }
+        if (state().capabilities != nullptr) {
+            static_cast<void>(state().capabilities->setLevel(
+                api::Capability::HostBridge,
+                api::SupportLevel::Experimental,
+                "cohtml::View::ExecuteScript captured via OreUI::View::initialize"
+            ));
+        }
+    }
+}
+
 LL_TYPE_INSTANCE_HOOK(
     Stage0RouterChangeHook,
     ll::memory::HookPriority::Normal,
@@ -221,13 +263,13 @@ LL_TYPE_INSTANCE_HOOK(
 bool allInstalled() {
     auto const& value = state();
     return value.techStack && value.scene && value.routeChange && value.routePush && value.routeReplace
-        && value.routeBack && value.routerDestructorThunk && value.clientUpdate;
+        && value.routeBack && value.routerDestructorThunk && value.clientUpdate && value.viewInitialize;
 }
 
 bool noneInstalled() {
     auto const& value = state();
     return !value.techStack && !value.scene && !value.routeChange && !value.routePush && !value.routeReplace
-        && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate;
+        && !value.routeBack && !value.routerDestructorThunk && !value.clientUpdate && !value.viewInitialize;
 }
 
 bool removeInstalled() {
@@ -240,6 +282,7 @@ bool removeInstalled() {
     if (value.routeChange && Stage0RouterChangeHook::unhook()) value.routeChange = false;
     if (value.scene && Stage0SceneProviderHook::unhook()) value.scene = false;
     if (value.techStack && Stage0TechStackHook::unhook()) value.techStack = false;
+    if (value.viewInitialize && Stage7ViewInitializeHook::unhook()) value.viewInitialize = false;
     return noneInstalled();
 }
 
@@ -267,11 +310,13 @@ void destroyAllContexts() {
 OreUIHookAdapter::OreUIHookAdapter(
     IPageHookCallback&            callback,
     capability::ICapabilityQuery& capabilities,
+    ipc::CoherentViewRegistry&    viewRegistry,
     diagnostic::DiagnosticLogger& logger,
     std::filesystem::path         dataDirectory
 )
 : mCallback(callback),
   mCapabilities(capabilities),
+  mViewRegistry(viewRegistry),
   mLogger(logger),
   mDataDirectory(std::move(dataDirectory)),
   mProbe(logger) {}
@@ -282,8 +327,10 @@ bool OreUIHookAdapter::install() {
     auto& adapterState = state();
     {
         std::lock_guard lock{adapterState.mutex};
-        adapterState.callback = &mCallback;
-        adapterState.probe    = &mProbe;
+        adapterState.callback       = &mCallback;
+        adapterState.probe          = &mProbe;
+        adapterState.capabilities   = &mCapabilities;
+        adapterState.viewRegistry   = &mViewRegistry;
     }
     if (allInstalled()) {
         return true;
@@ -297,6 +344,7 @@ bool OreUIHookAdapter::install() {
     if (adapterState.routeReplace) adapterState.routeBack = Stage0RouterBackHook::hook() == 0;
     if (adapterState.routeBack) adapterState.routerDestructorThunk = Stage1RouterDestructorThunkHook::hook() == 0;
     if (adapterState.routerDestructorThunk) adapterState.clientUpdate = Stage1ClientUpdateHook::hook() == 0;
+    if (adapterState.clientUpdate) adapterState.viewInitialize = Stage7ViewInitializeHook::hook() == 0;
 
     if (allInstalled()) {
         diagnostic::recordStage0("status", "event=hooks_installed");
@@ -306,7 +354,10 @@ bool OreUIHookAdapter::install() {
     destroyAllContexts();
     {
         std::lock_guard lock{adapterState.mutex};
-        adapterState.callback = nullptr;
+        adapterState.callback     = nullptr;
+        adapterState.probe        = nullptr;
+        adapterState.capabilities = nullptr;
+        adapterState.viewRegistry = nullptr;
     }
     removeInstalled();
     diagnostic::recordStage0("status", "event=hooks_unavailable");
@@ -328,8 +379,10 @@ bool OreUIHookAdapter::uninstall() {
     diagnostic::recordStage0("hook_adapter", "event=destroy_all_contexts_completed");
     {
         std::lock_guard lock{adapterState.mutex};
-        adapterState.callback = nullptr;
-        adapterState.probe    = nullptr;
+        adapterState.callback       = nullptr;
+        adapterState.probe          = nullptr;
+        adapterState.capabilities   = nullptr;
+        adapterState.viewRegistry   = nullptr;
     }
 
     if (noneInstalled()) return true;

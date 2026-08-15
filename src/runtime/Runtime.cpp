@@ -11,7 +11,7 @@
 #include "facet/RuntimeInfoFacet.h"
 #include "hook/OreUIHookAdapter.h"
 #include "inject/RuntimeInjector.h"
-#include "ipc/NullHostBridge.h"
+#include "ipc/CoherentHostBridge.h"
 #include "poc/Stage1NavigationPoc.h"
 #include "resource/ResourceIndex.h"
 #include "source/FileSystemSourceReader.h"
@@ -93,9 +93,11 @@ bool Runtime::enable() {
     logger.info("lifecycle", "enable").emit();
 
     mPageManager = std::make_unique<page::PageContextManager>();
+    mViewRegistry = std::make_unique<ipc::CoherentViewRegistry>();
     mHookAdapter = std::make_unique<hook::OreUIHookAdapter>(
         static_cast<hook::IPageHookCallback&>(*this),
         mCapabilities,
+        *mViewRegistry,
         logger,
         mConfig.dataDirectory
     );
@@ -106,7 +108,7 @@ bool Runtime::enable() {
     mChangePlanner    = std::make_unique<transform::ChangePlanner>(*mRegistry);
     mPageTransformer  = std::make_unique<transform::PageTransformer>();
 
-    mHostBridge     = std::make_unique<ipc::NullHostBridge>();
+    mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(*mViewRegistry);
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
@@ -127,6 +129,9 @@ bool Runtime::enable() {
 
     if (result) {
         logger.info("runtime", "ready").withField("page_lifecycle", "enabled").emit();
+        if (mConfig.enableDemoOverlay) {
+            registerDemoOverlay();
+        }
     }
 
     mEnabled = result;
@@ -170,6 +175,10 @@ bool Runtime::disable() {
     }
     if (mHostBridge != nullptr) {
         mHostBridge.reset();
+    }
+    if (mViewRegistry != nullptr) {
+        mViewRegistry->clear();
+        mViewRegistry.reset();
     }
 
     if (mRegistry != nullptr) {
@@ -343,5 +352,58 @@ api::IDearOreUIApi* Runtime::api() { return mApi.get(); }
 page::IPageContextManager* Runtime::pageManager() { return mPageManager.get(); }
 
 ipc::HostDispatcher* Runtime::hostDispatcher() { return mHostDispatcher.get(); }
+
+void Runtime::registerDemoOverlay() {
+    if (mApi == nullptr || mRegistry == nullptr) {
+        return;
+    }
+    auto& logger = diagnostic::globalLogger();
+
+    api::ModManifest modManifest;
+    modManifest.id           = api::ModId{"dearoreui"};
+    modManifest.modNamespace = "dearoreui";
+    modManifest.modVersion   = api::Version{0, 2, 0};
+    auto modResult = mApi->registerMod(modManifest);
+    if (modResult.isErr()) {
+        logger.warning("demo", "mod_registration_failed")
+            .withError(modResult.error().code)
+            .withMessage(modResult.error().message)
+            .emit();
+        return;
+    }
+
+    api::UiManifest uiManifest;
+    uiManifest.modNamespace  = "dearoreui";
+    uiManifest.id            = "demo";
+    uiManifest.kind          = api::UiKind::Overlay;
+    uiManifest.pageScopes    = {api::PageScope::Any};
+    uiManifest.anchor        = api::UiAnchor::TopLeft;
+    uiManifest.pointerEvents = false;
+    uiManifest.fingerprint   = "demo-overlay-v1";
+
+    auto uiResult = mApi->registerOverlay(
+        api::ModId{"dearoreui"},
+        uiManifest,
+        "<div id=\"dearoreui-demo-text\" style=\"padding:8px 12px;"
+        "background:var(--colorsBackground,rgba(0,0,0,0.75));"
+        "color:var(--colorsText,#ffffff);"
+        "font-family:var(--fontsUi,sans-serif);"
+        "font-size:14px;"
+        "border:1px solid var(--colorsPrimary,#4caf50);\">"
+        "DearOreUI Demo Overlay</div>"
+    );
+    if (uiResult.isErr()) {
+        logger.warning("demo", "overlay_registration_failed")
+            .withError(uiResult.error().code)
+            .withMessage(uiResult.error().message)
+            .emit();
+        return;
+    }
+
+    logger.info("demo", "overlay_registered")
+        .withField("handle", std::to_string(uiResult.value().value()))
+        .withField("container_id", api::makeUiContainerId("dearoreui", api::UiKind::Overlay, "demo"))
+        .emit();
+}
 
 } // namespace dearoreui::runtime

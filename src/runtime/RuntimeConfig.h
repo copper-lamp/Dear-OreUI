@@ -10,6 +10,7 @@ struct RuntimeConfig {
     bool                  enableStage0Compatibility = true;
     bool                  enableFileDiagnostics     = true;
     bool                  enableHooks               = true; // Allow tests to disable LeviLamina hook calls.
+    bool                  enableDemoOverlay         = false; // Real-client verification overlay (Stage 7.1).
 };
 
 } // namespace dearoreui::runtime

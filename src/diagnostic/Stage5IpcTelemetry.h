@@ -54,4 +54,13 @@ void recordStage5HostInvalidContext(
     std::string_view method
 );
 
+// Stage 7.1: real Coherent view capture and script submission events.
+void recordStage5ViewInitialized(std::uintptr_t viewPtr, bool executeScriptFound);
+
+void recordStage5ScriptSubmitted(api::ContextId id, std::size_t scriptLength);
+
+void recordStage5ScriptDeferred(api::ContextId id, std::size_t queueLength);
+
+void recordStage5ScriptFailed(api::ContextId id, std::string_view message);
+
 } // namespace dearoreui::diagnostic

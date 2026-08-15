@@ -4,6 +4,7 @@
 #include "diagnostic/DiagnosticLogger.h"
 #include "hook/IPageHookCallback.h"
 #include "hook/Stage5CoherentProbe.h"
+#include "ipc/CoherentViewRegistry.h"
 
 #include <filesystem>
 
@@ -14,6 +15,7 @@ public:
     OreUIHookAdapter(
         IPageHookCallback&            callback,
         capability::ICapabilityQuery& capabilities,
+        ipc::CoherentViewRegistry&    viewRegistry,
         diagnostic::DiagnosticLogger& logger,
         std::filesystem::path         dataDirectory = {}
     );
@@ -27,6 +29,7 @@ public:
 private:
     IPageHookCallback&            mCallback;
     capability::ICapabilityQuery& mCapabilities;
+    ipc::CoherentViewRegistry&    mViewRegistry;
     diagnostic::DiagnosticLogger& mLogger;
     std::filesystem::path         mDataDirectory;
     Stage5CoherentProbe           mProbe;

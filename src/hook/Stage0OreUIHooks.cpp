@@ -3,6 +3,7 @@
 #include "capability/StaticCapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "hook/OreUIHookAdapter.h"
+#include "ipc/CoherentViewRegistry.h"
 
 #include <optional>
 #include <string_view>
@@ -22,8 +23,9 @@ struct NullPageHookCallback : IPageHookCallback {
 OreUIHookAdapter& sharedAdapter() {
     static capability::StaticCapabilityQuery capabilities;
     static diagnostic::DiagnosticLogger      logger;
+    static ipc::CoherentViewRegistry         viewRegistry;
     static NullPageHookCallback              callback;
-    static OreUIHookAdapter                  adapter(callback, capabilities, logger);
+    static OreUIHookAdapter                  adapter(callback, capabilities, viewRegistry, logger);
     return adapter;
 }
 

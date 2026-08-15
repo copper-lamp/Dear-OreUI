@@ -67,6 +67,7 @@ bool DearOreUI::load() {
     runtime::RuntimeConfig config;
     config.dataDirectory      = getSelf().getDataDir();
     config.minecraftDirectory = detectMinecraftDirectory();
+    config.enableDemoOverlay  = true; // Stage 7.1 real-client display verification.
     mRuntime                  = std::make_unique<runtime::Runtime>(std::move(config));
 
     return mRuntime->initialize();
