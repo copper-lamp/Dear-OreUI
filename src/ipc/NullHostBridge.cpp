@@ -20,6 +20,8 @@ api::Result<IpcMessage> NullHostBridge::callHost(
     return api::Error{api::ErrorCode::NotSupported, "host bridge is not available"};
 }
 
+void NullHostBridge::setHostDispatcher(HostDispatcher& /*dispatcher*/) {}
+
 void NullHostBridge::cancel(api::RequestId /*requestId*/) {}
 
 void NullHostBridge::invalidateContext(api::ContextId /*id*/) {}

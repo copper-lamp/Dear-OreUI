@@ -1,6 +1,7 @@
 #include "hook/OreUIHookAdapter.h"
 
 #include "diagnostic/Stage0TelemetryCompat.h"
+#include "hook/BindingProbe.h"
 #include "poc/Stage1NavigationPoc.h"
 
 #include "ll/api/memory/Hook.h"
@@ -256,6 +257,10 @@ LL_TYPE_INSTANCE_HOOK(
 // view setup, giving us the JS execution entry (cohtml::View::ExecuteScript)
 // without any class-layout assumptions. The hook is read-only: origin runs
 // unchanged and we only register the view handle.
+//
+// Stage 8 observe-the-game: BindingProbe replaces the view's binding vtable
+// slots BEFORE origin() so that registrations made inside View::initialize
+// (e.g. the game's facet:request handler) are observed too.
 LL_TYPE_INSTANCE_HOOK(
     Stage7ViewInitializeHook,
     ll::memory::HookPriority::Normal,
@@ -268,6 +273,7 @@ LL_TYPE_INSTANCE_HOOK(
     OreUI::Detail::ViewContextFactory&       contextFactory,
     ::IOptions&                              options
 ) {
+    BindingProbe::install(&gamefaceView);
     origin(gamefaceView, std::move(renderer), std::move(inputHandler), contextFactory, options);
     {
         std::lock_guard lock{state().mutex};
@@ -402,6 +408,9 @@ LL_TYPE_INSTANCE_HOOK(
             state().viewRegistry->onViewDestroyed(this->mGamefaceView);
         }
     }
+    // Restore the binding vtable slots while the view memory is still alive
+    // (origin() below is what actually releases it).
+    BindingProbe::uninstall(this->mGamefaceView);
     diagnostic::recordStage0("js", "event=view_destroyed");
     origin();
 }

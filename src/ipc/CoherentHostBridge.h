@@ -29,10 +29,13 @@ void defaultCoherentExecutor(void* gamefaceView, std::string const& script);
 // and subsequent sendScript calls execute immediately.
 //
 // Stage 8 note: the JS->C++ channel previously used cohtml BindCall /
-// RegisterForEvent, but BOTH crash the client on page teardown (the game's
-// xgameruntime->msxml6 XML-parse bug is triggered by any registered handler).
-// The bridge is therefore C++->JS only for now; the JS->C++ channel moves to
-// a WebSocket loopback (see DearOreUI-阶段8-WebSocket回环通道-执行设计.md).
+// RegisterForEvent, but BOTH crashed the client when registered at the
+// OnReadyForBindings moment. BindingProbe observation showed the game registers
+// its facet handlers EARLIER (after page creation, before OnReadyForBindings)
+// and never unregisters. The bridge now mimics that: the handler is registered
+// as soon as a view is captured (view_initialize), not when bindings become
+// ready. If the timing hypothesis is right, returning to the menu no longer
+// crashes and engine.trigger("dearoreui_report", json) reaches handleJsPayload.
 class CoherentHostBridge : public IHostBridge {
 public:
     CoherentHostBridge(
@@ -56,16 +59,28 @@ public:
     void cancel(api::RequestId requestId) override;
     void invalidateContext(api::ContextId id) override;
 
+    // Wired by Runtime::enable() after the dispatcher is created. The native
+    // JS handler needs it to route engine.trigger("dearoreui_report", json).
+    void setHostDispatcher(HostDispatcher& dispatcher) override;
+
     // Called by CoherentViewRegistry when the page signals its script context
     // is ready (OnReadyForBindings); flushes the deferred script queue into
     // the active view via ExecuteScript.
     void onScriptContextReady();
 
 private:
+    // Called by CoherentViewRegistry when a view is first captured. Registers
+    // the JS->C++ event handler EARLY (view_initialize), mimicking the game's
+    // facet handler timing. Like the game, the handler is never unregistered.
+    void onViewRegistered(void* gamefaceView);
+
     [[nodiscard]] api::Result<void> submit(void* gamefaceView, api::ContextId id, std::string const& script);
 
     CoherentViewRegistry& mRegistry;
     ScriptExecutor        mExecutor;
+    HostDispatcher*       mDispatcher{nullptr};
+    void*                 mNativeHandler{nullptr}; // CoherentJsHandler* (opaque, cohtml-free header)
+    void*                 mBindingHandle{nullptr}; // handle returned by RegisterForEvent
 
     struct PendingScript {
         api::ContextId contextId;

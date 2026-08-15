@@ -143,6 +143,10 @@ bool Runtime::enable() {
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
+    // Stage 8: the native JS->C++ handler needs the dispatcher to route
+    // engine.trigger("dearoreui_report", ...) payloads (handled via
+    // handleJsPayload). The bridge registers that handler at view_initialize.
+    mHostBridge->setHostDispatcher(*mHostDispatcher);
     // Stage 8: the JS->C++ channel moves off the cohtml engine bindings
     // entirely (BindCall/RegisterForEvent both crash the client on page
     // teardown). It now runs over the WebSocket loopback: a local server

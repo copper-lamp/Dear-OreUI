@@ -106,13 +106,6 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     static_cast<void>(index);
 
     bool const bridgeAvailable = mBridge.isAvailable();
-    bool const channelReady    = !mWsUrl.empty();
-
-    // XHR fallback targets the same server without the WebSocket upgrade.
-    std::string httpUrl;
-    if (channelReady && mWsUrl.rfind("ws", 0) == 0) {
-        httpUrl = "http" + mWsUrl.substr(2);
-    }
 
     std::ostringstream stream;
     stream << "(function(){\n";
@@ -120,185 +113,106 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    window.__DearOreUI__.protocolVersion = 1;\n";
     stream << "    window.__DearOreUI__.stage = 8;\n";
     stream << "    window.__DearOreUI__.contextId = \"" << std::to_string(id.value()) << "\";\n";
-    if (channelReady) {
-        // Stage 8 WebSocket loopback IPC. JS->C++ requests/responses travel
-        // over ws://127.0.0.1:<port>/dearoreui?token=... and are routed by the
-        // C++ LoopbackWsServer straight into HostDispatcher — the cohtml
-        // engine bindings (BindCall/RegisterForEvent) that crashed the client
-        // on page teardown are never touched. XMLHttpRequest is the fallback
-        // when the cohtml build lacks WebSocket.
-        stream << "    window.__DearOreUI__.wsUrl = \"" << escapeJsString(mWsUrl) << "\";\n";
-        stream << "    window.__DearOreUI__.httpUrl = \"" << escapeJsString(httpUrl) << "\";\n";
-        stream << "    var hasWs = typeof WebSocket !== 'undefined';\n";
-        stream << "    var hasXhr = typeof XMLHttpRequest !== 'undefined';\n";
-        stream << "    function makeError(code, message) {\n";
-        stream << "        var err = new Error(message || code);\n";
-        stream << "        err.code = code;\n";
-        stream << "        return err;\n";
-        stream << "    }\n";
-        stream << "    var ipc = (function() {\n";
-        stream << "        var socket = null;\n";
-        stream << "        var nextId = 0;\n";
-        stream << "        var pending = {};\n";
-        stream << "        var outQueue = [];\n";
-        stream << "        var retryMs = 500;\n";
-        stream << "        var stopped = false;\n";
-        stream << "        function failAll(code) {\n";
-        stream << "            for (var key in pending) {\n";
-        stream << "                if (pending.hasOwnProperty(key)) {\n";
-        stream << "                    pending[key].reject(makeError(code, code));\n";
-        stream << "                }\n";
-        stream << "            }\n";
-        stream << "            pending = {};\n";
-        stream << "        }\n";
-        stream << "        function handleMessage(data) {\n";
-        stream << "            var msg = null;\n";
-        stream << "            try { msg = JSON.parse(data); } catch (e) { return; }\n";
-        stream << "            if (!msg || msg.type !== 'response') return;\n";
-        stream << "            var entry = pending[String(msg.id)];\n";
-        stream << "            if (!entry) return;\n";
-        stream << "            delete pending[String(msg.id)];\n";
-        stream << "            if (msg.error && msg.error !== 0) {\n";
-        stream << "                entry.reject(makeError(String(msg.error), msg.payload || 'HostError'));\n";
-        stream << "            } else {\n";
-        stream << "                entry.resolve(msg.payload);\n";
-        stream << "            }\n";
-        stream << "        }\n";
-        stream << "        function flushQueue() {\n";
-        stream << "            for (var i = 0; i < outQueue.length; i++) {\n";
-        stream << "                try { socket.send(outQueue[i]); } catch (e) {}\n";
-        stream << "            }\n";
-        stream << "            outQueue = [];\n";
-        stream << "        }\n";
-        stream << "        function scheduleReconnect() {\n";
-        stream << "            if (stopped || !hasWs) return;\n";
-        stream << "            if (retryMs < 30000) retryMs = retryMs * 2;\n";
-        stream << "            setTimeout(function() { connect(); }, retryMs);\n";
-        stream << "        }\n";
-        stream << "        function connect() {\n";
-        stream << "            if (stopped || !hasWs) return;\n";
-        stream << "            if (socket && (socket.readyState === 0 || socket.readyState === 1)) return;\n";
-        stream << "            if (!window.__DearOreUI__.wsUrl) return;\n";
-        stream << "            var s = null;\n";
-        stream << "            try { s = new WebSocket(window.__DearOreUI__.wsUrl); } catch (e) { scheduleReconnect(); return; }\n";
-        stream << "            socket = s;\n";
-        stream << "            s.onopen = function() {\n";
-        stream << "                retryMs = 500;\n";
-        stream << "                flushQueue();\n";
-        stream << "            };\n";
-        stream << "            s.onclose = function() {\n";
-        stream << "                if (socket === s) { socket = null; }\n";
-        stream << "                failAll('HostBridgeDisconnected');\n";
-        stream << "                scheduleReconnect();\n";
-        stream << "            };\n";
-        stream << "            s.onerror = function() {};\n";
-        stream << "            s.onmessage = function(ev) { handleMessage(ev.data); };\n";
-        stream << "        }\n";
-        stream << "        function sendViaWs(payload) {\n";
-        stream << "            connect();\n";
-        stream << "            if (socket && socket.readyState === 1) {\n";
-        stream << "                try { socket.send(payload); return true; } catch (e) { return false; }\n";
-        stream << "            }\n";
-        stream << "            if (socket && socket.readyState === 0) {\n";
-        stream << "                outQueue.push(payload);\n";
-        stream << "                return true;\n";
-        stream << "            }\n";
-        stream << "            return false;\n";
-        stream << "        }\n";
-        stream << "        function sendViaXhr(payload, resolve, reject) {\n";
-        stream << "            var xhr = new XMLHttpRequest();\n";
-        stream << "            try {\n";
-        stream << "                xhr.open('POST', window.__DearOreUI__.httpUrl, true);\n";
-        stream << "                xhr.onreadystatechange = function() {\n";
-        stream << "                    if (xhr.readyState !== 4) return;\n";
-        stream << "                    if (xhr.status !== 200) {\n";
-        stream << "                        reject(makeError('HostBridgeHttpError:' + xhr.status, 'host http error'));\n";
-        stream << "                        return;\n";
-        stream << "                    }\n";
-        stream << "                    var msg = null;\n";
-        stream << "                    try { msg = JSON.parse(xhr.responseText); } catch (e) { reject(e); return; }\n";
-        stream << "                    if (msg && msg.error && msg.error !== 0) {\n";
-        stream << "                        reject(makeError(String(msg.error), msg.payload || 'HostError'));\n";
-        stream << "                    } else {\n";
-        stream << "                        resolve(msg ? msg.payload : null);\n";
-        stream << "                    }\n";
-        stream << "                };\n";
-        stream << "                xhr.onerror = function() { reject(makeError('HostBridgeDisconnected', 'host disconnected')); };\n";
-        stream << "                xhr.send(payload);\n";
-        stream << "            } catch (e) { reject(e); }\n";
-        stream << "        }\n";
-        stream << "        return {\n";
-        stream << "            isAvailable: function() {\n";
-        stream << "                if (hasWs) return !!(socket && socket.readyState === 1);\n";
-        stream << "                return hasXhr;\n";
-        stream << "            },\n";
-        stream << "            callHost: function(method, args) {\n";
-        stream << "                return new Promise(function(resolve, reject) {\n";
-        stream << "                    var request = {\n";
-        stream << "                        type: 'request',\n";
-        stream << "                        id: ++nextId,\n";
-        stream << "                        ctx: Number(window.__DearOreUI__.contextId || 0),\n";
-        stream << "                        method: method,\n";
-        stream << "                        payload: (typeof args === 'string' ? args : JSON.stringify(args || {}))\n";
-        stream << "                    };\n";
-        stream << "                    var payload = JSON.stringify(request);\n";
-        stream << "                    if (hasWs) {\n";
-        stream << "                        if (sendViaWs(payload)) {\n";
-        stream << "                            pending[String(request.id)] = { resolve: resolve, reject: reject };\n";
-        stream << "                        } else {\n";
-        stream << "                            reject(makeError('HostBridgeDisconnected', 'ws not connected'));\n";
-        stream << "                        }\n";
-        stream << "                    } else if (hasXhr) {\n";
-        stream << "                        sendViaXhr(payload, resolve, reject);\n";
-        stream << "                    } else {\n";
-        stream << "                        reject(makeError('HostBridgeUnavailable', 'no ws or xhr'));\n";
-        stream << "                    }\n";
-        stream << "                });\n";
-        stream << "            },\n";
-        stream << "            report: function(msg) {\n";
-        stream << "                var payload = (typeof msg === 'string') ? msg : JSON.stringify(msg);\n";
-        stream << "                if (hasWs) {\n";
-        stream << "                    sendViaWs(payload);\n";
-        stream << "                } else if (hasXhr) {\n";
-        stream << "                    try {\n";
-        stream << "                        var xhr = new XMLHttpRequest();\n";
-        stream << "                        xhr.open('POST', window.__DearOreUI__.httpUrl, true);\n";
-        stream << "                        xhr.send(payload);\n";
-        stream << "                    } catch (e) {}\n";
-        stream << "                }\n";
-        stream << "            },\n";
-        stream << "            send: function(msg) { return this.report(msg); }\n";
-        stream << "        };\n";
-        stream << "    })();\n";
-        stream << "    window.__DearOreUI__.ipc = ipc;\n";
-        stream << "    window.DearOreUI = window.DearOreUI || {\n";
-        stream << "        call: function(method, args) { return ipc.callHost(method, args); },\n";
-        stream << "        report: function(msg) { return ipc.report(msg); }\n";
-        stream << "    };\n";
-    } else {
-        stream << "    window.__DearOreUI__.ipc = {\n";
-        stream << "        isAvailable: function() { return false; },\n";
-        stream << "        callHost: function(method, args) {\n";
-        stream << "            return new Promise(function(resolve, reject) {\n";
-        stream << "                var err = new Error('HostBridgeUnavailable');\n";
-        stream << "                err.code = 'HostBridgeUnavailable';\n";
-        stream << "                reject(err);\n";
-        stream << "            });\n";
-        stream << "        },\n";
-        stream << "        report: function(msg) {}\n";
-        stream << "    };\n";
-    }
+    // Stage 8 observe-the-game: JS->C++ goes through the engine event channel
+    // (engine.trigger("dearoreui_report", json)) exactly like the vanilla hbui
+    // JS calls the game via "facet:request". The native side registers the
+    // "dearoreui_report" handler at view_initialize (early, like the game).
+    stream << "    var hasEngine = (typeof engine !== 'undefined') && engine && engine.trigger;\n";
+    stream << "    window.__DearOreUI__.ipc = {\n";
+    stream << "        isAvailable: function() { return hasEngine; },\n";
+    stream << "        callHost: function(method, args) {\n";
+    stream << "            return new Promise(function(resolve, reject) {\n";
+    stream << "                try {\n";
+    stream << "                    if (!hasEngine) throw new Error('HostBridgeUnavailable');\n";
+    stream << "                    var request = {\n";
+    stream << "                        type: 'request',\n";
+    stream << "                        id: (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId || 0) + 1),\n";
+    stream << "                        ctx: Number(window.__DearOreUI__.contextId || 0),\n";
+    stream << "                        method: method,\n";
+    stream << "                        payload: (typeof args === 'string' ? args : JSON.stringify(args || {}))\n";
+    stream << "                    };\n";
+    stream << "                    engine.trigger('dearoreui_report', JSON.stringify(request));\n";
+    stream << "                    resolve(null);\n";
+    stream << "                } catch (e) { reject(e); }\n";
+    stream << "            });\n";
+    stream << "        },\n";
+    stream << "        report: function(msg) {\n";
+    stream << "            try {\n";
+    stream << "                if (hasEngine) engine.trigger('dearoreui_report', (typeof msg === 'string') ? msg : JSON.stringify(msg));\n";
+    stream << "            } catch (e) {}\n";
+    stream << "        },\n";
+    stream << "        send: function(msg) { return this.report(msg); }\n";
+    stream << "    };\n";
+    stream << "    window.DearOreUI = window.DearOreUI || {\n";
+    stream << "        call: function(method, args) { return window.__DearOreUI__.ipc.callHost(method, args); },\n";
+    stream << "        report: function(msg) { return window.__DearOreUI__.ipc.report(msg); }\n";
+    stream << "    };\n";
     stream << "    function dearOreUiReport(msg) {\n";
     stream << "        try { window.__DearOreUI__.ipc.report(msg); } catch (e) {}\n";
     stream << "    }\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
     stream << "        console.log('[DearOreUI] stage8 runtime injected, contextId="
            << escapeJsString(std::to_string(id.value())) << ", bridge="
-           << (bridgeAvailable ? "true" : "false") << ", ws="
-           << (channelReady ? "yes" : "no") << "');\n";
+           << (bridgeAvailable ? "true" : "false") << ", engine=' + (hasEngine ? 'yes' : 'no') + '');\n";
     stream << "    }\n";
     stream << "    dearOreUiReport('runtime_executed:context=' + "
            << escapeJsString(std::to_string(id.value())) << ");\n";
+    // Stage 8 capability probe: enumerate the engine/window communication APIs
+    // and render them into the demo overlay so the result is readable on
+    // screen (engine bindings crash; fetch/WS/XHR appeared missing — this
+    // verifies exactly what the JS runtime exposes, incl. engine's full method
+    // list for any undiscovered bridge).
+    stream << "    try {\n";
+    stream << "        function capKeys(obj) {\n";
+    stream << "            var out = [];\n";
+    stream << "            var names = [];\n";
+    stream << "            try { names = Object.getOwnPropertyNames(obj); } catch (e) {}\n";
+    stream << "            for (var i = 0; i < names.length; i++) { out.push(names[i]); }\n";
+    stream << "            return out.join(',');\n";
+    stream << "        }\n";
+    stream << "        function capFilter(obj, words) {\n";
+    stream << "            var out = [];\n";
+    stream << "            var names = [];\n";
+    stream << "            try { names = Object.getOwnPropertyNames(obj); } catch (e) {}\n";
+    stream << "            for (var i = 0; i < names.length; i++) {\n";
+    stream << "                var n = String(names[i]).toLowerCase();\n";
+    stream << "                for (var j = 0; j < words.length; j++) {\n";
+    stream << "                    if (n.indexOf(words[j]) >= 0) { out.push(names[i]); break; }\n";
+    stream << "                }\n";
+    stream << "            }\n";
+    stream << "            return out.join(',');\n";
+    stream << "        }\n";
+    stream << "        var cap = {\n";
+    stream << "            engine_all: (typeof engine !== 'undefined') ? capKeys(engine) : 'undefined',\n";
+    stream << "            engine_comm: (typeof engine !== 'undefined') ? capFilter(engine, ['call','bind','emit','post','send','socket','net','http','request','invoke','message']) : 'undefined',\n";
+    stream << "            window_comm: capFilter(window, ['socket','net','connect','send','http','stream','fetch','xhr','ajax','websocket']),\n";
+    stream << "            ws: typeof WebSocket,\n";
+    stream << "            xhr: typeof XMLHttpRequest,\n";
+    stream << "            fetch: typeof fetch,\n";
+    stream << "            es: typeof EventSource,\n";
+    stream << "            cohtml: typeof cohtml,\n";
+    stream << "            xhr_ctor: (function() { try { var x = new XMLHttpRequest(); return 'ok:' + (typeof x); } catch (e) { return 'err:' + (e && e.message); } })(),\n";
+    stream << "            ws_ctor: (function() { try { var w = new WebSocket('ws://127.0.0.1:9/nope'); w.onerror = function(){}; return 'ok'; } catch (e) { return 'err:' + (e && e.message); } })()\n";
+    stream << "        };\n";
+    stream << "        window.__DearOreUI__.__cap = cap;\n";
+    stream << "        function renderCap() {\n";
+    stream << "            var el = document.getElementById('dearoreui-dearoreui-overlay-demo');\n";
+    stream << "            if (!el) return false;\n";
+    stream << "            var pre = document.createElement('div');\n";
+    stream << "            pre.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;overflow:auto;font-size:10px;color:#0f0;background:rgba(0,0,0,0.85);z-index:2147483647;padding:8px;white-space:pre-wrap;';\n";
+    stream << "            pre.textContent = '--- DearOreUI capability ---\\n' + JSON.stringify(cap, null, 1);\n";
+    stream << "            el.appendChild(pre);\n";
+    stream << "            return true;\n";
+    stream << "        }\n";
+    stream << "        var capTries = 0;\n";
+    stream << "        var capIv = setInterval(function() {\n";
+    stream << "            capTries++;\n";
+    stream << "            if (renderCap() || capTries > 60) clearInterval(capIv);\n";
+    stream << "        }, 100);\n";
+    stream << "        if (typeof console !== 'undefined' && console.log) {\n";
+    stream << "            console.log('[DearOreUI] capability=' + JSON.stringify(cap));\n";
+    stream << "        }\n";
+    stream << "    } catch (e) {}\n";
     stream << "})();\n";
     return stream.str();
 }

@@ -18,6 +18,8 @@ public:
         std::chrono::milliseconds timeout
     ) override;
 
+    void setHostDispatcher(HostDispatcher& dispatcher) override;
+
     void cancel(api::RequestId requestId) override;
     void invalidateContext(api::ContextId id) override;
 };
