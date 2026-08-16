@@ -192,6 +192,10 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         nodes.push_back(std::move(bar));
         break;
     }
+    default:
+        // Kinds not yet implemented (T1~T4 renderers land in S4~S7) render an
+        // empty forest.
+        break;
     }
 
     return nodes;
