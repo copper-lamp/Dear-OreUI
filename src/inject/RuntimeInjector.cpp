@@ -179,111 +179,20 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "        call: function(method, args) { return window.__DearOreUI__.ipc.callHost(method, args); },\n";
     stream << "        report: function(msg) { return window.__DearOreUI__.ipc.report(msg); }\n";
     stream << "    };\n";
-    stream << "    function dearOreUiReport(msg) {\n";
-    stream << "        try { window.__DearOreUI__.ipc.report(msg); } catch (e) {}\n";
-    stream << "    }\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
     stream << "        console.log('[DearOreUI] stage8 runtime injected, contextId="
            << escapeJsString(std::to_string(id.value())) << ", bridge="
            << (bridgeAvailable ? "true" : "false") << ", facet=' + (hasFacet ? 'yes' : 'no') + '');\n";
     stream << "    }\n";
-    // Stage 8-A (round 6 / 方案A): probe the USER EVENT HANDLER context.
-    // Rounds 3-5 established that the first facet:request dispatch from an
-    // ExecuteScript body OR a timer callback terminates the page's current
-    // execution stack and cancels all pending timers (per-view single-shot).
-    // Vanilla facets dispatch from DOM event callbacks and work — that context
-    // has never been probed. The page must be trigger-free while loading
-    // (silent=true mutes every report, keeping the single dispatch slot free),
-    // then the user's click fires the first dispatch. Results render straight
-    // into the overlay DOM (no second dispatch) so the verdict is readable.
+    // Stage 8-A final contract: the facet channel is SINGLE-SHOT per view.
+    // The first facet:request dispatch on a view terminates that page's JS
+    // context (verified rounds 3-6), so the one dispatch slot must be reserved
+    // for the Mod's business call. silent=true mutes the diagnostic reports
+    // (bootstrap_executed, mount chain, ...) so they never consume the slot;
+    // Mod code fires the single request via DearOreUI.call(...) from a user
+    // event handler. Set window.__DearOreUI__.silent = false to re-enable
+    // reports for debugging.
     stream << "    window.__DearOreUI__.silent = true;\n";
-    stream << "    (function() {\n";
-    stream << "        var tries = 0;\n";
-    stream << "        var iv = setInterval(function() {\n";
-    stream << "            tries++;\n";
-    stream << "            var host = document.getElementById('dearoreui-dearoreui-overlay-demo');\n";
-    stream << "            if (!host) { if (tries > 200) clearInterval(iv); return; }\n";
-    stream << "            if (host.getAttribute('data-dearoreui-probe')) { return; }\n";
-    stream << "            host.setAttribute('data-dearoreui-probe', '1');\n";
-    stream << "            clearInterval(iv);\n";
-    stream << "            var box = document.createElement('div');\n";
-    stream << "            box.style.cssText = 'position:absolute;top:10px;left:10px;z-index:2147483647;padding:8px;background:rgba(0,0,0,0.85);border:1px solid #0f0;font-size:12px;color:#0f0;pointer-events:auto;';\n";
-    stream << "            var btn = document.createElement('div');\n";
-    stream << "            btn.style.cssText = 'padding:6px 12px;background:#1a7f37;color:#fff;display:inline-block;pointer-events:auto;';\n";
-    stream << "            btn.textContent = 'DearOreUI call runtime.info';\n";
-    stream << "            var res = document.createElement('div');\n";
-    stream << "            res.style.cssText = 'margin-top:6px;white-space:pre-wrap;pointer-events:auto;';\n";
-    stream << "            res.textContent = 'ready (click to test)';\n";
-    stream << "            btn.onclick = function() {\n";
-    stream << "                res.textContent = 'calling...';\n";
-    stream << "                window.DearOreUI.call('runtime.info', {}).then(function(resp) {\n";
-    stream << "                    var ok = resp && resp.type === 'response' && resp.error === 0;\n";
-    stream << "                    res.textContent = 'rt:' + (ok ? 'ok' : 'fail') + ':' + ((resp && resp.payload) || '');\n";
-    stream << "                }, function(err) {\n";
-    stream << "                    res.textContent = 'rt:fail:' + ((err && err.message) || err);\n";
-    stream << "                });\n";
-    stream << "            };\n";
-    stream << "            box.appendChild(btn);\n";
-    stream << "            box.appendChild(res);\n";
-    stream << "            host.appendChild(box);\n";
-    stream << "        }, 100);\n";
-    stream << "    })();\n";
-    // Stage 8 capability probe: enumerate the engine/window communication APIs
-    // and render them into the demo overlay so the result is readable on
-    // screen (engine bindings crash; fetch/WS/XHR appeared missing — this
-    // verifies exactly what the JS runtime exposes, incl. engine's full method
-    // list for any undiscovered bridge).
-    stream << "    try {\n";
-    stream << "        function capKeys(obj) {\n";
-    stream << "            var out = [];\n";
-    stream << "            var names = [];\n";
-    stream << "            try { names = Object.getOwnPropertyNames(obj); } catch (e) {}\n";
-    stream << "            for (var i = 0; i < names.length; i++) { out.push(names[i]); }\n";
-    stream << "            return out.join(',');\n";
-    stream << "        }\n";
-    stream << "        function capFilter(obj, words) {\n";
-    stream << "            var out = [];\n";
-    stream << "            var names = [];\n";
-    stream << "            try { names = Object.getOwnPropertyNames(obj); } catch (e) {}\n";
-    stream << "            for (var i = 0; i < names.length; i++) {\n";
-    stream << "                var n = String(names[i]).toLowerCase();\n";
-    stream << "                for (var j = 0; j < words.length; j++) {\n";
-    stream << "                    if (n.indexOf(words[j]) >= 0) { out.push(names[i]); break; }\n";
-    stream << "                }\n";
-    stream << "            }\n";
-    stream << "            return out.join(',');\n";
-    stream << "        }\n";
-    stream << "        var cap = {\n";
-    stream << "            engine_all: (typeof engine !== 'undefined') ? capKeys(engine) : 'undefined',\n";
-    stream << "            engine_comm: (typeof engine !== 'undefined') ? capFilter(engine, ['call','bind','emit','post','send','socket','net','http','request','invoke','message']) : 'undefined',\n";
-    stream << "            window_comm: capFilter(window, ['socket','net','connect','send','http','stream','fetch','xhr','ajax','websocket']),\n";
-    stream << "            ws: typeof WebSocket,\n";
-    stream << "            xhr: typeof XMLHttpRequest,\n";
-    stream << "            fetch: typeof fetch,\n";
-    stream << "            es: typeof EventSource,\n";
-    stream << "            cohtml: typeof cohtml,\n";
-    stream << "            xhr_ctor: (function() { try { var x = new XMLHttpRequest(); return 'ok:' + (typeof x); } catch (e) { return 'err:' + (e && e.message); } })(),\n";
-    stream << "            ws_ctor: (function() { try { var w = new WebSocket('ws://127.0.0.1:9/nope'); w.onerror = function(){}; return 'ok'; } catch (e) { return 'err:' + (e && e.message); } })()\n";
-    stream << "        };\n";
-    stream << "        window.__DearOreUI__.__cap = cap;\n";
-    stream << "        function renderCap() {\n";
-    stream << "            var el = document.getElementById('dearoreui-dearoreui-overlay-demo');\n";
-    stream << "            if (!el) return false;\n";
-    stream << "            var pre = document.createElement('div');\n";
-    stream << "            pre.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;overflow:auto;font-size:10px;color:#0f0;background:rgba(0,0,0,0.85);z-index:2147483647;padding:8px;white-space:pre-wrap;';\n";
-    stream << "            pre.textContent = '--- DearOreUI capability ---\\n' + JSON.stringify(cap, null, 1);\n";
-    stream << "            el.appendChild(pre);\n";
-    stream << "            return true;\n";
-    stream << "        }\n";
-    stream << "        var capTries = 0;\n";
-    stream << "        var capIv = setInterval(function() {\n";
-    stream << "            capTries++;\n";
-    stream << "            if (renderCap() || capTries > 60) clearInterval(capIv);\n";
-    stream << "        }, 100);\n";
-    stream << "        if (typeof console !== 'undefined' && console.log) {\n";
-    stream << "            console.log('[DearOreUI] capability=' + JSON.stringify(cap));\n";
-    stream << "        }\n";
-    stream << "    } catch (e) {}\n";
     stream << "})();\n";
     return stream.str();
 }

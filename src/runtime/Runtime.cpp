@@ -511,29 +511,17 @@ void Runtime::registerDemoOverlay() {
     uiManifest.pageScopes    = {api::PageScope::Any};
     uiManifest.anchor        = api::UiAnchor::TopLeft;
     uiManifest.pointerEvents = false;
-    uiManifest.fingerprint   = "demo-overlay-v1";
+    uiManifest.fingerprint   = "demo-overlay-v2";
 
-    // Stage 8: build the demo overlay from declarative components. The panel
-    // + button tree is rendered by ComponentRenderer and flows through the
-    // same register/plan/mount/inject pipeline as any Mod UI.
-    component::ComponentSpec demoPanel;
-    demoPanel.kind  = component::ComponentKind::Panel;
-    demoPanel.label = "DearOreUI";
+    // Stage 8-A cleanup: the demo overlay is now just a tiny corner badge —
+    // it stays as the mount target for the round-6 event-context probe button,
+    // but no longer renders the full-screen panel that blocked the view.
+    component::ComponentSpec demoBadge;
+    demoBadge.kind    = component::ComponentKind::Text;
+    demoBadge.variant = "muted";
+    demoBadge.label   = "DearOreUI 0.2.0";
 
-    component::ComponentSpec demoText;
-    demoText.kind    = component::ComponentKind::Text;
-    demoText.variant = "heading";
-    demoText.label   = "DEMO";
-
-    component::ComponentSpec demoButton;
-    demoButton.kind    = component::ComponentKind::Button;
-    demoButton.variant = "primary";
-    demoButton.label   = "OK";
-
-    demoPanel.children.push_back(demoText);
-    demoPanel.children.push_back(demoButton);
-
-    auto uiResult = mApi->registerComponent(api::ModId{"dearoreui"}, uiManifest, demoPanel);
+    auto uiResult = mApi->registerComponent(api::ModId{"dearoreui"}, uiManifest, demoBadge);
     if (uiResult.isErr()) {
         logger.warning("demo", "overlay_registration_failed")
             .withError(uiResult.error().code)
