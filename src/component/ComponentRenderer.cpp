@@ -30,7 +30,7 @@ void renderChildren(
     style << "display:inline-block;";
     style << "padding:10px 24px;";
     style << "font-family:" << theme.fontUi << ";";
-    style << "font-size:" << px(theme.fontSizeMedium) << ";";
+    style << "font-size:" << px(theme.fontSizes[FontSize::Medium]) << ";";
     style << "line-height:1;";
     style << "color:" << theme.colorText << ";";
     style << "border:3px solid " << theme.colorText << ";";
@@ -88,7 +88,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         if (!spec.label.empty()) {
             render::DomNode title;
             title.tag   = "div";
-            title.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizeLarge) + ";";
+            title.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
             title.style += "color:" + theme.colorText + ";margin-bottom:12px;";
             title.text  = spec.label;
             panel.children.push_back(std::move(title));
@@ -102,16 +102,16 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         text.tag  = "div";
         text.text = spec.label;
         if (spec.variant == "heading") {
-            text.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizeHeading) + ";";
+            text.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Heading]) + ";";
             text.style += "color:" + theme.colorText + ";";
         } else if (spec.variant == "subheading") {
-            text.style = "font-family:" + theme.fontSubheading + ";font-size:" + px(theme.fontSizeLarge) + ";";
+            text.style = "font-family:" + theme.fontSubheading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
             text.style += "color:" + theme.colorText + ";";
         } else if (spec.variant == "muted") {
-            text.style = "font-family:" + theme.fontBody + ";font-size:" + px(theme.fontSizeSmall) + ";";
+            text.style = "font-family:" + theme.fontBody + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
             text.style += "color:" + theme.colorMuted + ";";
         } else { // ui/body
-            text.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizeMedium) + ";";
+            text.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
             text.style += "color:" + theme.colorText + ";";
         }
         nodes.push_back(std::move(text));
@@ -139,7 +139,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
             render::DomNode label;
             label.tag   = "div";
             label.text  = spec.label;
-            label.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizeMedium) + ";";
+            label.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
             label.style += "color:" + theme.colorText + ";";
             item.children.push_back(std::move(label));
         }
@@ -156,7 +156,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
             render::DomNode hint;
             hint.tag   = "div";
             hint.text  = spec.label;
-            hint.style = "font-family:" + theme.fontSubheading + ";font-size:" + px(theme.fontSizeSmall) + ";";
+            hint.style = "font-family:" + theme.fontSubheading + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
             hint.style += "color:" + theme.colorMuted + ";margin-bottom:6px;";
             wrapper.children.push_back(std::move(hint));
         }
@@ -165,7 +165,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         field.style = "width:100%;box-sizing:border-box;padding:10px 12px;";
         field.style += "background:#1e1e1f;color:" + theme.colorText + ";";
         field.style += "border:2px solid " + theme.colorSecondary + ";border-radius:4px;";
-        field.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizeMedium) + ";";
+        field.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
         field.attrs.push_back(render::DomAttr{"type", "text"});
         if (spec.disabled) {
             field.attrs.push_back(render::DomAttr{"disabled", "true"});
@@ -184,7 +184,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
             tab.tag   = "div";
             tab.text  = child.label;
             tab.style = "padding:8px 18px;font-family:" + theme.fontUi + ";";
-            tab.style += "font-size:" + px(theme.fontSizeSmall) + ";color:" + theme.colorText + ";";
+            tab.style += "font-size:" + px(theme.fontSizes[FontSize::Small]) + ";color:" + theme.colorText + ";";
             tab.style += "background:" + theme.colorPanel + ";border:2px solid " + theme.colorSecondary + ";";
             tab.style += "border-radius:4px 4px 0 0;";
             bar.children.push_back(std::move(tab));
