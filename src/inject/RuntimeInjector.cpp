@@ -169,6 +169,7 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "        },\n";
     stream << "        report: function(msg) {\n";
     stream << "            try {\n";
+    stream << "                if (window.__DearOreUI__ && window.__DearOreUI__.silent) return;\n";
     stream << "                dearOreUiFacetTrigger((typeof msg === 'string') ? msg : JSON.stringify(msg));\n";
     stream << "            } catch (e) {}\n";
     stream << "        },\n";
@@ -186,8 +187,47 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
            << escapeJsString(std::to_string(id.value())) << ", bridge="
            << (bridgeAvailable ? "true" : "false") << ", facet=' + (hasFacet ? 'yes' : 'no') + '');\n";
     stream << "    }\n";
-    stream << "    dearOreUiReport('runtime_executed:context=' + "
-           << escapeJsString(std::to_string(id.value())) << ");\n";
+    // Stage 8-A (round 6 / 方案A): probe the USER EVENT HANDLER context.
+    // Rounds 3-5 established that the first facet:request dispatch from an
+    // ExecuteScript body OR a timer callback terminates the page's current
+    // execution stack and cancels all pending timers (per-view single-shot).
+    // Vanilla facets dispatch from DOM event callbacks and work — that context
+    // has never been probed. The page must be trigger-free while loading
+    // (silent=true mutes every report, keeping the single dispatch slot free),
+    // then the user's click fires the first dispatch. Results render straight
+    // into the overlay DOM (no second dispatch) so the verdict is readable.
+    stream << "    window.__DearOreUI__.silent = true;\n";
+    stream << "    (function() {\n";
+    stream << "        var tries = 0;\n";
+    stream << "        var iv = setInterval(function() {\n";
+    stream << "            tries++;\n";
+    stream << "            var host = document.getElementById('dearoreui-dearoreui-overlay-demo');\n";
+    stream << "            if (!host) { if (tries > 200) clearInterval(iv); return; }\n";
+    stream << "            if (host.getAttribute('data-dearoreui-probe')) { return; }\n";
+    stream << "            host.setAttribute('data-dearoreui-probe', '1');\n";
+    stream << "            clearInterval(iv);\n";
+    stream << "            var box = document.createElement('div');\n";
+    stream << "            box.style.cssText = 'position:absolute;top:10px;left:10px;z-index:2147483647;padding:8px;background:rgba(0,0,0,0.85);border:1px solid #0f0;font-size:12px;color:#0f0;pointer-events:auto;';\n";
+    stream << "            var btn = document.createElement('div');\n";
+    stream << "            btn.style.cssText = 'padding:6px 12px;background:#1a7f37;color:#fff;display:inline-block;pointer-events:auto;';\n";
+    stream << "            btn.textContent = 'DearOreUI call runtime.info';\n";
+    stream << "            var res = document.createElement('div');\n";
+    stream << "            res.style.cssText = 'margin-top:6px;white-space:pre-wrap;pointer-events:auto;';\n";
+    stream << "            res.textContent = 'ready (click to test)';\n";
+    stream << "            btn.onclick = function() {\n";
+    stream << "                res.textContent = 'calling...';\n";
+    stream << "                window.DearOreUI.call('runtime.info', {}).then(function(resp) {\n";
+    stream << "                    var ok = resp && resp.type === 'response' && resp.error === 0;\n";
+    stream << "                    res.textContent = 'rt:' + (ok ? 'ok' : 'fail') + ':' + ((resp && resp.payload) || '');\n";
+    stream << "                }, function(err) {\n";
+    stream << "                    res.textContent = 'rt:fail:' + ((err && err.message) || err);\n";
+    stream << "                });\n";
+    stream << "            };\n";
+    stream << "            box.appendChild(btn);\n";
+    stream << "            box.appendChild(res);\n";
+    stream << "            host.appendChild(box);\n";
+    stream << "        }, 100);\n";
+    stream << "    })();\n";
     // Stage 8 capability probe: enumerate the engine/window communication APIs
     // and render them into the demo overlay so the result is readable on
     // screen (engine bindings crash; fetch/WS/XHR appeared missing — this
@@ -469,7 +509,9 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "    window.__DearOreUI__.ui.report = function(msg) {\n";
     stream << "        try { if (window.__DearOreUI__ && window.__DearOreUI__.ipc) window.__DearOreUI__.ipc.report(msg); } catch (e) {}\n";
     stream << "    };\n";
-    stream << "    window.__DearOreUI__.ui.report('bootstrap_executed');\n";
+    stream << "    setTimeout(function() {\n";
+    stream << "        try { window.__DearOreUI__.ui.report('bootstrap_executed'); } catch (e) {}\n";
+    stream << "    }, 300);\n";
     // Stage 7.1 fix: defer mounting until the document body exists. ExecuteScript
     // can run while the Coherent document is still loading; appending to a
     // missing body would silently fail inside the engine. Poll with setInterval
