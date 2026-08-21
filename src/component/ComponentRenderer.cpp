@@ -206,6 +206,12 @@ std::vector<render::DomNode> renderComponent(
         if (variant == "transparent") {
             panel.style = "background:transparent;";
             panel.style += "height:100%;overflow-y:auto;";
+        } else if (variant == "translucent") {
+            // Review container with a semi-transparent black backdrop
+            // (--colorsPanel rgba(0,0,0,0.72)) so the underlying UI stays
+            // dimly visible while the component library is inspected.
+            panel.style = "background:rgba(0,0,0,0.72);";
+            panel.style += "height:100%;overflow-y:auto;";
         } else {
             panel.style = borderImageStyle("panel." + variant, theme, resolver);
         }

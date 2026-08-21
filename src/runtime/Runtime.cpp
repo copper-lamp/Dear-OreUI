@@ -578,14 +578,15 @@ void Runtime::registerComponentShowcase() {
     uiManifest.pointerEvents = true;
     uiManifest.fingerprint   = "component-showcase-v1";
 
-    // Build a full component-library showcase: a transparent, scrollable panel
-    // container holding every vanilla atomic component (stage 8.1) plus
-    // representative states/variants. The container blocks pointer events so
-    // clicks never reach the vanilla UI underneath (no accidental clicks).
+    // Build a full component-library showcase: a translucent (semi-transparent
+    // black) scrollable panel container holding every vanilla atomic component
+    // (stage 8.1) plus the stage 8.1.4 layout/composite/nav/interaction/data
+    // components. The container blocks pointer events so clicks never reach
+    // the vanilla UI underneath (no accidental clicks).
     component::ComponentSpec root;
     root.kind  = component::ComponentKind::Panel;
-    root.style = "transparent";
-    root.label = "DearOreUI 组件库展示 (Stage 8.1)";
+    root.style = "translucent";
+    root.label = "DearOreUI 组件库展示 (Stage 8.1 + 8.1.4)";
 
     auto section = [](std::string title) {
         component::ComponentSpec s;
@@ -706,9 +707,36 @@ void Runtime::registerComponentShowcase() {
         progress.kind = component::ComponentKind::Progress;
         root.children.push_back(progress);
     }
+    {
+        component::ComponentSpec bubble;
+        bubble.kind  = component::ComponentKind::Bubble;
+        bubble.label = "Bubble";
+        root.children.push_back(bubble);
+    }
+    {
+        component::ComponentSpec filter;
+        filter.kind  = component::ComponentKind::FilterBar;
+        filter.label = "Filter";
+        root.children.push_back(filter);
+    }
 
-    // Stage 8.1.4: layout components (stack / grid / section / spacer).
-    root.children.push_back(section("Layout (Stack / Grid / Section)"));
+    // Stage 8.1.4: layout components (stack / grid / section / spacer /
+    // scrollView).
+    root.children.push_back(section("Layout (Stack / Grid / Section / Scroll)"));
+    {
+        component::ComponentSpec scroll;
+        scroll.kind = component::ComponentKind::ScrollView;
+        component::ComponentSpec item;
+        item.kind  = component::ComponentKind::ListItem;
+        item.label = "Scroll item";
+        scroll.children.push_back(item);
+        root.children.push_back(scroll);
+    }
+    {
+        component::ComponentSpec spacer;
+        spacer.kind = component::ComponentKind::Spacer;
+        root.children.push_back(spacer);
+    }
     {
         component::ComponentSpec stack;
         stack.kind = component::ComponentKind::Stack;
@@ -734,14 +762,14 @@ void Runtime::registerComponentShowcase() {
         root.children.push_back(grid);
     }
     {
-        component::ComponentSpec section;
-        section.kind  = component::ComponentKind::Section;
-        section.label = "Section title";
+        component::ComponentSpec sec;
+        sec.kind  = component::ComponentKind::Section;
+        sec.label = "Section title";
         component::ComponentSpec tip;
         tip.kind  = component::ComponentKind::Tooltip;
         tip.label = "Section content";
-        section.children.push_back(tip);
-        root.children.push_back(section);
+        sec.children.push_back(tip);
+        root.children.push_back(sec);
     }
 
     // Stage 8.1.4: composite components (modal / menu / dropdown / form /
@@ -768,6 +796,17 @@ void Runtime::registerComponentShowcase() {
             menu.children.push_back(item);
         }
         root.children.push_back(menu);
+    }
+    {
+        component::ComponentSpec list;
+        list.kind = component::ComponentKind::ScrollingList;
+        for (int i = 0; i < 3; ++i) {
+            component::ComponentSpec item;
+            item.kind  = component::ComponentKind::ListItem;
+            item.label = "List item " + std::to_string(i + 1);
+            list.children.push_back(item);
+        }
+        root.children.push_back(list);
     }
     {
         component::ComponentSpec dropdown;
@@ -843,6 +882,12 @@ void Runtime::registerComponentShowcase() {
         pager.columns = 3;
         pager.value   = "1";
         root.children.push_back(pager);
+    }
+    {
+        component::ComponentSpec area;
+        area.kind  = component::ComponentKind::TextArea;
+        area.label = "Notes";
+        root.children.push_back(area);
     }
     {
         component::ComponentSpec slider;

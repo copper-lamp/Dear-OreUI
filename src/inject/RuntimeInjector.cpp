@@ -536,9 +536,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        return el ? (el.__dearOreUiState || 'default') : null;\n";
     stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.mount = function(spec) {\n";
-    stream << "        window.__DearOreUI__.ui.dbg('mount_enter:' + spec.containerId);\n";
     stream << "        var container = document.getElementById(spec.containerId);\n";
-    stream << "        window.__DearOreUI__.ui.dbg('container_exists=' + !!container);\n";
     stream << "        if (!container) {\n";
     stream << "            container = document.createElement('div');\n";
     stream << "            container.id = spec.containerId;\n";
@@ -556,13 +554,10 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "                    'position:fixed;top:0;left:0;right:0;bottom:0;' +\n";
     stream << "                    'z-index:2147483647;' +\n";
     stream << "                    'pointer-events:' + (spec.pointerEvents ? 'auto' : 'none') + ';';\n";
-    stream << "                window.__DearOreUI__.ui.dbg('container_style_ok');\n";
-    stream << "            } catch (e) { window.__DearOreUI__.ui.dbg('container_style_err:' + (e && e.message)); }\n";
+    stream << "            } catch (e) {}\n";
     stream << "            var parent = document.body || document.documentElement;\n";
-    stream << "            window.__DearOreUI__.ui.dbg('parent=' + (parent ? parent.tagName : 'null'));\n";
     stream << "            if (parent) {\n";
     stream << "                parent.appendChild(container);\n";
-    stream << "                window.__DearOreUI__.ui.dbg('container_appended');\n";
     stream << "            } else {\n";
     stream << "                throw new Error('no document.body or documentElement');\n";
     stream << "            }\n";
@@ -636,7 +631,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "    };\n";
     stream << "    function dearOreUiLogReadyState(label) {\n";
     stream << "        if (window.console && console.log) {\n";
-    stream << "            console.log('[DearOreUI] ' + (label || 'check') + ' readyState=' + document.readyState + ' body=' + !!document.body);\n";
+    stream << "            console.log('[DearOreUI] ' + (label || 'check') + ' body=' + !!document.body);\n";
     stream << "        }\n";
     stream << "    }\n";
     stream << "    function dearOreUiReadyMount() {\n";
