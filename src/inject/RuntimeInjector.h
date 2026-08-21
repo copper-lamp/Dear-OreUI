@@ -25,7 +25,25 @@ public:
 
 private:
     [[nodiscard]] std::string generateRuntimeScript(api::ContextId id, resource::IResourceIndex const& index) const;
-    [[nodiscard]] std::string generateUiBootstrapScript(api::ContextId id, ui::UiMountPlan const& plan) const;
+    // Generates a self-contained bootstrap script for ONE UI item (machinery +
+    // spec). Injecting per-UI keeps each ExecuteScript small (cohtml silently
+    // drops large ones).
+    [[nodiscard]] std::string generateUiBootstrapScript(api::ContextId id, ui::UiMountItem const& item) const;
+    // Body-only follow-up for UIs after the first: reuses the machinery already
+    // injected by the bootstrap script so each additional UI stays small.
+    // `bodyOverride` (optional) replaces the spec's body for chunked injection.
+    [[nodiscard]] std::string generateUiBodyScript(
+        api::ContextId id,
+        ui::UiMountItem const& item,
+        std::vector<render::DomNode> const* bodyOverride = nullptr
+    ) const;
+    // Append-only script for chunked UIs: appends a node forest into an
+    // already-mounted container.
+    [[nodiscard]] std::string generateUiAppendScript(
+        api::ContextId id,
+        std::string const& containerId,
+        std::vector<render::DomNode> const& nodes
+    ) const;
 
     diagnostic::DiagnosticLogger& mLogger;
     ipc::IHostBridge&             mBridge;

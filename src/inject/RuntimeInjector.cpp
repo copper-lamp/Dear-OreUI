@@ -229,18 +229,84 @@ namespace {
     return std::string{"oreui://"} + std::string{scheme} + "/" + std::string{ns} + "/" + std::string{path};
 }
 
+// Serializes one UI spec as a JS object literal (the `specs` array entry).
+// Shared by the full bootstrap script and the body-only follow-up scripts.
+// `bodyOverride` (optional) replaces the spec's own body — used when a large
+// UI is injected in chunks.
+void appendUiSpec(
+    std::ostream& stream,
+    ui::OverlaySpec const& spec,
+    std::vector<render::DomNode> const* bodyOverride = nullptr
+) {
+    // Stage 8: parse the Mod-provided htmlBody into a DomNode forest and
+    // serialize it as a compact JS node array. The bootstrap renderer
+    // (dearOreUiBuildDom) builds the DOM through CSSOM only, because cohtml
+    // drops style="" attributes injected via innerHTML.
+    //
+    // M8.1.2: component-registered UIs carry a pre-rendered DomNode forest
+    // (spec.domNodes) with per-state cssText (stateStyles) that the htmlBody
+    // round-trip cannot represent; prefer it over parsing htmlBody.
+    auto domNodes = bodyOverride != nullptr
+        ? *bodyOverride
+        : (spec.domNodes.empty() ? render::parseHtmlFragment(spec.htmlBody) : spec.domNodes);
+    stream << "        {\n";
+    stream << "            containerId: \"" << escapeJsString(spec.containerId) << "\",\n";
+    stream << "            modNamespace: \"" << escapeJsString(spec.modNamespace) << "\",\n";
+    stream << "            uiId: \"" << escapeJsString(spec.uiId) << "\",\n";
+    stream << "            kind: \"" << escapeJsString(std::string(api::uiKindName(spec.kind))) << "\",\n";
+    stream << "            anchorStyle: \"" << escapeJsString(anchorStyle(spec.anchor)) << "\",\n";
+    stream << "            pointerEvents: " << (spec.pointerEvents ? "true" : "false") << ",\n";
+    stream << "            body: " << render::serializeDomForest(domNodes) << ",\n";
+    stream << "            scripts: [";
+    for (std::size_t index = 0; index < spec.scripts.size(); ++index) {
+        if (index > 0) {
+            stream << ",";
+        }
+        stream << "\"" << escapeJsString(oreUri("script", spec.modNamespace, spec.scripts[index])) << "\"";
+    }
+    stream << "],\n";
+    stream << "            styles: [";
+    for (std::size_t index = 0; index < spec.styles.size(); ++index) {
+        if (index > 0) {
+            stream << ",";
+        }
+        stream << "\"" << escapeJsString(oreUri("style", spec.modNamespace, spec.styles[index])) << "\"";
+    }
+    stream << "]\n";
+    stream << "        }\n";
+}
+
+// Splits a UI body into chunks so each injected script stays under cohtml's
+// ExecuteScript size limit. A single container node with many children (e.g.
+// the showcase root panel) is split by children; otherwise the body is one
+// chunk. Returns groups of the root's children (NOT wrapped in the root) so
+// the first chunk mounts the root and later chunks append into it.
+std::vector<std::vector<render::DomNode>> chunkUiBody(
+    std::vector<render::DomNode> const& body,
+    std::size_t maxChunkNodes
+) {
+    std::vector<std::vector<render::DomNode>> chunks;
+    if (body.size() == 1 && body[0].children.size() > maxChunkNodes) {
+        auto const& root = body[0];
+        for (std::size_t i = 0; i < root.children.size(); i += maxChunkNodes) {
+            std::vector<render::DomNode> group;
+            auto const end = std::min(i + maxChunkNodes, root.children.size());
+            for (std::size_t j = i; j < end; ++j) {
+                group.push_back(root.children[j]);
+            }
+            chunks.push_back(std::move(group));
+        }
+    } else {
+        chunks.push_back(body);
+    }
+    return chunks;
+}
+
 } // namespace
 
 api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::UiMountPlan const& plan) {
     InjectionReport report;
     report.contextId = id;
-
-    auto bootstrapScript = generateUiBootstrapScript(id, plan);
-    if (bootstrapScript.empty()) {
-        report.errors.push_back(api::Error{api::ErrorCode::InternalError, "failed to generate ui bootstrap script"});
-        report.success = false;
-        return report;
-    }
 
     report.hostBridgeAvailable = mBridge.isAvailable();
 
@@ -252,81 +318,107 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
     }
     report.uiCount = mountedCount;
 
-    if (mBridge.isAvailable()) {
-        auto sendResult = mBridge.sendScript(id, bootstrapScript);
-        if (sendResult.isErr()) {
-            report.errors.push_back(sendResult.error());
+    // M8.1.2: cohtml ExecuteScript silently drops large scripts (verified: a
+    // ~47KB combined bootstrap never executed, while a ~9KB one did). Inject
+    // the machinery ONCE as a small script, then ONE small body-only script
+    // per UI that reuses it. No single ExecuteScript exceeds the limit, and a
+    // failure in one UI cannot take down the others.
+    std::size_t submitted{0};
+    auto submitScript = [&](std::string const& script) -> bool {
+        if (mBridge.isAvailable()) {
+            auto sendResult = mBridge.sendScript(id, script);
+            if (sendResult.isErr()) {
+                report.errors.push_back(sendResult.error());
+                report.success = false;
+                return false;
+            }
+            report.injectedScripts.emplace_back("oreui://__dearoreui__/stage7-ui-bootstrap.js");
+        } else {
+            report.injectedScripts.emplace_back("oreui://__dearoreui__/stage7-ui-bootstrap.js?submitted=false");
+        }
+        ++submitted;
+        return true;
+    };
+
+    // 1) Machinery script (no spec) — must run before any body-only script.
+    {
+        auto machineryScript = generateUiBootstrapScript(id, ui::UiMountItem{});
+        if (machineryScript.empty() || !submitScript(machineryScript)) {
             report.success = false;
             return report;
         }
-        report.injectedScripts.emplace_back("oreui://__dearoreui__/stage7-ui-bootstrap.js");
-    } else {
-        report.injectedScripts.emplace_back("oreui://__dearoreui__/stage7-ui-bootstrap.js?submitted=false");
+        mLogger.info("inject", "ui_machinery_generated")
+            .withContext(id)
+            .withField("script_length", std::to_string(machineryScript.size()))
+            .emit();
+    }
+
+    // 2) One body-only script per UI. Large bodies (single container with many
+    // children, e.g. the showcase root panel) are injected in chunks: the
+    // first chunk mounts the container with the root + first group, the rest
+    // append the remaining children into the root — each ExecuteScript stays
+    // under cohtml's silent size limit.
+    for (auto const& item : plan.items) {
+        if (item.decision != ui::UiMountDecision::Mount) {
+            continue;
+        }
+        auto body = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
+        auto chunks = chunkUiBody(body, 4);
+        for (std::size_t chunkIndex = 0; chunkIndex < chunks.size(); ++chunkIndex) {
+            std::string script;
+            if (chunkIndex == 0) {
+                // First chunk: mount the root with the first group of children.
+                std::vector<render::DomNode> mountBody;
+                if (body.size() == 1 && chunks.size() > 1) {
+                    render::DomNode root = body[0];
+                    root.children = chunks[0];
+                    mountBody.push_back(std::move(root));
+                } else {
+                    mountBody = chunks[0];
+                }
+                script = generateUiBodyScript(id, item, &mountBody);
+            } else {
+                // Later chunks: append the remaining children into the root.
+                script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex]);
+            }
+            if (script.empty() || !submitScript(script)) {
+                report.success = false;
+                return report;
+            }
+            mLogger.info("inject", "ui_bootstrap_generated")
+                .withContext(id)
+                .withField("script_length", std::to_string(script.size()))
+                .withField("ui_id", item.spec.uiId)
+                .withField("chunk", std::to_string(chunkIndex))
+                .withField("host_bridge_available", mBridge.isAvailable() ? "true" : "false")
+                .emit();
+        }
     }
 
     report.success = true;
 
-    mLogger.info("inject", "ui_bootstrap_generated")
+    mLogger.info("inject", "ui_bootstrap_batch")
         .withContext(id)
-        .withField("script_length", std::to_string(bootstrapScript.size()))
         .withField("ui_count", std::to_string(report.uiCount))
-        .withField("host_bridge_available", mBridge.isAvailable() ? "true" : "false")
+        .withField("submitted", std::to_string(submitted))
         .emit();
 
     return report;
 }
 
-std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::UiMountPlan const& plan) const {
+std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::UiMountItem const& item) const {
+    static_cast<void>(item);
     std::ostringstream stream;
     stream << "(function(){\n";
     stream << "    window.__DearOreUI__ = window.__DearOreUI__ || {};\n";
     stream << "    window.__DearOreUI__.ui = window.__DearOreUI__.ui || {};\n";
     stream << "    window.__DearOreUI__.ui.executed = true;\n";
     stream << "    window.__DearOreUI__.ui.contextId = \"" << std::to_string(id.value()) << "\";\n";
-    stream << "    window.__DearOreUI__.ui.specs = [\n";
-
-    for (auto const& item : plan.items) {
-        if (item.decision != ui::UiMountDecision::Mount) {
-            continue;
-        }
-        auto const& spec = item.spec;
-        // Stage 8: parse the Mod-provided htmlBody into a DomNode forest and
-        // serialize it as a compact JS node array. The bootstrap renderer
-        // (dearOreUiBuildDom) builds the DOM through CSSOM only, because cohtml
-        // drops style="" attributes injected via innerHTML.
-        //
-        // M8.1.2: component-registered UIs carry a pre-rendered DomNode forest
-        // (spec.domNodes) with per-state cssText (stateStyles) that the htmlBody
-        // round-trip cannot represent; prefer it over parsing htmlBody.
-        auto domNodes = spec.domNodes.empty() ? render::parseHtmlFragment(spec.htmlBody) : spec.domNodes;
-        stream << "        {\n";
-        stream << "            containerId: \"" << escapeJsString(spec.containerId) << "\",\n";
-        stream << "            modNamespace: \"" << escapeJsString(spec.modNamespace) << "\",\n";
-        stream << "            uiId: \"" << escapeJsString(spec.uiId) << "\",\n";
-        stream << "            kind: \"" << escapeJsString(std::string(api::uiKindName(spec.kind))) << "\",\n";
-        stream << "            anchorStyle: \"" << escapeJsString(anchorStyle(spec.anchor)) << "\",\n";
-        stream << "            pointerEvents: " << (spec.pointerEvents ? "true" : "false") << ",\n";
-        stream << "            body: " << render::serializeDomForest(domNodes) << ",\n";
-        stream << "            scripts: [";
-        for (std::size_t index = 0; index < spec.scripts.size(); ++index) {
-            if (index > 0) {
-                stream << ",";
-            }
-            stream << "\"" << escapeJsString(oreUri("script", spec.modNamespace, spec.scripts[index])) << "\"";
-        }
-        stream << "],\n";
-        stream << "            styles: [";
-        for (std::size_t index = 0; index < spec.styles.size(); ++index) {
-            if (index > 0) {
-                stream << ",";
-            }
-            stream << "\"" << escapeJsString(oreUri("style", spec.modNamespace, spec.styles[index])) << "\"";
-        }
-        stream << "]\n";
-        stream << "        },\n";
-    }
-
-    stream << "    ];\n";
+    // M8.1.2 size fix: the machinery script carries NO spec. Every UI is
+    // injected as a small body-only follow-up (generateUiBodyScript) that
+    // pushes its spec and mounts it, so no single ExecuteScript exceeds
+    // cohtml's silent size limit regardless of plan ordering.
+    stream << "    window.__DearOreUI__.ui.specs = [];\n";
     stream << "    window.__DearOreUI__.ui.debug = [];\n";
     stream << "    window.__DearOreUI__.ui.dbg = function(msg) {\n";
     stream << "        window.__DearOreUI__.ui.debug.push(msg);\n";
@@ -354,20 +446,24 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            if (n.x) {\n";
     stream << "                el.textContent = n.x;\n";
     stream << "            }\n";
-    // M8.1.2: interactive components carry per-state cssText (st:). Store them
-    // on the element and wire hover/pressed/focused events so the bootstrap can
-    // swap element.style.cssText on interaction.
-    stream << "            if (n.st) {\n";
-    stream << "                el.__dearOreUiStates = {};\n";
-    stream << "                for (var k = 0; k < n.st.length; k++) {\n";
-    stream << "                    el.__dearOreUiStates[n.st[k][0]] = n.st[k][1];\n";
-    stream << "                }\n";
-    stream << "                dearOreUiWireState(el);\n";
-    stream << "            }\n";
     stream << "            if (n.c && n.c.length) {\n";
     stream << "                dearOreUiBuildDom(el, n.c);\n";
     stream << "            }\n";
     stream << "            parent.appendChild(el);\n";
+    // M8.1.2: interactive components carry per-state cssText (st:). Store them
+    // on the element and wire hover/pressed/focused events so the bootstrap can
+    // swap element.style.cssText on interaction. Wiring is wrapped in try/catch
+    // and runs AFTER appendChild: cohtml throws for unsupported event types
+    // (verified: mouseenter aborts the whole body build), so a wiring failure
+    // must never prevent the page from rendering.
+    stream << "            if (n.st) {\n";
+    stream << "                el.__dearOreUiStates = {};\n";
+    stream << "                el.__dearOreUiBase = n.b || '';\n";
+    stream << "                for (var k = 0; k < n.st.length; k++) {\n";
+    stream << "                    el.__dearOreUiStates[n.st[k][0]] = n.st[k][1];\n";
+    stream << "                }\n";
+    stream << "                try { dearOreUiWireState(el); } catch (e) {}\n";
+    stream << "            }\n";
     stream << "        }\n";
     stream << "    }\n";
     // M8.1.2: runtime state switching. dearOreUiSetState swaps the element's
@@ -381,34 +477,50 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        var css = el.__dearOreUiStates[state];\n";
     stream << "        if (css === undefined) css = el.__dearOreUiStates['default'];\n";
     stream << "        if (css === undefined) return;\n";
-    stream << "        try { el.style.cssText = css; } catch (e) {}\n";
+    stream << "        try { el.style.cssText = (el.__dearOreUiBase || '') + css; } catch (e) {}\n";
     stream << "        el.__dearOreUiState = state;\n";
+    stream << "    }\n";
+    // Safe event binding: cohtml throws for unsupported event types, so each
+    // binding is isolated and hover falls back to mouseover/mouseout when
+    // mouseenter/mouseleave are unavailable.
+    stream << "    function dearOreUiOn(el, type, fn) {\n";
+    stream << "        try { el.addEventListener(type, fn); return true; } catch (e) { return false; }\n";
     stream << "    }\n";
     stream << "    function dearOreUiWireState(el) {\n";
     stream << "        if (!el || !el.__dearOreUiStates) return;\n";
     stream << "        el.__dearOreUiDisabled = (el.getAttribute('aria-disabled') === 'true');\n";
-    stream << "        el.addEventListener('mouseenter', function() {\n";
+    stream << "        if (!dearOreUiOn(el, 'mouseenter', function() {\n";
     stream << "            if (el.__dearOreUiDisabled) return;\n";
     stream << "            dearOreUiSetState(el, 'hovered');\n";
-    stream << "        });\n";
-    stream << "        el.addEventListener('mouseleave', function() {\n";
+    stream << "        })) {\n";
+    stream << "            dearOreUiOn(el, 'mouseover', function() {\n";
+    stream << "                if (el.__dearOreUiDisabled) return;\n";
+    stream << "                dearOreUiSetState(el, 'hovered');\n";
+    stream << "            });\n";
+    stream << "        }\n";
+    stream << "        if (!dearOreUiOn(el, 'mouseleave', function() {\n";
     stream << "            if (el.__dearOreUiDisabled) return;\n";
     stream << "            dearOreUiSetState(el, el.__dearOreUiFocused ? 'focused' : 'default');\n";
-    stream << "        });\n";
-    stream << "        el.addEventListener('mousedown', function() {\n";
+    stream << "        })) {\n";
+    stream << "            dearOreUiOn(el, 'mouseout', function() {\n";
+    stream << "                if (el.__dearOreUiDisabled) return;\n";
+    stream << "                dearOreUiSetState(el, el.__dearOreUiFocused ? 'focused' : 'default');\n";
+    stream << "            });\n";
+    stream << "        }\n";
+    stream << "        dearOreUiOn(el, 'mousedown', function() {\n";
     stream << "            if (el.__dearOreUiDisabled) return;\n";
     stream << "            dearOreUiSetState(el, el.__dearOreUiFocused ? 'pressedFocused' : 'pressed');\n";
     stream << "        });\n";
-    stream << "        el.addEventListener('mouseup', function() {\n";
+    stream << "        dearOreUiOn(el, 'mouseup', function() {\n";
     stream << "            if (el.__dearOreUiDisabled) return;\n";
     stream << "            dearOreUiSetState(el, el.__dearOreUiFocused ? 'focused' : 'hovered');\n";
     stream << "        });\n";
-    stream << "        el.addEventListener('focus', function() {\n";
+    stream << "        dearOreUiOn(el, 'focus', function() {\n";
     stream << "            el.__dearOreUiFocused = true;\n";
     stream << "            if (el.__dearOreUiDisabled) return;\n";
     stream << "            dearOreUiSetState(el, 'focused');\n";
     stream << "        });\n";
-    stream << "        el.addEventListener('blur', function() {\n";
+    stream << "        dearOreUiOn(el, 'blur', function() {\n";
     stream << "            el.__dearOreUiFocused = false;\n";
     stream << "            if (el.__dearOreUiDisabled) return;\n";
     stream << "            dearOreUiSetState(el, 'default');\n";
@@ -478,6 +590,20 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            if (document.body) document.body.appendChild(script);\n";
     stream << "        }\n";
     stream << "    };\n";
+    // M8.1.2 size fix: append nodes to an already-mounted container. Large
+    // UIs are injected in chunks (each ExecuteScript stays under cohtml's
+    // silent size limit); the first chunk mounts the container, the rest
+    // append into it.
+    stream << "    window.__DearOreUI__.ui.appendTo = function(containerId, nodes) {\n";
+    stream << "        var container = document.getElementById(containerId);\n";
+    stream << "        if (!container) return false;\n";
+    // Chunked UIs: the first chunk mounts the container with the root panel;
+    // later chunks append into that root (container.firstElementChild) so the
+    // layout stays a single panel instead of stacked duplicates.
+    stream << "        var target = container.firstElementChild || container;\n";
+    stream << "        try { dearOreUiBuildDom(target, nodes); } catch (e) { return false; }\n";
+    stream << "        return true;\n";
+    stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.unmount = function(containerId) {\n";
     stream << "        var container = document.getElementById(containerId);\n";
     stream << "        if (container && container.parentNode) {\n";
@@ -537,6 +663,67 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            }\n";
     stream << "        });\n";
     stream << "        setTimeout(function() { clearInterval(dearOreUiIntervalId); }, 10000);\n";
+    stream << "    }\n";
+    stream << "})();\n";
+    return stream.str();
+}
+
+// Body-only follow-up script for UIs after the first one. It reuses the
+// machinery already injected by the bootstrap script (window.__DearOreUI__.ui),
+// so each additional UI stays small — cohtml ExecuteScript silently drops
+// large scripts, so the machinery must not be duplicated per UI.
+// `bodyOverride` (optional) replaces the spec's body for chunked injection.
+std::string RuntimeInjector::generateUiBodyScript(
+    api::ContextId id,
+    ui::UiMountItem const& item,
+    std::vector<render::DomNode> const* bodyOverride
+) const {
+    static_cast<void>(id);
+    std::ostringstream stream;
+    stream << "(function(){\n";
+    stream << "    var ui = window.__DearOreUI__ && window.__DearOreUI__.ui;\n";
+    stream << "    if (!ui || !ui.mount) return;\n";
+    stream << "    var spec = ";
+    appendUiSpec(stream, item.spec, bodyOverride);
+    stream << "    ;\n";
+    stream << "    ui.specs.push(spec);\n";
+    stream << "    function dearOreUiBodyMount() {\n";
+    stream << "        if (!document.body) return false;\n";
+    stream << "        try { ui.mount(spec); } catch (e) { return false; }\n";
+    stream << "        return !!document.getElementById(spec.containerId);\n";
+    stream << "    }\n";
+    stream << "    if (!dearOreUiBodyMount()) {\n";
+    stream << "        var iv = setInterval(function() {\n";
+    stream << "            if (dearOreUiBodyMount()) clearInterval(iv);\n";
+    stream << "        }, 100);\n";
+    stream << "        setTimeout(function() { clearInterval(iv); }, 10000);\n";
+    stream << "    }\n";
+    stream << "})();\n";
+    return stream.str();
+}
+
+// Append-only script for chunked UIs: appends a node forest into an
+// already-mounted container (created by the first chunk's mount script).
+std::string RuntimeInjector::generateUiAppendScript(
+    api::ContextId id,
+    std::string const& containerId,
+    std::vector<render::DomNode> const& nodes
+) const {
+    static_cast<void>(id);
+    std::ostringstream stream;
+    stream << "(function(){\n";
+    stream << "    var ui = window.__DearOreUI__ && window.__DearOreUI__.ui;\n";
+    stream << "    if (!ui || !ui.appendTo) return;\n";
+    stream << "    var nodes = " << render::serializeDomForest(nodes) << ";\n";
+    stream << "    function dearOreUiAppend() {\n";
+    stream << "        if (!document.body) return false;\n";
+    stream << "        try { return ui.appendTo(\"" << escapeJsString(containerId) << "\", nodes); } catch (e) { return false; }\n";
+    stream << "    }\n";
+    stream << "    if (!dearOreUiAppend()) {\n";
+    stream << "        var iv = setInterval(function() {\n";
+    stream << "            if (dearOreUiAppend()) clearInterval(iv);\n";
+    stream << "        }, 100);\n";
+    stream << "        setTimeout(function() { clearInterval(iv); }, 10000);\n";
     stream << "    }\n";
     stream << "})();\n";
     return stream.str();

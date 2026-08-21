@@ -43,11 +43,13 @@ namespace {
     return borderImageStyle(key, theme, resolver) + baseStyle;
 }
 
-// Emits the per-state cssText map for an interactive component (M8.1.2).
-// `states` is the ordered state list; `keyPrefix` + state forms the semantic
-// texture key. States whose texture key is unknown (e.g. additionalAction has
-// no disabled texture) are skipped. Returns the default state's full cssText
-// (callers may ignore it and set node.style from the effective state instead).
+// Emits the per-state texture cssText map for an interactive component
+// (M8.1.2). `states` is the ordered state list; `keyPrefix` + state forms the
+// semantic texture key. States whose texture key is unknown (e.g.
+// additionalAction has no disabled texture) are skipped. To keep the injected
+// script small (cohtml ExecuteScript silently drops large scripts), only the
+// state-specific texture cssText is stored; the shared base style goes into
+// node.baseStyle. Returns the default state's full cssText (texture + base).
 std::string emitStateStyles(
     render::DomNode& node,
     std::vector<std::string> const& states,
@@ -56,16 +58,16 @@ std::string emitStateStyles(
     ThemeTokens const& theme,
     IAssetResolver const& resolver
 ) {
+    node.baseStyle = baseStyle;
     std::string defaultStyle;
     for (auto const& state : states) {
         auto texture = borderImageStyle(keyPrefix + state, theme, resolver);
         if (texture.empty()) {
             continue;
         }
-        auto full = texture + baseStyle;
-        node.stateStyles.emplace_back(state, full);
+        node.stateStyles.emplace_back(state, texture);
         if (state == "default") {
-            defaultStyle = full;
+            defaultStyle = texture + baseStyle;
         }
     }
     return defaultStyle;
@@ -357,8 +359,10 @@ std::vector<render::DomNode> renderComponent(
         fieldBase += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
         field.style = fieldBase;
         // M8.1.2: focus highlight for the input field (no vanilla texture).
-        field.stateStyles.emplace_back("default", fieldBase);
-        field.stateStyles.emplace_back("focused", fieldBase + "border-color:#fff;outline:none;");
+        // baseStyle + texture-only stateStyles keeps the injected script small.
+        field.baseStyle = fieldBase;
+        field.stateStyles.emplace_back("default", "");
+        field.stateStyles.emplace_back("focused", "border-color:#fff;outline:none;");
         field.attrs.push_back(render::DomAttr{"type", "text"});
         if (spec.disabled) {
             field.attrs.push_back(render::DomAttr{"disabled", "true"});

@@ -611,42 +611,28 @@ void Runtime::registerComponentShowcase() {
         return b;
     };
 
-    // Text (four-step type scale).
+    // Text (representative type scale).
     root.children.push_back(section("Text"));
     root.children.push_back(text("Tiny 10px", "tiny"));
-    root.children.push_back(text("Small 14px", "small"));
     root.children.push_back(text("Medium 16px", "medium"));
-    root.children.push_back(text("Large 20px", "large"));
     root.children.push_back(text("Heading 32px", "heading"));
-    root.children.push_back(text("Muted", "muted"));
 
-    // Button (variants x states x elevated).
+    // Button (variants). States are interactive now (M8.1.2 state machine), so
+    // static state-variant buttons are omitted. The showcase is kept small:
+    // cohtml ExecuteScript silently drops large scripts (verified ~47KB fails,
+    // ~9KB works), so every component counts.
     root.children.push_back(section("Button"));
     root.children.push_back(button("Primary", "primary"));
-    root.children.push_back(button("Primary Hovered", "primary", "normal", "hovered"));
-    root.children.push_back(button("Primary Pressed", "primary", "normal", "pressed"));
-    root.children.push_back(button("Primary Focused", "primary", "normal", "focused"));
-    root.children.push_back(button("Primary Disabled", "primary", "normal", "disabled"));
     root.children.push_back(button("Secondary", "secondary"));
-    root.children.push_back(button("Neutral", "neutral"));
     root.children.push_back(button("Destructive", "destructive"));
-    root.children.push_back(button("Elevated Primary", "primary", "elevated"));
-    root.children.push_back(button("Elevated Secondary", "secondary", "elevated"));
 
-    // Panel variants.
+    // Panel.
     root.children.push_back(section("Panel"));
     {
         component::ComponentSpec p;
         p.kind  = component::ComponentKind::Panel;
         p.style = "chest";
         p.label = "Chest Panel";
-        root.children.push_back(p);
-    }
-    {
-        component::ComponentSpec p;
-        p.kind  = component::ComponentKind::Panel;
-        p.style = "barrel";
-        p.label = "Barrel Panel";
         root.children.push_back(p);
     }
 
@@ -659,25 +645,9 @@ void Runtime::registerComponentShowcase() {
         root.children.push_back(card);
     }
     {
-        component::ComponentSpec card;
-        card.kind    = component::ComponentKind::Card;
-        card.variant = "action";
-        card.state   = "hovered";
-        card.label   = "Card action hovered";
-        root.children.push_back(card);
-    }
-    {
         component::ComponentSpec item;
         item.kind  = component::ComponentKind::ListItem;
         item.label = "List item base";
-        root.children.push_back(item);
-    }
-    {
-        component::ComponentSpec item;
-        item.kind    = component::ComponentKind::ListItem;
-        item.variant = "action";
-        item.state   = "focused";
-        item.label   = "List item action focused";
         root.children.push_back(item);
     }
 
@@ -703,36 +673,16 @@ void Runtime::registerComponentShowcase() {
         component::ComponentSpec tabA;
         tabA.kind  = component::ComponentKind::Text;
         tabA.label = "Tab A";
-        tabA.state = "focused";
         component::ComponentSpec tabB;
         tabB.kind  = component::ComponentKind::Text;
         tabB.label = "Tab B";
-        component::ComponentSpec tabC;
-        tabC.kind  = component::ComponentKind::Text;
-        tabC.label = "Tab C";
         bar.children.push_back(tabA);
         bar.children.push_back(tabB);
-        bar.children.push_back(tabC);
         root.children.push_back(bar);
     }
 
-    // Bubble / FilterBar.
-    root.children.push_back(section("Bubble / FilterBar"));
-    {
-        component::ComponentSpec bubble;
-        bubble.kind  = component::ComponentKind::Bubble;
-        bubble.label = "New";
-        root.children.push_back(bubble);
-    }
-    {
-        component::ComponentSpec filter;
-        filter.kind  = component::ComponentKind::FilterBar;
-        filter.label = "All";
-        root.children.push_back(filter);
-    }
-
-    // Tooltip / ContainerSlot / KeyIcon.
-    root.children.push_back(section("Tooltip / ContainerSlot / KeyIcon"));
+    // Tooltip / ContainerSlot / KeyIcon / Progress.
+    root.children.push_back(section("Tooltip / Slot / Key / Progress"));
     {
         component::ComponentSpec tip;
         tip.kind  = component::ComponentKind::Tooltip;
@@ -746,42 +696,14 @@ void Runtime::registerComponentShowcase() {
         root.children.push_back(slot);
     }
     {
-        component::ComponentSpec slot;
-        slot.kind  = component::ComponentKind::ContainerSlot;
-        slot.style = "chest";
-        slot.label = "16";
-        root.children.push_back(slot);
-    }
-    {
         component::ComponentSpec key;
         key.kind  = component::ComponentKind::KeyIcon;
         key.label = "A";
         root.children.push_back(key);
     }
     {
-        component::ComponentSpec key;
-        key.kind  = component::ComponentKind::KeyIcon;
-        key.label = "Enter";
-        root.children.push_back(key);
-    }
-    {
-        component::ComponentSpec key;
-        key.kind  = component::ComponentKind::KeyIcon;
-        key.label = "MouseMovement";
-        root.children.push_back(key);
-    }
-
-    // Progress.
-    root.children.push_back(section("Progress"));
-    {
         component::ComponentSpec progress;
         progress.kind = component::ComponentKind::Progress;
-        root.children.push_back(progress);
-    }
-    {
-        component::ComponentSpec progress;
-        progress.kind    = component::ComponentKind::Progress;
-        progress.variant = "linear";
         root.children.push_back(progress);
     }
 

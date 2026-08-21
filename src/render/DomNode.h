@@ -21,9 +21,13 @@ struct DomNode {
     std::vector<DomAttr> attrs;    // non-style attributes (class/id/...)
     std::string          text;     // text content (leaf nodes only)
     std::vector<DomNode> children; // child nodes
-    // M8.1.2: per-state cssText variants for interactive components
-    // (state name -> full cssText). The bootstrap swaps element.style.cssText
-    // on hover/pressed/focused events; `style` holds the default-state cssText.
+    // M8.1.2: per-state cssText variants for interactive components.
+    // To keep the injected script small (cohtml ExecuteScript silently drops
+    // large scripts), `stateStyles` stores only the state-specific texture
+    // cssText (border-image...), and `baseStyle` holds the shared non-texture
+    // part. The bootstrap applies `baseStyle + stateStyles[state]` on switch;
+    // `style` holds the full cssText of the effective state for initial render.
+    std::string          baseStyle;
     std::vector<std::pair<std::string, std::string>> stateStyles;
 };
 

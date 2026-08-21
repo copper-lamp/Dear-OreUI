@@ -83,9 +83,15 @@ void appendNode(std::ostream& stream, DomNode const& node) {
         stream << ']';
     }
     if (!node.stateStyles.empty()) {
-        // M8.1.2: per-state cssText variants (state -> full cssText). The
-        // bootstrap stores them on the element and swaps element.style.cssText
-        // on hover/pressed/focused events.
+        // M8.1.2: per-state texture cssText (state -> texture-only cssText).
+        // The bootstrap applies baseStyle + stateStyles[state] on switch; the
+        // base style is emitted separately (b:) so the injected script stays
+        // small (cohtml ExecuteScript silently drops large scripts).
+        if (!node.baseStyle.empty()) {
+            stream << "b:";
+            appendJsString(stream, node.baseStyle);
+            stream << ',';
+        }
         stream << "st:[";
         for (std::size_t index = 0; index < node.stateStyles.size(); ++index) {
             if (index > 0) {
