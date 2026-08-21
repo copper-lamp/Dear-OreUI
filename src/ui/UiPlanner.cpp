@@ -163,6 +163,7 @@ UiMountPlan UiPlanner::plan(api::ContextId contextId, api::PageScope scope) cons
         spec.anchor       = entry.manifest.anchor;
         spec.pointerEvents = entry.manifest.pointerEvents;
         spec.htmlBody     = entry.htmlBody;
+        spec.domNodes     = entry.domNodes;
         spec.scripts      = entry.manifest.scripts;
         spec.styles       = entry.manifest.styles;
 

@@ -32,6 +32,45 @@ namespace {
     return style.str();
 }
 
+// Full cssText for a texture-family component in a given state: the resolved
+// border-image texture followed by the non-texture base style.
+[[nodiscard]] std::string textureStyle(
+    std::string const& key,
+    std::string const& baseStyle,
+    ThemeTokens const& theme,
+    IAssetResolver const& resolver
+) {
+    return borderImageStyle(key, theme, resolver) + baseStyle;
+}
+
+// Emits the per-state cssText map for an interactive component (M8.1.2).
+// `states` is the ordered state list; `keyPrefix` + state forms the semantic
+// texture key. States whose texture key is unknown (e.g. additionalAction has
+// no disabled texture) are skipped. Returns the default state's full cssText
+// (callers may ignore it and set node.style from the effective state instead).
+std::string emitStateStyles(
+    render::DomNode& node,
+    std::vector<std::string> const& states,
+    std::string const& keyPrefix,
+    std::string const& baseStyle,
+    ThemeTokens const& theme,
+    IAssetResolver const& resolver
+) {
+    std::string defaultStyle;
+    for (auto const& state : states) {
+        auto texture = borderImageStyle(keyPrefix + state, theme, resolver);
+        if (texture.empty()) {
+            continue;
+        }
+        auto full = texture + baseStyle;
+        node.stateStyles.emplace_back(state, full);
+        if (state == "default") {
+            defaultStyle = full;
+        }
+    }
+    return defaultStyle;
+}
+
 // Renders nested component children (excluding raw body) plus raw body nodes.
 void renderChildren(
     ComponentSpec const&        spec,
@@ -126,17 +165,26 @@ std::vector<render::DomNode> renderComponent(
         render::DomNode button;
         button.tag   = "div";
         // pressable texture family: variant x style(elevated) x state.
-        button.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
-        button.style += "display:inline-block;";
-        button.style += "padding:0.8rem 1.6rem;"; // vanilla padding unknown; reasonable default
-        button.style += "font-family:" + theme.fontUi + ";";
-        button.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
-        button.style += "line-height:1;color:" + theme.colorText + ";";
-        button.style += "cursor:pointer;";
+        auto const variant   = spec.variant.empty() ? "neutral" : spec.variant;
+        auto const keyPrefix = (spec.style == "elevated") ? "pressable.elevated." + variant + "."
+                                                          : "pressable." + variant + ".";
+        std::string base = "display:inline-block;";
+        base += "padding:0.8rem 1.6rem;"; // vanilla padding unknown; reasonable default
+        base += "font-family:" + theme.fontUi + ";";
+        base += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+        base += "line-height:1;color:" + theme.colorText + ";";
+        base += "cursor:pointer;";
+        if (spec.disabled) {
+            base += "cursor:default;";
+        }
+        // M8.1.2: node.style reflects the effective state; stateStyles carries
+        // every state so the bootstrap can swap cssText on hover/pressed/focus.
+        button.style = textureStyle(keyPrefix + std::string(effectiveState(spec)), base, theme, resolver);
+        emitStateStyles(button, {"default", "hovered", "focused", "pressed", "disabled"}, keyPrefix, base, theme, resolver);
         button.attrs.push_back(render::DomAttr{"data-component", "button"});
+        button.attrs.push_back(render::DomAttr{"tabindex", "0"});
         if (spec.disabled) {
             button.attrs.push_back(render::DomAttr{"aria-disabled", "true"});
-            button.style += "cursor:default;";
         }
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, button.children);
@@ -202,8 +250,17 @@ std::vector<render::DomNode> renderComponent(
         render::DomNode card;
         card.tag   = "div";
         // detailedCard texture family: base / action / additionalAction x state.
-        card.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
-        card.style += "padding:1.2rem 1.6rem;";
+        std::string base = "padding:1.2rem 1.6rem;";
+        if (spec.variant == "action" || spec.variant == "additionalAction") {
+            auto const variant   = spec.variant.empty() ? "action" : spec.variant;
+            auto const keyPrefix = "detailedCard." + variant + ".";
+            card.style = textureStyle(keyPrefix + std::string(effectiveState(spec)), base, theme, resolver);
+            emitStateStyles(card, {"default", "hovered", "pressed", "focused", "pressedFocused", "disabled", "disabledFocused"},
+                            keyPrefix, base, theme, resolver);
+            card.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        } else {
+            card.style = textureStyle("detailedCard.base", base, theme, resolver);
+        }
         card.attrs.push_back(render::DomAttr{"data-component", "card"});
         renderChildren(spec, theme, resolver, card.children);
         nodes.push_back(std::move(card));
@@ -213,8 +270,21 @@ std::vector<render::DomNode> renderComponent(
         render::DomNode item;
         item.tag   = "div";
         // listItem texture family: base / action / additionalAction x state.
-        item.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
-        item.style += "display:flex;align-items:center;padding:0.8rem 1.4rem;";
+        std::string base = "display:flex;align-items:center;padding:0.8rem 1.4rem;";
+        if (spec.variant == "action" || spec.variant == "additionalAction") {
+            auto const variant   = spec.variant.empty() ? "action" : spec.variant;
+            auto const keyPrefix = "listItem." + variant + ".";
+            item.style = textureStyle(keyPrefix + std::string(effectiveState(spec)), base, theme, resolver);
+            emitStateStyles(item, {"default", "hovered", "pressed", "focused", "pressedFocused", "disabled", "disabledFocused"},
+                            keyPrefix, base, theme, resolver);
+            item.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        } else {
+            // listItem.base only has default/focused textures.
+            auto const baseState = (effectiveState(spec) == "focused") ? "focused" : "default";
+            item.style = textureStyle("listItem.base." + std::string(baseState), base, theme, resolver);
+            emitStateStyles(item, {"default", "focused"}, "listItem.base.", base, theme, resolver);
+            item.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        }
         item.attrs.push_back(render::DomAttr{"data-component", "listItem"});
         if (!spec.label.empty()) {
             render::DomNode label;
@@ -281,10 +351,14 @@ std::vector<render::DomNode> renderComponent(
         }
         render::DomNode field;
         field.tag   = "input";
-        field.style = "width:100%;box-sizing:border-box;padding:10px 12px;";
-        field.style += "background:#1e1e1f;color:" + theme.colorText + ";";
-        field.style += "border:2px solid " + theme.colorSecondary + ";border-radius:4px;";
-        field.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+        std::string fieldBase = "width:100%;box-sizing:border-box;padding:10px 12px;";
+        fieldBase += "background:#1e1e1f;color:" + theme.colorText + ";";
+        fieldBase += "border:2px solid " + theme.colorSecondary + ";border-radius:4px;";
+        fieldBase += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+        field.style = fieldBase;
+        // M8.1.2: focus highlight for the input field (no vanilla texture).
+        field.stateStyles.emplace_back("default", fieldBase);
+        field.stateStyles.emplace_back("focused", fieldBase + "border-color:#fff;outline:none;");
         field.attrs.push_back(render::DomAttr{"type", "text"});
         if (spec.disabled) {
             field.attrs.push_back(render::DomAttr{"disabled", "true"});
@@ -386,9 +460,12 @@ std::vector<render::DomNode> renderComponent(
             tab.text = child.label;
             // Each tab uses the tabBar texture family with its own state.
             auto const state = child.state.empty() ? "default" : child.state;
-            tab.style = borderImageStyle("tabBar.neutral." + std::string(state), theme, resolver);
-            tab.style += "padding:0.8rem 1.8rem;font-family:" + theme.fontUi + ";";
-            tab.style += "font-size:" + px(theme.fontSizes[FontSize::Small]) + ";color:" + theme.colorText + ";";
+            std::string base = "padding:0.8rem 1.8rem;font-family:" + theme.fontUi + ";";
+            base += "font-size:" + px(theme.fontSizes[FontSize::Small]) + ";color:" + theme.colorText + ";";
+            tab.style = textureStyle("tabBar.neutral." + std::string(state), base, theme, resolver);
+            emitStateStyles(tab, {"default", "hovered", "focused", "pressed", "pressedFocused"}, "tabBar.neutral.", base, theme, resolver);
+            tab.attrs.push_back(render::DomAttr{"data-component", "tab"});
+            tab.attrs.push_back(render::DomAttr{"tabindex", "0"});
             bar.children.push_back(std::move(tab));
         }
         nodes.push_back(std::move(bar));

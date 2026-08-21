@@ -322,7 +322,8 @@ namespace {
     std::string                                                        htmlBody,
     dearoreui::api::UiKind                                             expectedKind,
     dearoreui::registry::IModRegistry&                                 registry,
-    dearoreui::diagnostic::DiagnosticLogger&                           logger
+    dearoreui::diagnostic::DiagnosticLogger&                           logger,
+    std::vector<dearoreui::render::DomNode>                            domNodes = {}
 ) {
     using namespace dearoreui::api;
 
@@ -356,6 +357,7 @@ namespace {
     entry.owner    = owner;
     entry.manifest = std::move(manifest);
     entry.htmlBody = std::move(htmlBody);
+    entry.domNodes = std::move(domNodes);
 
     auto result = registry.insert(std::move(entry));
     if (result.isErr()) {
@@ -406,15 +408,20 @@ DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, compone
     // component renderer, then reuse the standard overlay registration path.
     // The htmlBody is later parsed back into a DomNode forest by the universal
     // CSSOM renderer at injection time.
+    //
+    // M8.1.2: also keep the rendered DomNode forest (with per-state cssText
+    // stateStyles) so injection can skip the lossy htmlBody round-trip.
+    auto nodes = component::renderComponent(spec);
     std::string htmlBody = component::renderComponentToHtml(spec);
 
     mLogger.info("ui", "component_registered")
         .withMod(owner)
         .withField("component", std::string(component::componentKindName(spec.kind)))
         .withField("html_body_length", std::to_string(htmlBody.size()))
+        .withField("dom_node_count", std::to_string(nodes.size()))
         .emit();
 
-    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Overlay, mRegistry, mLogger);
+    return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Overlay, mRegistry, mLogger, std::move(nodes));
 }
 
 Result<void> DearOreUIApi::unregisterUi(RegistrationHandle handle) {

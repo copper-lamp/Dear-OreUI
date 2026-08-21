@@ -1,9 +1,11 @@
 #pragma once
 
 #include "api/types/Id.h"
+#include "render/DomNode.h"
 #include "ui/UiManifest.h"
 
 #include <string>
+#include <vector>
 
 namespace dearoreui::ui {
 
@@ -16,6 +18,10 @@ struct OverlaySpec {
     api::UiAnchor           anchor{api::UiAnchor::FullScreen};
     bool                    pointerEvents{false};
     std::string             htmlBody;
+    // M8.1.2: pre-rendered DomNode forest (component-registered UIs only).
+    // Injection prefers this over parsing htmlBody so per-state cssText
+    // (stateStyles) survives to the bootstrap.
+    std::vector<render::DomNode> domNodes;
     std::vector<std::string> scripts;
     std::vector<std::string> styles;
 };

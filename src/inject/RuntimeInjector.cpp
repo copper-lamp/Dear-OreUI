@@ -294,7 +294,11 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
         // serialize it as a compact JS node array. The bootstrap renderer
         // (dearOreUiBuildDom) builds the DOM through CSSOM only, because cohtml
         // drops style="" attributes injected via innerHTML.
-        auto domNodes = render::parseHtmlFragment(spec.htmlBody);
+        //
+        // M8.1.2: component-registered UIs carry a pre-rendered DomNode forest
+        // (spec.domNodes) with per-state cssText (stateStyles) that the htmlBody
+        // round-trip cannot represent; prefer it over parsing htmlBody.
+        auto domNodes = spec.domNodes.empty() ? render::parseHtmlFragment(spec.htmlBody) : spec.domNodes;
         stream << "        {\n";
         stream << "            containerId: \"" << escapeJsString(spec.containerId) << "\",\n";
         stream << "            modNamespace: \"" << escapeJsString(spec.modNamespace) << "\",\n";
@@ -350,12 +354,75 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            if (n.x) {\n";
     stream << "                el.textContent = n.x;\n";
     stream << "            }\n";
+    // M8.1.2: interactive components carry per-state cssText (st:). Store them
+    // on the element and wire hover/pressed/focused events so the bootstrap can
+    // swap element.style.cssText on interaction.
+    stream << "            if (n.st) {\n";
+    stream << "                el.__dearOreUiStates = {};\n";
+    stream << "                for (var k = 0; k < n.st.length; k++) {\n";
+    stream << "                    el.__dearOreUiStates[n.st[k][0]] = n.st[k][1];\n";
+    stream << "                }\n";
+    stream << "                dearOreUiWireState(el);\n";
+    stream << "            }\n";
     stream << "            if (n.c && n.c.length) {\n";
     stream << "                dearOreUiBuildDom(el, n.c);\n";
     stream << "            }\n";
     stream << "            parent.appendChild(el);\n";
     stream << "        }\n";
     stream << "    }\n";
+    // M8.1.2: runtime state switching. dearOreUiSetState swaps the element's
+    // full cssText to the requested state's texture; dearOreUiWireState binds
+    // mouse/focus events. Disabled elements (aria-disabled) never switch. This
+    // is pure DOM work — no facet dispatch, so it never consumes the single
+    // JS->C++ request slot per view.
+    stream << "    function dearOreUiSetState(el, state) {\n";
+    stream << "        if (!el || !el.__dearOreUiStates) return;\n";
+    stream << "        if (el.__dearOreUiDisabled) return;\n";
+    stream << "        var css = el.__dearOreUiStates[state];\n";
+    stream << "        if (css === undefined) css = el.__dearOreUiStates['default'];\n";
+    stream << "        if (css === undefined) return;\n";
+    stream << "        try { el.style.cssText = css; } catch (e) {}\n";
+    stream << "        el.__dearOreUiState = state;\n";
+    stream << "    }\n";
+    stream << "    function dearOreUiWireState(el) {\n";
+    stream << "        if (!el || !el.__dearOreUiStates) return;\n";
+    stream << "        el.__dearOreUiDisabled = (el.getAttribute('aria-disabled') === 'true');\n";
+    stream << "        el.addEventListener('mouseenter', function() {\n";
+    stream << "            if (el.__dearOreUiDisabled) return;\n";
+    stream << "            dearOreUiSetState(el, 'hovered');\n";
+    stream << "        });\n";
+    stream << "        el.addEventListener('mouseleave', function() {\n";
+    stream << "            if (el.__dearOreUiDisabled) return;\n";
+    stream << "            dearOreUiSetState(el, el.__dearOreUiFocused ? 'focused' : 'default');\n";
+    stream << "        });\n";
+    stream << "        el.addEventListener('mousedown', function() {\n";
+    stream << "            if (el.__dearOreUiDisabled) return;\n";
+    stream << "            dearOreUiSetState(el, el.__dearOreUiFocused ? 'pressedFocused' : 'pressed');\n";
+    stream << "        });\n";
+    stream << "        el.addEventListener('mouseup', function() {\n";
+    stream << "            if (el.__dearOreUiDisabled) return;\n";
+    stream << "            dearOreUiSetState(el, el.__dearOreUiFocused ? 'focused' : 'hovered');\n";
+    stream << "        });\n";
+    stream << "        el.addEventListener('focus', function() {\n";
+    stream << "            el.__dearOreUiFocused = true;\n";
+    stream << "            if (el.__dearOreUiDisabled) return;\n";
+    stream << "            dearOreUiSetState(el, 'focused');\n";
+    stream << "        });\n";
+    stream << "        el.addEventListener('blur', function() {\n";
+    stream << "            el.__dearOreUiFocused = false;\n";
+    stream << "            if (el.__dearOreUiDisabled) return;\n";
+    stream << "            dearOreUiSetState(el, 'default');\n";
+    stream << "        });\n";
+    stream << "    }\n";
+    // M8.1.2: programmatic state API for Mods (e.g. keyboard-navigation focus).
+    stream << "    window.__DearOreUI__.ui.setState = function(elOrId, state) {\n";
+    stream << "        var el = (typeof elOrId === 'string') ? document.getElementById(elOrId) : elOrId;\n";
+    stream << "        if (el) dearOreUiSetState(el, state);\n";
+    stream << "    };\n";
+    stream << "    window.__DearOreUI__.ui.getState = function(elOrId) {\n";
+    stream << "        var el = (typeof elOrId === 'string') ? document.getElementById(elOrId) : elOrId;\n";
+    stream << "        return el ? (el.__dearOreUiState || 'default') : null;\n";
+    stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.mount = function(spec) {\n";
     stream << "        window.__DearOreUI__.ui.dbg('mount_enter:' + spec.containerId);\n";
     stream << "        var container = document.getElementById(spec.containerId);\n";

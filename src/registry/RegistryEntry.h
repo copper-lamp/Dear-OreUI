@@ -5,6 +5,7 @@
 #include "api/manifest/StyleSheetManifest.h"
 #include "api/manifest/UiManifest.h"
 #include "api/types/Id.h"
+#include "render/DomNode.h"
 
 #include <chrono>
 #include <string>
@@ -41,6 +42,10 @@ struct UiEntry {
     api::ModId                            owner;
     api::UiManifest                       manifest;
     std::string                           htmlBody;
+    // M8.1.2: pre-rendered DomNode forest (component-registered UIs only).
+    // Carries per-state cssText (stateStyles) that the htmlBody round-trip
+    // cannot represent; injection prefers this over parsing htmlBody.
+    std::vector<render::DomNode>          domNodes;
     std::chrono::system_clock::time_point registeredAt;
 };
 

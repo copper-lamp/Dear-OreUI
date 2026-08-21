@@ -82,6 +82,23 @@ void appendNode(std::ostream& stream, DomNode const& node) {
         }
         stream << ']';
     }
+    if (!node.stateStyles.empty()) {
+        // M8.1.2: per-state cssText variants (state -> full cssText). The
+        // bootstrap stores them on the element and swaps element.style.cssText
+        // on hover/pressed/focused events.
+        stream << "st:[";
+        for (std::size_t index = 0; index < node.stateStyles.size(); ++index) {
+            if (index > 0) {
+                stream << ',';
+            }
+            stream << '[';
+            appendJsString(stream, node.stateStyles[index].first);
+            stream << ',';
+            appendJsString(stream, node.stateStyles[index].second);
+            stream << ']';
+        }
+        stream << ']';
+    }
     stream << '}';
 }
 

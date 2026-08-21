@@ -21,6 +21,10 @@ struct DomNode {
     std::vector<DomAttr> attrs;    // non-style attributes (class/id/...)
     std::string          text;     // text content (leaf nodes only)
     std::vector<DomNode> children; // child nodes
+    // M8.1.2: per-state cssText variants for interactive components
+    // (state name -> full cssText). The bootstrap swaps element.style.cssText
+    // on hover/pressed/focused events; `style` holds the default-state cssText.
+    std::vector<std::pair<std::string, std::string>> stateStyles;
 };
 
 } // namespace dearoreui::render
