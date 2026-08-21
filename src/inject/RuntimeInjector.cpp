@@ -379,7 +379,7 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
                 script = generateUiBodyScript(id, item, &mountBody);
             } else {
                 // Later chunks: append the remaining children into the root.
-                script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex]);
+                script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex], chunkIndex);
             }
             if (script.empty() || !submitScript(script)) {
                 report.success = false;
@@ -432,6 +432,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     // The spec.body array was produced by the C++ DomScriptSerializer from the
     // Mod's htmlBody (stage 8 replaces the old hard-coded 'demo' branch).
     stream << "    function dearOreUiBuildDom(parent, nodes) {\n";
+    stream << "        var last = null;\n";
     stream << "        for (var i = 0; i < nodes.length; i++) {\n";
     stream << "            var n = nodes[i];\n";
     stream << "            var el = document.createElement(n.t || 'div');\n";
@@ -450,6 +451,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "                dearOreUiBuildDom(el, n.c);\n";
     stream << "            }\n";
     stream << "            parent.appendChild(el);\n";
+    stream << "            last = el;\n";
     // M8.1.2: interactive components carry per-state cssText (st:). Store them
     // on the element and wire hover/pressed/focused events so the bootstrap can
     // swap element.style.cssText on interaction. Wiring is wrapped in try/catch
@@ -465,6 +467,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "                try { dearOreUiWireState(el); } catch (e) {}\n";
     stream << "            }\n";
     stream << "        }\n";
+    stream << "        return last;\n";
     stream << "    }\n";
     // M8.1.2: runtime state switching. dearOreUiSetState swaps the element's
     // full cssText to the requested state's texture; dearOreUiWireState binds
@@ -566,7 +569,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     // universal CSSOM renderer (replaces the former 'demo' special case).
     stream << "        container.innerHTML = '';\n";
     stream << "        try {\n";
-    stream << "            dearOreUiBuildDom(container, spec.body);\n";
+    stream << "            container.__dearOreUiRoot = dearOreUiBuildDom(container, spec.body);\n";
     stream << "            window.__DearOreUI__.ui.dbg('body_built:' + spec.containerId);\n";
     stream << "        } catch (e) {\n";
     stream << "            window.__DearOreUI__.ui.dbg('body_build_err:' + (e && e.message));\n";
@@ -589,14 +592,21 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     // UIs are injected in chunks (each ExecuteScript stays under cohtml's
     // silent size limit); the first chunk mounts the container, the rest
     // append into it.
+    //
+    // Stage 8.1.5: the append TARGET is captured at mount time
+    // (container.__dearOreUiRoot) instead of container.firstElementChild —
+    // that property is unverified on this cohtml build, and if it is missing
+    // the appends silently land in the container as siblings UNDER the
+    // full-screen panel (invisible). The mount-captured element is exact.
     stream << "    window.__DearOreUI__.ui.appendTo = function(containerId, nodes) {\n";
     stream << "        var container = document.getElementById(containerId);\n";
     stream << "        if (!container) return false;\n";
     // Chunked UIs: the first chunk mounts the container with the root panel;
-    // later chunks append into that root (container.firstElementChild) so the
-    // layout stays a single panel instead of stacked duplicates.
-    stream << "        var target = container.firstElementChild || container;\n";
+    // later chunks append into that root so the layout stays a single panel
+    // instead of stacked duplicates.
+    stream << "        var target = container.__dearOreUiRoot || container.firstElementChild || container;\n";
     stream << "        try { dearOreUiBuildDom(target, nodes); } catch (e) { return false; }\n";
+    stream << "        container.__dearOreUiAppended = (container.__dearOreUiAppended || 0) + 1;\n";
     stream << "        return true;\n";
     stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.unmount = function(containerId) {\n";
@@ -608,9 +618,6 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "    window.__DearOreUI__.ui.report = function(msg) {\n";
     stream << "        try { if (window.__DearOreUI__ && window.__DearOreUI__.ipc) window.__DearOreUI__.ipc.report(msg); } catch (e) {}\n";
     stream << "    };\n";
-    stream << "    setTimeout(function() {\n";
-    stream << "        try { window.__DearOreUI__.ui.report('bootstrap_executed'); } catch (e) {}\n";
-    stream << "    }, 300);\n";
     // Stage 7.1 fix: defer mounting until the document body exists. ExecuteScript
     // can run while the Coherent document is still loading; appending to a
     // missing body would silently fail inside the engine. Poll with setInterval
@@ -629,11 +636,6 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            }\n";
     stream << "        }\n";
     stream << "    };\n";
-    stream << "    function dearOreUiLogReadyState(label) {\n";
-    stream << "        if (window.console && console.log) {\n";
-    stream << "            console.log('[DearOreUI] ' + (label || 'check') + ' body=' + !!document.body);\n";
-    stream << "        }\n";
-    stream << "    }\n";
     stream << "    function dearOreUiReadyMount() {\n";
     stream << "        if (document.body) {\n";
     stream << "            window.__DearOreUI__.ui.mountAll();\n";
@@ -643,16 +645,13 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        }\n";
     stream << "        return false;\n";
     stream << "    }\n";
-    stream << "    dearOreUiLogReadyState('start');\n";
     stream << "    if (!dearOreUiReadyMount()) {\n";
     stream << "        var dearOreUiIntervalId = setInterval(function() {\n";
-    stream << "            dearOreUiLogReadyState('poll');\n";
     stream << "            if (dearOreUiReadyMount()) {\n";
     stream << "                clearInterval(dearOreUiIntervalId);\n";
     stream << "            }\n";
     stream << "        }, 100);\n";
     stream << "        document.addEventListener('DOMContentLoaded', function() {\n";
-    stream << "            dearOreUiLogReadyState('domready');\n";
     stream << "            if (dearOreUiReadyMount()) {\n";
     stream << "                clearInterval(dearOreUiIntervalId);\n";
     stream << "            }\n";
@@ -699,10 +698,17 @@ std::string RuntimeInjector::generateUiBodyScript(
 
 // Append-only script for chunked UIs: appends a node forest into an
 // already-mounted container (created by the first chunk's mount script).
+//
+// Stage 8.1.5: on a SUCCESSFUL append, a small numbered chip (chunkIndex) is
+// painted fixed at the bottom-right corner of the viewport. The chips are the
+// only JS-side execution evidence we can observe without a JS->C++ channel
+// (facet terminates the page; the cohtml console is not captured), so the next
+// in-game screenshot shows definitively whether every append chunk ran.
 std::string RuntimeInjector::generateUiAppendScript(
     api::ContextId id,
     std::string const& containerId,
-    std::vector<render::DomNode> const& nodes
+    std::vector<render::DomNode> const& nodes,
+    std::size_t chunkIndex
 ) const {
     static_cast<void>(id);
     std::ostringstream stream;
@@ -712,7 +718,18 @@ std::string RuntimeInjector::generateUiAppendScript(
     stream << "    var nodes = " << render::serializeDomForest(nodes) << ";\n";
     stream << "    function dearOreUiAppend() {\n";
     stream << "        if (!document.body) return false;\n";
-    stream << "        try { return ui.appendTo(\"" << escapeJsString(containerId) << "\", nodes); } catch (e) { return false; }\n";
+    stream << "        var ok = false;\n";
+    stream << "        try { ok = ui.appendTo(\"" << escapeJsString(containerId) << "\", nodes); } catch (e) { ok = false; }\n";
+    stream << "        if (ok) {\n";
+    stream << "            try {\n";
+    stream << "                var m = document.createElement('div');\n";
+    stream << "                m.style.cssText = 'position:fixed;bottom:2px;right:" << (2 + chunkIndex * 18)
+        << "px;z-index:2147483646;width:14px;height:14px;font-size:9px;line-height:14px;text-align:center;color:#ffff00;background:rgba(0,0,0,0.6);border:1px solid #ffff00;pointer-events:none;';\n";
+    stream << "                m.textContent = \"" << chunkIndex << "\";\n";
+    stream << "                document.body.appendChild(m);\n";
+    stream << "            } catch (e2) {}\n";
+    stream << "        }\n";
+    stream << "        return ok;\n";
     stream << "    }\n";
     stream << "    if (!dearOreUiAppend()) {\n";
     stream << "        var iv = setInterval(function() {\n";
