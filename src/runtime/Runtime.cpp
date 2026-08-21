@@ -18,6 +18,8 @@
 #include "ipc/CoherentHostBridge.h"
 #include "poc/Stage1NavigationPoc.h"
 #include "resource/ResourceIndex.h"
+#include "render/DomScriptSerializer.h"
+#include "render/HtmlDomParser.h"
 #include "source/FileSystemSourceReader.h"
 #include "ui/MountManager.h"
 #include "ui/NullMountHost.h"
@@ -212,6 +214,9 @@ bool Runtime::enable() {
         logger.info("runtime", "ready").withField("page_lifecycle", "enabled").emit();
         if (mConfig.enableDemoOverlay) {
             registerDemoOverlay();
+        }
+        if (mConfig.enableComponentShowcase) {
+            registerComponentShowcase();
         }
     }
 
@@ -533,6 +538,277 @@ void Runtime::registerDemoOverlay() {
     logger.info("demo", "overlay_registered")
         .withField("handle", std::to_string(uiResult.value().value()))
         .withField("container_id", api::makeUiContainerId("dearoreui", api::UiKind::Overlay, "demo"))
+        .emit();
+}
+
+void Runtime::registerComponentShowcase() {
+    if (mApi == nullptr || mRegistry == nullptr) {
+        return;
+    }
+    auto& logger = diagnostic::globalLogger();
+    logger.info("showcase", "register_attempt")
+        .withField("mod_id", "dearoreui")
+        .withField("ui_id", "component-showcase")
+        .emit();
+
+    api::ModManifest modManifest;
+    modManifest.id           = api::ModId{"dearoreui"};
+    modManifest.modNamespace = "dearoreui";
+    modManifest.modVersion   = api::Version{0, 2, 0};
+    auto modResult = mApi->registerMod(modManifest);
+    // The mod may already be registered by the demo overlay; that is fine —
+    // both overlays share the same "dearoreui" mod. Only a non-already-registered
+    // failure is fatal.
+    if (modResult.isErr() && modResult.error().code != api::ErrorCode::AlreadyExists) {
+        logger.warning("showcase", "mod_registration_failed")
+            .withError(modResult.error().code)
+            .withMessage(modResult.error().message)
+            .emit();
+        return;
+    }
+
+    api::UiManifest uiManifest;
+    uiManifest.modNamespace  = "dearoreui";
+    uiManifest.id            = "component_showcase";
+    uiManifest.kind          = api::UiKind::Overlay;
+    uiManifest.pageScopes    = {api::PageScope::Any};
+    uiManifest.anchor        = api::UiAnchor::TopLeft;
+    uiManifest.pointerEvents = false;
+    uiManifest.fingerprint   = "component-showcase-v1";
+
+    // Build a full component-library showcase: a panel container holding every
+    // vanilla atomic component (stage 8.1) plus representative states/variants.
+    component::ComponentSpec root;
+    root.kind  = component::ComponentKind::Panel;
+    root.style = "dark";
+    root.label = "DearOreUI 组件库展示 (Stage 8.1)";
+
+    auto section = [](std::string title) {
+        component::ComponentSpec s;
+        s.kind  = component::ComponentKind::Text;
+        s.variant = "subheading";
+        s.label = title;
+        return s;
+    };
+    auto text = [](std::string label, std::string variant) {
+        component::ComponentSpec t;
+        t.kind    = component::ComponentKind::Text;
+        t.variant = variant;
+        t.label   = label;
+        return t;
+    };
+    auto button = [](std::string label, std::string variant, std::string style = "normal", std::string state = "default") {
+        component::ComponentSpec b;
+        b.kind    = component::ComponentKind::Button;
+        b.variant = variant;
+        b.style   = style;
+        b.state   = state;
+        b.label   = label;
+        return b;
+    };
+
+    // Text (four-step type scale).
+    root.children.push_back(section("Text"));
+    root.children.push_back(text("Tiny 10px", "tiny"));
+    root.children.push_back(text("Small 14px", "small"));
+    root.children.push_back(text("Medium 16px", "medium"));
+    root.children.push_back(text("Large 20px", "large"));
+    root.children.push_back(text("Heading 32px", "heading"));
+    root.children.push_back(text("Muted", "muted"));
+
+    // Button (variants x states x elevated).
+    root.children.push_back(section("Button"));
+    root.children.push_back(button("Primary", "primary"));
+    root.children.push_back(button("Primary Hovered", "primary", "normal", "hovered"));
+    root.children.push_back(button("Primary Pressed", "primary", "normal", "pressed"));
+    root.children.push_back(button("Primary Focused", "primary", "normal", "focused"));
+    root.children.push_back(button("Primary Disabled", "primary", "normal", "disabled"));
+    root.children.push_back(button("Secondary", "secondary"));
+    root.children.push_back(button("Neutral", "neutral"));
+    root.children.push_back(button("Destructive", "destructive"));
+    root.children.push_back(button("Elevated Primary", "primary", "elevated"));
+    root.children.push_back(button("Elevated Secondary", "secondary", "elevated"));
+
+    // Panel variants.
+    root.children.push_back(section("Panel"));
+    {
+        component::ComponentSpec p;
+        p.kind  = component::ComponentKind::Panel;
+        p.style = "chest";
+        p.label = "Chest Panel";
+        root.children.push_back(p);
+    }
+    {
+        component::ComponentSpec p;
+        p.kind  = component::ComponentKind::Panel;
+        p.style = "barrel";
+        p.label = "Barrel Panel";
+        root.children.push_back(p);
+    }
+
+    // Card / ListItem.
+    root.children.push_back(section("Card / ListItem"));
+    {
+        component::ComponentSpec card;
+        card.kind  = component::ComponentKind::Card;
+        card.label = "Card base";
+        root.children.push_back(card);
+    }
+    {
+        component::ComponentSpec card;
+        card.kind    = component::ComponentKind::Card;
+        card.variant = "action";
+        card.state   = "hovered";
+        card.label   = "Card action hovered";
+        root.children.push_back(card);
+    }
+    {
+        component::ComponentSpec item;
+        item.kind  = component::ComponentKind::ListItem;
+        item.label = "List item base";
+        root.children.push_back(item);
+    }
+    {
+        component::ComponentSpec item;
+        item.kind    = component::ComponentKind::ListItem;
+        item.variant = "action";
+        item.state   = "focused";
+        item.label   = "List item action focused";
+        root.children.push_back(item);
+    }
+
+    // Input / Divider.
+    root.children.push_back(section("Input / Divider"));
+    {
+        component::ComponentSpec input;
+        input.kind  = component::ComponentKind::Input;
+        input.label = "Seed";
+        root.children.push_back(input);
+    }
+    {
+        component::ComponentSpec divider;
+        divider.kind = component::ComponentKind::Divider;
+        root.children.push_back(divider);
+    }
+
+    // TabBar.
+    root.children.push_back(section("TabBar"));
+    {
+        component::ComponentSpec bar;
+        bar.kind = component::ComponentKind::TabBar;
+        component::ComponentSpec tabA;
+        tabA.kind  = component::ComponentKind::Text;
+        tabA.label = "Tab A";
+        tabA.state = "focused";
+        component::ComponentSpec tabB;
+        tabB.kind  = component::ComponentKind::Text;
+        tabB.label = "Tab B";
+        component::ComponentSpec tabC;
+        tabC.kind  = component::ComponentKind::Text;
+        tabC.label = "Tab C";
+        bar.children.push_back(tabA);
+        bar.children.push_back(tabB);
+        bar.children.push_back(tabC);
+        root.children.push_back(bar);
+    }
+
+    // Bubble / FilterBar.
+    root.children.push_back(section("Bubble / FilterBar"));
+    {
+        component::ComponentSpec bubble;
+        bubble.kind  = component::ComponentKind::Bubble;
+        bubble.label = "New";
+        root.children.push_back(bubble);
+    }
+    {
+        component::ComponentSpec filter;
+        filter.kind  = component::ComponentKind::FilterBar;
+        filter.label = "All";
+        root.children.push_back(filter);
+    }
+
+    // Tooltip / ContainerSlot / KeyIcon.
+    root.children.push_back(section("Tooltip / ContainerSlot / KeyIcon"));
+    {
+        component::ComponentSpec tip;
+        tip.kind  = component::ComponentKind::Tooltip;
+        tip.label = "Tooltip text";
+        root.children.push_back(tip);
+    }
+    {
+        component::ComponentSpec slot;
+        slot.kind  = component::ComponentKind::ContainerSlot;
+        slot.label = "64";
+        root.children.push_back(slot);
+    }
+    {
+        component::ComponentSpec slot;
+        slot.kind  = component::ComponentKind::ContainerSlot;
+        slot.style = "chest";
+        slot.label = "16";
+        root.children.push_back(slot);
+    }
+    {
+        component::ComponentSpec key;
+        key.kind  = component::ComponentKind::KeyIcon;
+        key.label = "A";
+        root.children.push_back(key);
+    }
+    {
+        component::ComponentSpec key;
+        key.kind  = component::ComponentKind::KeyIcon;
+        key.label = "Enter";
+        root.children.push_back(key);
+    }
+    {
+        component::ComponentSpec key;
+        key.kind  = component::ComponentKind::KeyIcon;
+        key.label = "MouseMovement";
+        root.children.push_back(key);
+    }
+
+    // Progress.
+    root.children.push_back(section("Progress"));
+    {
+        component::ComponentSpec progress;
+        progress.kind = component::ComponentKind::Progress;
+        root.children.push_back(progress);
+    }
+    {
+        component::ComponentSpec progress;
+        progress.kind    = component::ComponentKind::Progress;
+        progress.variant = "linear";
+        root.children.push_back(progress);
+    }
+
+    auto uiResult = mApi->registerComponent(api::ModId{"dearoreui"}, uiManifest, root);
+    if (uiResult.isErr()) {
+        logger.warning("showcase", "overlay_registration_failed")
+            .withError(uiResult.error().code)
+            .withMessage(uiResult.error().message)
+            .emit();
+        return;
+    }
+
+    // TEMP diagnostic (stage 8.1): dump the generated htmlBody and the
+    // serialized JS body array so the real-client rendering issue can be
+    // inspected without a debugger.
+    {
+        auto html = component::renderComponentToHtml(root);
+        auto nodes = render::parseHtmlFragment(html);
+        std::ofstream dumpHtml(mConfig.dataDirectory / "showcase-html.html");
+        dumpHtml << html;
+        std::ofstream dumpBody(mConfig.dataDirectory / "showcase-body.js");
+        dumpBody << render::serializeDomForest(nodes);
+        logger.info("showcase", "dump_written")
+            .withField("html_length", std::to_string(html.size()))
+            .withField("node_count", std::to_string(nodes.size()))
+            .emit();
+    }
+
+    logger.info("showcase", "overlay_registered")
+        .withField("handle", std::to_string(uiResult.value().value()))
+        .withField("container_id", api::makeUiContainerId("dearoreui", api::UiKind::Overlay, "component_showcase"))
         .emit();
 }
 

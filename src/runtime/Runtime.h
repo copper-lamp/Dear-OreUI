@@ -54,6 +54,11 @@ private:
     // verification. Gated by RuntimeConfig::enableDemoOverlay.
     void registerDemoOverlay();
 
+    // Stage 8.1: register a full component-library showcase overlay (all 14
+    // vanilla atomic components + states/variants). Gated by
+    // RuntimeConfig::enableComponentShowcase.
+    void registerComponentShowcase();
+
     RuntimeConfig                             mConfig;
     capability::StaticCapabilityQuery         mCapabilities;
     std::unique_ptr<registry::ModRegistry>    mRegistry;

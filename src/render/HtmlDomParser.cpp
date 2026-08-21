@@ -161,14 +161,24 @@ bool parseNode(Cursor& cursor, DomNode& node, bool allowTextOnly) {
         if (cursor.peek() == '<' && cursor.peek(1) == '/') {
             cursor.advance(2);
             auto closing = readName(cursor);
-            if (closing != node.tag) {
-                return false; // mismatched closing tag
+            if (closing == node.tag) {
+                cursor.skipWhitespace();
+                if (cursor.peek() == '>') {
+                    cursor.advance();
+                }
+                return true;
             }
-            cursor.skipWhitespace();
-            if (cursor.peek() == '>') {
-                cursor.advance();
+            if (isVoidTag(closing)) {
+                // Tolerate explicit closing tags for void elements (e.g.
+                // `<input></input>`): the serializer emits them, and real HTML
+                // parsers ignore them.
+                cursor.skipWhitespace();
+                if (cursor.peek() == '>') {
+                    cursor.advance();
+                }
+                continue;
             }
-            return true;
+            return false; // mismatched closing tag
         }
         DomNode child;
         if (!parseNode(cursor, child, true)) {

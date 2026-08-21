@@ -50,33 +50,61 @@ void renderChildren(
     }
 }
 
-[[nodiscard]] std::string buttonStyle(std::string_view variant, ThemeTokens const& theme) {
-    std::ostringstream style;
-    style << "display:inline-block;";
-    style << "padding:10px 24px;";
-    style << "font-family:" << theme.fontUi << ";";
-    style << "font-size:" << px(theme.fontSizes[FontSize::Medium]) << ";";
-    style << "line-height:1;";
-    style << "color:" << theme.colorText << ";";
-    style << "border:3px solid " << theme.colorText << ";";
-    style << "border-radius:4px;";
-    style << "cursor:pointer;";
-    if (variant == "primary") {
-        style << "background:" << theme.colorPrimary << ";";
-    } else if (variant == "destructive") {
-        style << "background:" << theme.colorDestructive << ";";
-    } else if (variant == "secondary") {
-        style << "background:" << theme.colorSecondary << ";";
-        style << "color:#1a1a1a;";
-        style << "border-color:" << theme.colorSecondary << ";";
-    } else if (variant == "neutral") {
-        style << "background:" << theme.colorPanel << ";";
-    } else { // elevated
-        style << "background:" << theme.colorPanel << ";";
-        style << "border:3px solid " << theme.colorSecondary << ";";
-        style << "box-shadow:0 4px 0 rgba(0,0,0,0.5);";
+// Effective interaction state: `disabled` wins over the declared state
+// (stage 8.1 plan 2.2: "disabled 与 state=disabled 等价"). Returns a view into
+// spec.state (a stable member) or a literal — never a temporary.
+[[nodiscard]] std::string_view effectiveState(ComponentSpec const& spec) {
+    if (spec.disabled) {
+        return "disabled";
     }
-    return style.str();
+    if (spec.state.empty()) {
+        return "default";
+    }
+    return spec.state;
+}
+
+// Semantic texture key for a component, following the stage 8.1 plan 2.3
+// naming (<family>.<variant>.<state>). Unknown keys fall back to the vanilla
+// table lookup inside borderImageStyle.
+[[nodiscard]] std::string textureKeyFor(ComponentSpec const& spec) {
+    auto const state = effectiveState(spec);
+    switch (spec.kind) {
+    case ComponentKind::Button: {
+        auto const variant = spec.variant.empty() ? "neutral" : spec.variant;
+        if (spec.style == "elevated") {
+            return "pressable.elevated." + variant + "." + std::string(state);
+        }
+        return "pressable." + variant + "." + std::string(state);
+    }
+    case ComponentKind::TabBar:
+        return "tabBar.neutral." + std::string(state);
+    case ComponentKind::Bubble:
+        return spec.variant == "action" ? "bubble.action.default" : "bubble.base.default";
+    case ComponentKind::FilterBar:
+        return spec.variant == "action" ? "filterBar.action.default" : "filterBar.base.default";
+    case ComponentKind::ListItem: {
+        if (spec.variant == "action") {
+            return "listItem.action." + std::string(state);
+        }
+        if (spec.variant == "additionalAction") {
+            return "listItem.additionalAction." + std::string(state);
+        }
+        // listItem.base only has default/focused textures.
+        auto const baseState = (state == "focused") ? "focused" : "default";
+        return "listItem.base." + std::string(baseState);
+    }
+    case ComponentKind::Card: {
+        if (spec.variant == "action") {
+            return "detailedCard.action." + std::string(state);
+        }
+        if (spec.variant == "additionalAction") {
+            return "detailedCard.additionalAction." + std::string(state);
+        }
+        return "detailedCard.base";
+    }
+    default:
+        return {};
+    }
 }
 
 } // namespace
@@ -97,11 +125,18 @@ std::vector<render::DomNode> renderComponent(
     case ComponentKind::Button: {
         render::DomNode button;
         button.tag   = "div";
-        button.style = buttonStyle(spec.variant, theme);
+        // pressable texture family: variant x style(elevated) x state.
+        button.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
+        button.style += "display:inline-block;";
+        button.style += "padding:0.8rem 1.6rem;"; // vanilla padding unknown; reasonable default
+        button.style += "font-family:" + theme.fontUi + ";";
+        button.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+        button.style += "line-height:1;color:" + theme.colorText + ";";
+        button.style += "cursor:pointer;";
         button.attrs.push_back(render::DomAttr{"data-component", "button"});
         if (spec.disabled) {
             button.attrs.push_back(render::DomAttr{"aria-disabled", "true"});
-            button.style += "opacity:0.5;cursor:default;";
+            button.style += "cursor:default;";
         }
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, button.children);
@@ -114,16 +149,17 @@ std::vector<render::DomNode> renderComponent(
     case ComponentKind::Panel: {
         render::DomNode panel;
         panel.tag = "div";
-        panel.style = "display:flex;flex-direction:column;";
-        panel.style += "background:" + theme.colorPanel + ";";
-        panel.style += "border:3px solid " + theme.colorSecondary + ";";
-        panel.style += "border-radius:6px;padding:16px 20px;";
+        // panel texture family: 8 container variants (default/dark/furnace/...).
+        auto const variant = (spec.style.empty() || spec.style == "normal") ? "default" : spec.style;
+        panel.style = borderImageStyle("panel." + variant, theme, resolver);
+        panel.style += "display:flex;flex-direction:column;";
+        panel.style += "padding:1.6rem 1.6rem 2rem 1.6rem;"; // --panelPadding*
         panel.attrs.push_back(render::DomAttr{"data-component", "panel"});
         if (!spec.label.empty()) {
             render::DomNode title;
             title.tag   = "div";
             title.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
-            title.style += "color:" + theme.colorText + ";margin-bottom:12px;";
+            title.style += "color:" + theme.colorText + ";margin-bottom:1.2rem;";
             title.text  = spec.label;
             panel.children.push_back(std::move(title));
         }
@@ -158,9 +194,9 @@ std::vector<render::DomNode> renderComponent(
     case ComponentKind::Card: {
         render::DomNode card;
         card.tag   = "div";
-        card.style = "background:" + theme.colorPanel + ";";
-        card.style += "border:2px solid " + theme.colorSecondary + ";";
-        card.style += "border-radius:4px;padding:12px 16px;";
+        // detailedCard texture family: base / action / additionalAction x state.
+        card.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
+        card.style += "padding:1.2rem 1.6rem;";
         card.attrs.push_back(render::DomAttr{"data-component", "card"});
         renderChildren(spec, theme, resolver, card.children);
         nodes.push_back(std::move(card));
@@ -169,9 +205,9 @@ std::vector<render::DomNode> renderComponent(
     case ComponentKind::ListItem: {
         render::DomNode item;
         item.tag   = "div";
-        item.style = "display:flex;align-items:center;padding:10px 14px;";
-        item.style += "background:" + theme.colorPanel + ";";
-        item.style += "border-bottom:2px solid " + theme.colorSecondary + ";";
+        // listItem texture family: base / action / additionalAction x state.
+        item.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
+        item.style += "display:flex;align-items:center;padding:0.8rem 1.4rem;";
         item.attrs.push_back(render::DomAttr{"data-component", "listItem"});
         if (!spec.label.empty()) {
             render::DomNode label;
@@ -183,6 +219,38 @@ std::vector<render::DomNode> renderComponent(
         }
         renderChildren(spec, theme, resolver, item.children);
         nodes.push_back(std::move(item));
+        break;
+    }
+    case ComponentKind::Bubble: {
+        render::DomNode bubble;
+        bubble.tag = "div";
+        bubble.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
+        bubble.style += "display:inline-block;padding:0.8rem 1.2rem;";
+        bubble.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
+        bubble.style += "color:" + theme.colorText + ";";
+        bubble.attrs.push_back(render::DomAttr{"data-component", "bubble"});
+        if (spec.label.empty()) {
+            renderChildren(spec, theme, resolver, bubble.children);
+        } else {
+            bubble.text = spec.label;
+        }
+        nodes.push_back(std::move(bubble));
+        break;
+    }
+    case ComponentKind::FilterBar: {
+        render::DomNode bar;
+        bar.tag = "div";
+        bar.style = borderImageStyle(textureKeyFor(spec), theme, resolver);
+        bar.style += "display:inline-block;padding:0.4rem 0.8rem;";
+        bar.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
+        bar.style += "color:" + theme.colorText + ";";
+        bar.attrs.push_back(render::DomAttr{"data-component", "filterBar"});
+        if (spec.label.empty()) {
+            renderChildren(spec, theme, resolver, bar.children);
+        } else {
+            bar.text = spec.label;
+        }
+        nodes.push_back(std::move(bar));
         break;
     }
     case ComponentKind::Input: {
@@ -303,19 +371,59 @@ std::vector<render::DomNode> renderComponent(
     case ComponentKind::TabBar: {
         render::DomNode bar;
         bar.tag   = "div";
-        bar.style = "display:flex;gap:4px;";
+        bar.style = "display:flex;gap:0.4rem;";
         bar.attrs.push_back(render::DomAttr{"data-component", "tabBar"});
         for (auto const& child : spec.children) {
             render::DomNode tab;
-            tab.tag   = "div";
-            tab.text  = child.label;
-            tab.style = "padding:8px 18px;font-family:" + theme.fontUi + ";";
+            tab.tag  = "div";
+            tab.text = child.label;
+            // Each tab uses the tabBar texture family with its own state.
+            auto const state = child.state.empty() ? "default" : child.state;
+            tab.style = borderImageStyle("tabBar.neutral." + std::string(state), theme, resolver);
+            tab.style += "padding:0.8rem 1.8rem;font-family:" + theme.fontUi + ";";
             tab.style += "font-size:" + px(theme.fontSizes[FontSize::Small]) + ";color:" + theme.colorText + ";";
-            tab.style += "background:" + theme.colorPanel + ";border:2px solid " + theme.colorSecondary + ";";
-            tab.style += "border-radius:4px 4px 0 0;";
             bar.children.push_back(std::move(tab));
         }
         nodes.push_back(std::move(bar));
+        break;
+    }
+    case ComponentKind::Progress: {
+        // Furnace progress: radial (smelting ring) or linear (fuel flame).
+        // The keyframes (clip-path polygons) are already loaded by the page
+        // (gameplay-theme); the renderer references them by name.
+        auto const radial = (spec.variant == "linear") ? false : true;
+        render::DomNode progress;
+        progress.tag = "div";
+        progress.style = "position:relative;";
+        progress.attrs.push_back(render::DomAttr{"data-component", "progress"});
+        if (radial) {
+            progress.style += "width:2.6rem;height:2.6rem;"; // radial ring footprint
+            render::DomNode bg;
+            bg.tag   = "div";
+            bg.style = borderImageStyle("progress.radial.bg", theme, resolver);
+            bg.style += "position:absolute;inset:0;";
+            progress.children.push_back(std::move(bg));
+            render::DomNode fill;
+            fill.tag   = "div";
+            fill.style = borderImageStyle("progress.radial.fill", theme, resolver);
+            fill.style += "position:absolute;inset:0;";
+            fill.style += "animation:animation-249c45b 1s steps(9) infinite;"; // --progressRadialAnimation
+            progress.children.push_back(std::move(fill));
+        } else {
+            progress.style += "width:3.8rem;height:3.8rem;"; // fuel slot footprint
+            render::DomNode bg;
+            bg.tag   = "div";
+            bg.style = borderImageStyle("progress.linear.bg", theme, resolver);
+            bg.style += "position:absolute;inset:0;";
+            progress.children.push_back(std::move(bg));
+            render::DomNode fill;
+            fill.tag   = "div";
+            fill.style = borderImageStyle("progress.linear.fill", theme, resolver);
+            fill.style += "position:absolute;inset:0;";
+            fill.style += "animation:animation--2c0f9be3 1s steps(1) infinite;"; // --progressLinearAnimation
+            progress.children.push_back(std::move(fill));
+        }
+        nodes.push_back(std::move(progress));
         break;
     }
     default:
@@ -352,8 +460,9 @@ void appendEscapedHtml(std::string& out, std::string_view value) {
 }
 
 void appendDomNodeHtml(std::string& out, render::DomNode const& node) {
+    auto const tag = node.tag.empty() ? "div" : node.tag;
     out += '<';
-    out += node.tag.empty() ? "div" : node.tag;
+    out += tag;
     if (!node.style.empty()) {
         out += " style=\"";
         appendEscapedHtml(out, node.style);
@@ -373,9 +482,12 @@ void appendDomNodeHtml(std::string& out, render::DomNode const& node) {
     for (auto const& child : node.children) {
         appendDomNodeHtml(out, child);
     }
-    out += "</";
-    out += node.tag.empty() ? "div" : node.tag;
-    out += '>';
+    // Void elements (input/img/br/...) have no closing tag in HTML.
+    if (tag != "input" && tag != "img" && tag != "br" && tag != "hr" && tag != "meta" && tag != "link") {
+        out += "</";
+        out += tag;
+        out += '>';
+    }
 }
 
 } // namespace
