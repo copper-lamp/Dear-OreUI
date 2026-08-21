@@ -1,4 +1,5 @@
 #include "component/ComponentRenderer.h"
+#include "component/VanillaAssets.h"
 
 #include <sstream>
 
@@ -8,14 +9,38 @@ namespace {
 
 [[nodiscard]] std::string px(int value) { return std::to_string(value) + "px"; }
 
+// Emits the vanilla 9-slice border-image cssText for a semantic texture key:
+//   border-image:url(<resolved>) <slice>; border-width:<width>; border-image-outset:<outset>;
+// The theme override table wins; otherwise the vanilla table is used. Returns
+// an empty string when the key is unknown (renderer falls back to plain CSS).
+[[nodiscard]] std::string borderImageStyle(
+    std::string_view      key,
+    ThemeTokens const&    theme,
+    IAssetResolver const& resolver
+) {
+    auto const* spec = theme.texture(key);
+    if (spec == nullptr) {
+        spec = VanillaAssets::texture(key);
+    }
+    if (spec == nullptr) {
+        return {};
+    }
+    std::ostringstream style;
+    style << "border-image:url(" << resolver.resolveTexture(*spec) << ") " << spec->slice << ";";
+    style << "border-width:" << spec->width << ";";
+    style << "border-image-outset:" << spec->outset << ";";
+    return style.str();
+}
+
 // Renders nested component children (excluding raw body) plus raw body nodes.
 void renderChildren(
     ComponentSpec const&        spec,
     ThemeTokens const&          theme,
+    IAssetResolver const&       resolver,
     std::vector<render::DomNode>& out
 ) {
     for (auto const& child : spec.children) {
-        auto rendered = renderComponent(child, theme);
+        auto rendered = renderComponent(child, theme, resolver);
         for (auto& node : rendered) {
             out.push_back(std::move(node));
         }
@@ -56,7 +81,16 @@ void renderChildren(
 
 } // namespace
 
-std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTokens const& theme) {
+VanillaAssetResolver const& defaultAssetResolver() {
+    static VanillaAssetResolver const resolver;
+    return resolver;
+}
+
+std::vector<render::DomNode> renderComponent(
+    ComponentSpec const&  spec,
+    ThemeTokens const&    theme,
+    IAssetResolver const& resolver
+) {
     std::vector<render::DomNode> nodes;
 
     switch (spec.kind) {
@@ -70,7 +104,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
             button.style += "opacity:0.5;cursor:default;";
         }
         if (spec.label.empty()) {
-            renderChildren(spec, theme, button.children);
+            renderChildren(spec, theme, resolver, button.children);
         } else {
             button.text = spec.label;
         }
@@ -93,7 +127,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
             title.text  = spec.label;
             panel.children.push_back(std::move(title));
         }
-        renderChildren(spec, theme, panel.children);
+        renderChildren(spec, theme, resolver, panel.children);
         nodes.push_back(std::move(panel));
         break;
     }
@@ -110,6 +144,10 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         } else if (spec.variant == "muted") {
             text.style = "font-family:" + theme.fontBody + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
             text.style += "color:" + theme.colorMuted + ";";
+        } else if (spec.variant == "tiny") {
+            // Four-step type scale (--fontSizes0..3): tiny/small/medium/large.
+            text.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Tiny]) + ";";
+            text.style += "color:" + theme.colorText + ";";
         } else { // ui/body
             text.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
             text.style += "color:" + theme.colorText + ";";
@@ -124,7 +162,7 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         card.style += "border:2px solid " + theme.colorSecondary + ";";
         card.style += "border-radius:4px;padding:12px 16px;";
         card.attrs.push_back(render::DomAttr{"data-component", "card"});
-        renderChildren(spec, theme, card.children);
+        renderChildren(spec, theme, resolver, card.children);
         nodes.push_back(std::move(card));
         break;
     }
@@ -143,21 +181,27 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
             label.style += "color:" + theme.colorText + ";";
             item.children.push_back(std::move(label));
         }
-        renderChildren(spec, theme, item.children);
+        renderChildren(spec, theme, resolver, item.children);
         nodes.push_back(std::move(item));
         break;
     }
     case ComponentKind::Input: {
         render::DomNode wrapper;
         wrapper.tag   = "div";
+        // inputLegend (menus-theme): wrapper background + hint typography.
         wrapper.style = "display:flex;flex-direction:column;";
+        wrapper.style += "background:#1e1e1f;"; // --inputLegendWrapperBackgroundColor
+        wrapper.style += "padding:0 2rem;";     // --inputLegendWrapperPaddingLeft/Right
+        wrapper.style += "text-shadow:0.2rem 0.2rem 0rem #303438;"; // --inputLegendWrapperTextShadow
         wrapper.attrs.push_back(render::DomAttr{"data-component", "input"});
         if (!spec.label.empty()) {
             render::DomNode hint;
             hint.tag   = "div";
             hint.text  = spec.label;
-            hint.style = "font-family:" + theme.fontSubheading + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
-            hint.style += "color:" + theme.colorMuted + ";margin-bottom:6px;";
+            // --inputLegendInputHint*: Minecraft Seven v2, 1.6rem.
+            hint.style = "font-family:" + theme.fontUi + ";";
+            hint.style += "font-size:1.6rem;line-height:1.6rem;letter-spacing:0.04rem;";
+            hint.style += "color:#fff;margin-bottom:0.8rem;"; // --inputLegendInputHintSpaceToLabel
             wrapper.children.push_back(std::move(hint));
         }
         render::DomNode field;
@@ -172,6 +216,88 @@ std::vector<render::DomNode> renderComponent(ComponentSpec const& spec, ThemeTok
         }
         wrapper.children.push_back(std::move(field));
         nodes.push_back(std::move(wrapper));
+        break;
+    }
+    case ComponentKind::Divider: {
+        render::DomNode divider;
+        divider.tag = "div";
+        // formDivider (gameplay-theme .modalForm): 0.4rem hairline with a dark
+        // top / light bottom border.
+        divider.style = "height:0.4rem;"; // --formDividerHeight
+        divider.style += "border-top:0.2rem solid rgba(0,0,0,0.3);";    // --formDividerBorderTopColor
+        divider.style += "border-bottom:0.2rem solid rgba(255,255,255,0.1);"; // --formDividerBorderBottomColor
+        divider.attrs.push_back(render::DomAttr{"data-component", "divider"});
+        nodes.push_back(std::move(divider));
+        break;
+    }
+    case ComponentKind::Tooltip: {
+        render::DomNode tip;
+        tip.tag = "div";
+        // Single-texture tooltip (gameplay-theme --tooltip*).
+        tip.style = borderImageStyle("tooltip.default", theme, resolver);
+        tip.style += "display:inline-block;padding:0.8rem 1.2rem;";
+        tip.style += "color:#fff;"; // --tooltipTextColor
+        tip.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
+        tip.attrs.push_back(render::DomAttr{"data-component", "tooltip"});
+        if (spec.label.empty()) {
+            renderChildren(spec, theme, resolver, tip.children);
+        } else {
+            tip.text = spec.label;
+        }
+        nodes.push_back(std::move(tip));
+        break;
+    }
+    case ComponentKind::ContainerSlot: {
+        render::DomNode slot;
+        slot.tag = "div";
+        // Texture key: state picks default/highlight/touchSelection; style
+        // picks the container tone (chest/barrel/shulker/furnace/...).
+        std::string key;
+        if (spec.state == "highlight") {
+            key = "containerItem.highlight";
+        } else if (spec.state == "touchSelection") {
+            key = "containerItem.touchSelection";
+        } else {
+            auto const tone = (spec.style.empty() || spec.style == "normal") ? "default" : spec.style;
+            key = (tone == "default") ? "containerItem.default" : "containerItem." + tone + ".default";
+        }
+        slot.style = borderImageStyle(key, theme, resolver);
+        slot.style += "position:relative;";
+        slot.style += "width:3.8rem;height:3.8rem;"; // --containerItemWidth/Height
+        slot.attrs.push_back(render::DomAttr{"data-component", "containerSlot"});
+        if (!spec.label.empty()) {
+            // Stack amount badge (--containerItemAmountDefaultColor/TextShadow).
+            render::DomNode amount;
+            amount.tag   = "div";
+            amount.text  = spec.label;
+            amount.style = "position:absolute;right:0.2rem;bottom:0.2rem;";
+            amount.style += "color:#fff;text-shadow:0.2rem 0.2rem 0rem rgba(0,0,0,0.4);";
+            amount.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
+            slot.children.push_back(std::move(amount));
+        }
+        nodes.push_back(std::move(slot));
+        break;
+    }
+    case ComponentKind::KeyIcon: {
+        // Key cap (border-image) + per-key glyph (background-image + size).
+        auto const* icon = VanillaAssets::keyIcon(spec.label);
+        if (icon == nullptr) {
+            break; // unknown key name -> render nothing
+        }
+        render::DomNode key;
+        key.tag = "div";
+        key.style = borderImageStyle("keyIcon.keyboard", theme, resolver);
+        key.style += "display:inline-flex;align-items:center;justify-content:center;";
+        key.style += "padding:1rem 0.8rem 1.2rem 0.8rem;"; // --buttonIconKeyboardPadding*
+        key.attrs.push_back(render::DomAttr{"data-component", "keyIcon"});
+        render::DomNode glyph;
+        glyph.tag = "div";
+        glyph.style = "width:" + icon->width + ";height:" + icon->height + ";";
+        glyph.style += "background-image:url("
+            + resolver.resolveTexture(TextureSpec{icon->source, {}, {}, {}}) + ");";
+        glyph.style += "background-size:contain;background-repeat:no-repeat;background-position:center;";
+        key.children.push_back(std::move(glyph));
+        nodes.push_back(std::move(key));
         break;
     }
     case ComponentKind::TabBar: {
@@ -254,9 +380,13 @@ void appendDomNodeHtml(std::string& out, render::DomNode const& node) {
 
 } // namespace
 
-std::string renderComponentToHtml(ComponentSpec const& spec, ThemeTokens const& theme) {
+std::string renderComponentToHtml(
+    ComponentSpec const&  spec,
+    ThemeTokens const&    theme,
+    IAssetResolver const& resolver
+) {
     std::string html;
-    for (auto const& node : renderComponent(spec, theme)) {
+    for (auto const& node : renderComponent(spec, theme, resolver)) {
         appendDomNodeHtml(html, node);
     }
     return html;

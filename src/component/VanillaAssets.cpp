@@ -153,6 +153,14 @@ TextureTable const& textureTable() {
         add("containerItem.highlight", tex("/hbui/assets/hover-91a80e612ae835842a9a.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
         add("containerItem.touchSelection", tex("/hbui/assets/touch_selection-dce3bdba6c6eed1ada2c.png", "6 6 6 6 fill", "1.2rem 1.2rem 1.2rem 1.2rem", kOutsetZero));
 
+        // ---- containerItem container tones (gameplay-theme .dark/.furnace/... scopes) ----
+        add("containerItem.dark.default", tex("/hbui/assets/item_slot_dark-53401ed574cc560b3b70.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
+        add("containerItem.furnace.default", tex("/hbui/assets/item_slot_furnace-6ec951b202a4cac3ea75.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
+        add("containerItem.chest.default", tex("/hbui/assets/item_slot_chest-68f36114aceb511609da.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
+        add("containerItem.enderChest.default", tex("/hbui/assets/item_slot_ender_chest-192b82ee63ae3e54a94c.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
+        add("containerItem.shulkerBox.default", tex("/hbui/assets/item_slot_shulker_box-5312333f4673585e0b54.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
+        add("containerItem.barrel.default", tex("/hbui/assets/item_slot_barrels-f6698289d7519d32fa1e.png", "1 1 1 1 fill", "0.2rem 0.2rem 0.2rem 0.2rem", kOutsetZero));
+
         // ---- tooltip ----
         add("tooltip.default", tex("/hbui/assets/tooltip-2712aa22c3be49bc6874.png", "2 2 2 2 fill", "0.4rem 0.4rem 0.4rem 0.4rem", kOutsetZero));
 
