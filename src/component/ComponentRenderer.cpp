@@ -514,9 +514,477 @@ std::vector<render::DomNode> renderComponent(
         nodes.push_back(std::move(progress));
         break;
     }
+    // ---- Stage 8.1.4: layout (L) components (pure CSS, no texture) ----
+    case ComponentKind::Stack: {
+        render::DomNode stack;
+        stack.tag = "div";
+        auto const dir = (spec.orientation == "row") ? "row" : "column";
+        stack.style = "display:flex;flex-direction:" + std::string(dir) + ";";
+        stack.style += "gap:" + px(theme.spaces[2]) + ";"; // --space2
+        stack.attrs.push_back(render::DomAttr{"data-component", "stack"});
+        renderChildren(spec, theme, resolver, stack.children);
+        nodes.push_back(std::move(stack));
+        break;
+    }
+    case ComponentKind::Grid: {
+        render::DomNode grid;
+        grid.tag = "div";
+        auto const cols = spec.columns > 0 ? spec.columns : 1;
+        grid.style = "display:grid;grid-template-columns:repeat(" + std::to_string(cols) + ",1fr);";
+        grid.style += "gap:" + px(theme.spaces[2]) + ";"; // --space2
+        grid.attrs.push_back(render::DomAttr{"data-component", "grid"});
+        renderChildren(spec, theme, resolver, grid.children);
+        nodes.push_back(std::move(grid));
+        break;
+    }
+    case ComponentKind::ScrollView: {
+        render::DomNode scroll;
+        scroll.tag = "div";
+        scroll.style = "overflow-y:auto;height:100%;";
+        scroll.attrs.push_back(render::DomAttr{"data-component", "scrollView"});
+        renderChildren(spec, theme, resolver, scroll.children);
+        nodes.push_back(std::move(scroll));
+        break;
+    }
+    case ComponentKind::Section: {
+        render::DomNode section;
+        section.tag = "div";
+        section.style = "display:flex;flex-direction:column;gap:" + px(theme.spaces[2]) + ";";
+        section.attrs.push_back(render::DomAttr{"data-component", "section"});
+        if (!spec.label.empty()) {
+            render::DomNode title;
+            title.tag   = "div";
+            title.text  = spec.label;
+            title.style = "font-family:" + theme.fontSubheading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
+            title.style += "color:" + theme.colorText + ";";
+            section.children.push_back(std::move(title));
+        }
+        renderChildren(spec, theme, resolver, section.children);
+        nodes.push_back(std::move(section));
+        break;
+    }
+    case ComponentKind::Spacer: {
+        render::DomNode spacer;
+        spacer.tag = "div";
+        spacer.style = "flex:1;";
+        spacer.attrs.push_back(render::DomAttr{"data-component", "spacer"});
+        nodes.push_back(std::move(spacer));
+        break;
+    }
+    // ---- Stage 8.1.4: composite (B) components ----
+    case ComponentKind::Modal: {
+        // backdrop (semi-transparent overlay) -> panel(modalForm) -> content.
+        render::DomNode backdrop;
+        backdrop.tag = "div";
+        backdrop.style = "position:fixed;top:0;left:0;right:0;bottom:0;";
+        backdrop.style += "background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;";
+        backdrop.attrs.push_back(render::DomAttr{"data-component", "modal"});
+        render::DomNode panel;
+        panel.tag = "div";
+        panel.style = borderImageStyle("panel.modalForm", theme, resolver);
+        panel.style += "display:flex;flex-direction:column;gap:" + px(theme.spaces[2]) + ";";
+        panel.style += "padding:1.6rem;min-width:24rem;max-width:80%;";
+        if (!spec.label.empty()) {
+            render::DomNode title;
+            title.tag   = "div";
+            title.text  = spec.label;
+            title.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
+            title.style += "color:" + theme.colorText + ";";
+            panel.children.push_back(std::move(title));
+        }
+        renderChildren(spec, theme, resolver, panel.children);
+        backdrop.children.push_back(std::move(panel));
+        nodes.push_back(std::move(backdrop));
+        break;
+    }
+    case ComponentKind::Menu: {
+        // panel -> listItem group.
+        render::DomNode menu;
+        menu.tag = "div";
+        menu.style = borderImageStyle("panel.default", theme, resolver);
+        menu.style += "display:flex;flex-direction:column;padding:0.8rem;min-width:16rem;";
+        menu.attrs.push_back(render::DomAttr{"data-component", "menu"});
+        renderChildren(spec, theme, resolver, menu.children);
+        nodes.push_back(std::move(menu));
+        break;
+    }
+    case ComponentKind::ScrollingList: {
+        // scrollView -> listItem group.
+        render::DomNode scroll;
+        scroll.tag = "div";
+        scroll.style = "overflow-y:auto;height:100%;display:flex;flex-direction:column;";
+        scroll.attrs.push_back(render::DomAttr{"data-component", "scrollingList"});
+        renderChildren(spec, theme, resolver, scroll.children);
+        nodes.push_back(std::move(scroll));
+        break;
+    }
+    case ComponentKind::Dropdown: {
+        // trigger button + options panel (children as listItems).
+        render::DomNode dropdown;
+        dropdown.tag = "div";
+        dropdown.style = "display:inline-block;position:relative;";
+        dropdown.attrs.push_back(render::DomAttr{"data-component", "dropdown"});
+        render::DomNode trigger;
+        trigger.tag = "div";
+        trigger.style = "display:inline-flex;align-items:center;gap:0.6rem;";
+        trigger.style += "padding:0.8rem 1.6rem;font-family:" + theme.fontUi + ";";
+        trigger.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
+        trigger.style += "cursor:pointer;";
+        trigger.style += borderImageStyle("pressable.neutral.default", theme, resolver);
+        trigger.attrs.push_back(render::DomAttr{"data-component", "dropdownTrigger"});
+        trigger.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        if (!spec.label.empty()) {
+            trigger.text = spec.label;
+        }
+        dropdown.children.push_back(std::move(trigger));
+        if (!spec.children.empty()) {
+            render::DomNode options;
+            options.tag = "div";
+            options.style = "position:absolute;top:100%;left:0;margin-top:0.4rem;";
+            options.style += "display:flex;flex-direction:column;min-width:100%;";
+            options.style += borderImageStyle("panel.default", theme, resolver);
+            options.style += "padding:0.4rem;z-index:10;";
+            options.attrs.push_back(render::DomAttr{"data-component", "dropdownOptions"});
+            for (auto const& child : spec.children) {
+                auto rendered = renderComponent(child, theme, resolver);
+                for (auto& node : rendered) {
+                    options.children.push_back(std::move(node));
+                }
+            }
+            dropdown.children.push_back(std::move(options));
+        }
+        nodes.push_back(std::move(dropdown));
+        break;
+    }
+    case ComponentKind::Form: {
+        // panel -> input group + formButton + formDivider.
+        render::DomNode form;
+        form.tag = "div";
+        form.style = borderImageStyle("panel.modalForm", theme, resolver);
+        form.style += "display:flex;flex-direction:column;gap:" + px(theme.spaces[2]) + ";";
+        form.style += "padding:1.6rem;";
+        form.attrs.push_back(render::DomAttr{"data-component", "form"});
+        if (!spec.label.empty()) {
+            render::DomNode title;
+            title.tag   = "div";
+            title.text  = spec.label;
+            title.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
+            title.style += "color:" + theme.colorText + ";";
+            form.children.push_back(std::move(title));
+        }
+        renderChildren(spec, theme, resolver, form.children);
+        nodes.push_back(std::move(form));
+        break;
+    }
+    case ComponentKind::NavigationBar: {
+        // brand + tabBar + keyIcon hint.
+        render::DomNode bar;
+        bar.tag = "div";
+        bar.style = "display:flex;align-items:center;gap:" + px(theme.spaces[3]) + ";";
+        bar.style += "padding:0.8rem 1.6rem;";
+        bar.attrs.push_back(render::DomAttr{"data-component", "navigationBar"});
+        if (!spec.label.empty()) {
+            render::DomNode brand;
+            brand.tag   = "div";
+            brand.text  = spec.label;
+            brand.style = "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
+            brand.style += "color:" + theme.colorText + ";";
+            bar.children.push_back(std::move(brand));
+        }
+        renderChildren(spec, theme, resolver, bar.children);
+        nodes.push_back(std::move(bar));
+        break;
+    }
+    case ComponentKind::Toast: {
+        // bubble + text.
+        render::DomNode toast;
+        toast.tag = "div";
+        toast.style = borderImageStyle("bubble.base.default", theme, resolver);
+        toast.style += "display:inline-block;padding:0.8rem 1.2rem;";
+        toast.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
+        toast.style += "color:" + theme.colorText + ";";
+        toast.attrs.push_back(render::DomAttr{"data-component", "toast"});
+        if (spec.label.empty()) {
+            renderChildren(spec, theme, resolver, toast.children);
+        } else {
+            toast.text = spec.label;
+        }
+        nodes.push_back(std::move(toast));
+        break;
+    }
+    case ComponentKind::SearchField: {
+        // input + search icon.
+        render::DomNode wrapper;
+        wrapper.tag = "div";
+        wrapper.style = "display:flex;align-items:center;gap:0.6rem;";
+        wrapper.style += "background:#1e1e1f;padding:0 1rem;";
+        wrapper.attrs.push_back(render::DomAttr{"data-component", "searchField"});
+        render::DomNode field;
+        field.tag = "input";
+        field.style = "flex:1;background:transparent;border:none;outline:none;";
+        field.style += "color:" + theme.colorText + ";font-family:" + theme.fontUi + ";";
+        field.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";padding:0.8rem 0;";
+        field.attrs.push_back(render::DomAttr{"type", "text"});
+        if (!spec.label.empty()) {
+            field.attrs.push_back(render::DomAttr{"placeholder", spec.label});
+        }
+        wrapper.children.push_back(std::move(field));
+        if (auto const* icon = VanillaAssets::icon("search"); icon != nullptr) {
+            render::DomNode glyph;
+            glyph.tag = "div";
+            glyph.style = "width:" + icon->width + ";height:" + icon->height + ";";
+            glyph.style += "background-image:url("
+                + resolver.resolveTexture(TextureSpec{icon->source, {}, {}, {}}) + ");";
+            glyph.style += "background-size:contain;background-repeat:no-repeat;background-position:center;";
+            wrapper.children.push_back(std::move(glyph));
+        }
+        nodes.push_back(std::move(wrapper));
+        break;
+    }
+    case ComponentKind::Toggle: {
+        // button state + checkmark icon (approximation of vanilla facet).
+        render::DomNode toggle;
+        toggle.tag = "div";
+        toggle.style = "display:inline-flex;align-items:center;gap:0.6rem;cursor:pointer;";
+        toggle.style += "padding:0.6rem 1.2rem;font-family:" + theme.fontUi + ";";
+        toggle.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
+        toggle.style += borderImageStyle("pressable.neutral.default", theme, resolver);
+        toggle.attrs.push_back(render::DomAttr{"data-component", "toggle"});
+        toggle.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        if (spec.state == "on" || spec.state == "checked") {
+            if (auto const* icon = VanillaAssets::icon("checkmark"); icon != nullptr) {
+                render::DomNode glyph;
+                glyph.tag = "div";
+                glyph.style = "width:" + icon->width + ";height:" + icon->height + ";";
+                glyph.style += "background-image:url("
+                    + resolver.resolveTexture(TextureSpec{icon->source, {}, {}, {}}) + ");";
+                glyph.style += "background-size:contain;background-repeat:no-repeat;background-position:center;";
+                toggle.children.push_back(std::move(glyph));
+            }
+        }
+        if (!spec.label.empty()) {
+            render::DomNode label;
+            label.tag   = "div";
+            label.text  = spec.label;
+            label.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+            label.style += "color:" + theme.colorText + ";";
+            toggle.children.push_back(std::move(label));
+        }
+        nodes.push_back(std::move(toggle));
+        break;
+    }
+    // ---- Stage 8.1.4: navigation (N) / interaction (I) / data (D) ----
+    case ComponentKind::Breadcrumb: {
+        render::DomNode crumb;
+        crumb.tag = "div";
+        crumb.style = "display:flex;align-items:center;gap:0.6rem;";
+        crumb.attrs.push_back(render::DomAttr{"data-component", "breadcrumb"});
+        bool first = true;
+        for (auto const& child : spec.children) {
+            if (!first) {
+                render::DomNode sep;
+                sep.tag   = "div";
+                sep.text  = "/";
+                sep.style = "color:" + theme.colorMuted + ";font-family:" + theme.fontUi + ";";
+                crumb.children.push_back(std::move(sep));
+            }
+            first = false;
+            auto rendered = renderComponent(child, theme, resolver);
+            for (auto& node : rendered) {
+                crumb.children.push_back(std::move(node));
+            }
+        }
+        nodes.push_back(std::move(crumb));
+        break;
+    }
+    case ComponentKind::Pager: {
+        // button group (dots/pages).
+        render::DomNode pager;
+        pager.tag = "div";
+        pager.style = "display:flex;align-items:center;gap:0.4rem;";
+        pager.attrs.push_back(render::DomAttr{"data-component", "pager"});
+        auto const count = spec.columns > 0 ? spec.columns : 1;
+        for (int i = 0; i < count; ++i) {
+            render::DomNode dot;
+            dot.tag = "div";
+            auto const active = (spec.value == std::to_string(i));
+            dot.style = "width:1rem;height:1rem;border-radius:50%;";
+            dot.style += active ? "background:" + theme.colorPrimary + ";" : "background:" + theme.colorMuted + ";";
+            dot.attrs.push_back(render::DomAttr{"data-component", "pagerDot"});
+            pager.children.push_back(std::move(dot));
+        }
+        nodes.push_back(std::move(pager));
+        break;
+    }
+    case ComponentKind::TextArea: {
+        render::DomNode wrapper;
+        wrapper.tag = "div";
+        wrapper.style = "display:flex;flex-direction:column;";
+        wrapper.style += "background:#1e1e1f;padding:0 2rem;";
+        wrapper.attrs.push_back(render::DomAttr{"data-component", "textArea"});
+        if (!spec.label.empty()) {
+            render::DomNode hint;
+            hint.tag   = "div";
+            hint.text  = spec.label;
+            hint.style = "font-family:" + theme.fontUi + ";font-size:1.6rem;line-height:1.6rem;";
+            hint.style += "color:#fff;margin-bottom:0.8rem;";
+            wrapper.children.push_back(std::move(hint));
+        }
+        render::DomNode area;
+        area.tag = "textarea";
+        area.style = "width:100%;box-sizing:border-box;padding:10px 12px;";
+        area.style += "background:#1e1e1f;color:" + theme.colorText + ";";
+        area.style += "border:2px solid " + theme.colorSecondary + ";border-radius:4px;";
+        area.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+        area.style += "min-height:6rem;resize:vertical;";
+        if (spec.disabled) {
+            area.attrs.push_back(render::DomAttr{"disabled", "true"});
+        }
+        wrapper.children.push_back(std::move(area));
+        nodes.push_back(std::move(wrapper));
+        break;
+    }
+    case ComponentKind::Slider: {
+        // progress track + button handle.
+        render::DomNode slider;
+        slider.tag = "div";
+        slider.style = "display:flex;align-items:center;gap:0.8rem;";
+        slider.attrs.push_back(render::DomAttr{"data-component", "slider"});
+        render::DomNode track;
+        track.tag = "div";
+        track.style = "flex:1;height:0.8rem;position:relative;";
+        track.style += borderImageStyle("progress.linear.bg", theme, resolver);
+        slider.children.push_back(std::move(track));
+        render::DomNode handle;
+        handle.tag = "div";
+        handle.style = "width:1.6rem;height:1.6rem;";
+        handle.style += borderImageStyle("pressable.neutral.default", theme, resolver);
+        handle.attrs.push_back(render::DomAttr{"data-component", "sliderHandle"});
+        slider.children.push_back(std::move(handle));
+        if (!spec.value.empty()) {
+            render::DomNode val;
+            val.tag   = "div";
+            val.text  = spec.value;
+            val.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
+            val.style += "color:" + theme.colorText + ";min-width:2rem;text-align:right;";
+            slider.children.push_back(std::move(val));
+        }
+        nodes.push_back(std::move(slider));
+        break;
+    }
+    case ComponentKind::Stepper: {
+        // button(-) + value + button(+).
+        render::DomNode stepper;
+        stepper.tag = "div";
+        stepper.style = "display:inline-flex;align-items:center;gap:0.4rem;";
+        stepper.attrs.push_back(render::DomAttr{"data-component", "stepper"});
+        auto makeStepBtn = [&](std::string const& glyph) {
+            render::DomNode btn;
+            btn.tag = "div";
+            btn.style = "padding:0.4rem 0.8rem;cursor:pointer;";
+            btn.style += borderImageStyle("pressable.neutral.default", theme, resolver);
+            btn.style += "font-family:" + theme.fontUi + ";color:" + theme.colorText + ";";
+            btn.attrs.push_back(render::DomAttr{"data-component", "stepperButton"});
+            btn.attrs.push_back(render::DomAttr{"tabindex", "0"});
+            btn.text = glyph;
+            return btn;
+        };
+        stepper.children.push_back(makeStepBtn("-"));
+        render::DomNode val;
+        val.tag   = "div";
+        val.text  = spec.value.empty() ? "0" : spec.value;
+        val.style = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
+        val.style += "color:" + theme.colorText + ";min-width:2.4rem;text-align:center;";
+        stepper.children.push_back(std::move(val));
+        stepper.children.push_back(makeStepBtn("+"));
+        nodes.push_back(std::move(stepper));
+        break;
+    }
+    case ComponentKind::Picker: {
+        // dropdown + list (reuse dropdown rendering with a label).
+        render::DomNode picker;
+        picker.tag = "div";
+        picker.style = "display:inline-block;position:relative;";
+        picker.attrs.push_back(render::DomAttr{"data-component", "picker"});
+        render::DomNode trigger;
+        trigger.tag = "div";
+        trigger.style = "display:inline-flex;align-items:center;gap:0.6rem;";
+        trigger.style += "padding:0.8rem 1.6rem;font-family:" + theme.fontUi + ";";
+        trigger.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
+        trigger.style += "cursor:pointer;";
+        trigger.style += borderImageStyle("pressable.neutral.default", theme, resolver);
+        trigger.attrs.push_back(render::DomAttr{"data-component", "pickerTrigger"});
+        trigger.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        trigger.text = spec.value.empty() ? (spec.label.empty() ? "Select" : spec.label) : spec.value;
+        picker.children.push_back(std::move(trigger));
+        if (!spec.children.empty()) {
+            render::DomNode options;
+            options.tag = "div";
+            options.style = "position:absolute;top:100%;left:0;margin-top:0.4rem;";
+            options.style += "display:flex;flex-direction:column;min-width:100%;";
+            options.style += borderImageStyle("panel.default", theme, resolver);
+            options.style += "padding:0.4rem;z-index:10;";
+            options.attrs.push_back(render::DomAttr{"data-component", "pickerOptions"});
+            for (auto const& child : spec.children) {
+                auto rendered = renderComponent(child, theme, resolver);
+                for (auto& node : rendered) {
+                    options.children.push_back(std::move(node));
+                }
+            }
+            picker.children.push_back(std::move(options));
+        }
+        nodes.push_back(std::move(picker));
+        break;
+    }
+    case ComponentKind::Icon: {
+        auto const* icon = VanillaAssets::icon(spec.icon);
+        if (icon == nullptr) {
+            break; // unknown icon -> render nothing
+        }
+        render::DomNode ic;
+        ic.tag = "div";
+        ic.style = "width:" + icon->width + ";height:" + icon->height + ";";
+        ic.style += "background-image:url("
+            + resolver.resolveTexture(TextureSpec{icon->source, {}, {}, {}}) + ");";
+        ic.style += "background-size:contain;background-repeat:no-repeat;background-position:center;";
+        ic.attrs.push_back(render::DomAttr{"data-component", "icon"});
+        nodes.push_back(std::move(ic));
+        break;
+    }
+    case ComponentKind::Image: {
+        render::DomNode img;
+        img.tag = "img";
+        auto const src = spec.src.empty() ? spec.icon : spec.src;
+        if (src.empty()) {
+            break; // no source -> render nothing
+        }
+        img.attrs.push_back(render::DomAttr{"src", src});
+        img.attrs.push_back(render::DomAttr{"data-component", "image"});
+        if (!spec.style.empty() && spec.style != "normal") {
+            img.style = spec.style;
+        }
+        nodes.push_back(std::move(img));
+        break;
+    }
+    case ComponentKind::Badge: {
+        // bubble + text (corner badge).
+        render::DomNode badge;
+        badge.tag = "div";
+        badge.style = borderImageStyle("bubble.base.default", theme, resolver);
+        badge.style += "display:inline-block;padding:0.2rem 0.6rem;";
+        badge.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Tiny]) + ";";
+        badge.style += "color:" + theme.colorText + ";";
+        badge.attrs.push_back(render::DomAttr{"data-component", "badge"});
+        if (spec.label.empty()) {
+            renderChildren(spec, theme, resolver, badge.children);
+        } else {
+            badge.text = spec.label;
+        }
+        nodes.push_back(std::move(badge));
+        break;
+    }
     default:
-        // Kinds not yet implemented (T1~T4 renderers land in S4~S7) render an
-        // empty forest.
+        // Kinds not yet implemented render an empty forest.
         break;
     }
 

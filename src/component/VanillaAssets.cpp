@@ -252,6 +252,58 @@ KeyIconTable const& keyIconTable() {
     return table;
 }
 
+KeyIconTable const& iconTable() {
+    static KeyIconTable const table = [] {
+        KeyIconTable m;
+        auto add = [&m](std::string name, KeyIconSpec spec) { m.emplace(std::move(name), std::move(spec)); };
+        auto ic = [](std::string_view source, std::string_view size) {
+            return KeyIconSpec{std::string(source), std::string(size), std::string(size)};
+        };
+        // Common UI icons (icon/image component). Sizes are reasonable display
+        // defaults; the renderer can override via ComponentSpec.style.
+        char const* const kS = "1.6rem";
+        char const* const kM = "2.4rem";
+
+        add("checkmark", ic("/hbui/assets/Checkmark-146e6e1d90a5252799a5.png", kM));
+        add("checkmarkSmall", ic("/hbui/assets/checkmark@0.5x.icon-6995d82c2fd8380979391eebf918a78d.png", kS));
+        add("chevronDown", ic("/hbui/assets/Chevron-Down-f78fe544e233d872e3dc.png", kM));
+        add("chevronLeft", ic("/hbui/assets/Chevron-Left-8d197572f18d4a55f95d.png", kM));
+        add("chevronRight", ic("/hbui/assets/Chevron-Right-1d4f98b0ad98623f9d16.png", kM));
+        add("chevronUp", ic("/hbui/assets/Chevron-Up-d8cf47a50d52d10115da.png", kM));
+        add("close", ic("/hbui/assets/Close-5979125403a29b489ba1.png", kM));
+        add("search", ic("/hbui/assets/Search-c8b139db2204a77723aa.png", kM));
+        add("plus", ic("/hbui/assets/Plus-48f3d515c1b14439d2ae.png", kM));
+        add("minus", ic("/hbui/assets/Minus-47cf96f41d776d814646.png", kM));
+        add("settings", ic("/hbui/assets/Settings-8f90a7636bfd4c817e7b.png", kM));
+        add("home", ic("/hbui/assets/Home-02b3e27c45a2cdc76560.png", kM));
+        add("info", ic("/hbui/assets/Information-44f8320dd4c8b79ffd22.png", kM));
+        add("warning", ic("/hbui/assets/Warning-b499a7a09f376c8c3f19.png", kM));
+        add("error", ic("/hbui/assets/Error-0d91b8f32485c56b993f.png", kM));
+        add("play", ic("/hbui/assets/Play-b8e5aadba97d31b3abd0.png", kM));
+        add("arrowDown", ic("/hbui/assets/Arrow-Down-54c9e3c1a4a43aeea357.png", kM));
+        add("arrowLeft", ic("/hbui/assets/Arrow-Left-c849abd58d100852a258.png", kM));
+        add("arrowRight", ic("/hbui/assets/Arrow-Right-811abc88c4276ac1b489.png", kM));
+        add("arrowUp", ic("/hbui/assets/Arrow-Up-808714b9d89c7ac13c89.png", kM));
+        add("filter", ic("/hbui/assets/Filter-835272b58644c815f123.png", kM));
+        add("edit", ic("/hbui/assets/Edit-887593a7c3d9749e237a.png", kM));
+        add("trash", ic("/hbui/assets/Trash-Can-1661e78af971e4c1356b.png", kM));
+        add("copy", ic("/hbui/assets/Copy-9b6af84bc85c68bc308e.png", kM));
+        add("refresh", ic("/hbui/assets/Reload-5717bba55eb67ef86ac8.png", kM));
+        add("lock", ic("/hbui/assets/Lock-Locked-324dd6d761961d7b7be9.png", kM));
+        add("unlock", ic("/hbui/assets/Lock-Unlocked-010337b3fc883113f53f.png", kM));
+        add("menu", ic("/hbui/assets/Menu-8168ee1fe5cdda445a00.png", kM));
+        add("list", ic("/hbui/assets/List-d57ec7b5b9763035cca4.png", kM));
+        add("grid", ic("/hbui/assets/Grid-4f94726ce02c0e7b55f7.png", kM));
+        add("world", ic("/hbui/assets/World-c4d7e28b02a3ff918f13.png", kM));
+        add("envelope", ic("/hbui/assets/Envelope-89e113c0995d7ee4c1ba.png", kM));
+        add("bell", ic("/hbui/assets/bell@0.5x.icon-259b09ba26b33bdd5b23861e067a3eb7.png", kS));
+        add("clock", ic("/hbui/assets/IconClock-999dc9265a3d50c3a97b.png", kM));
+
+        return m;
+    }();
+    return table;
+}
+
 } // namespace
 
 namespace VanillaAssets {
@@ -268,12 +320,22 @@ KeyIconSpec const* keyIcon(std::string_view name) {
     return it == table.end() ? nullptr : &it->second;
 }
 
+KeyIconSpec const* icon(std::string_view name) {
+    auto const& table = iconTable();
+    auto const it = table.find(name);
+    return it == table.end() ? nullptr : &it->second;
+}
+
 std::size_t textureCount() {
     return textureTable().size();
 }
 
 std::size_t keyIconCount() {
     return keyIconTable().size();
+}
+
+std::size_t iconCount() {
+    return iconTable().size();
 }
 
 std::vector<std::string> textureKeys() {
@@ -290,6 +352,16 @@ std::vector<std::string> keyIconNames() {
     std::vector<std::string> names;
     names.reserve(keyIconTable().size());
     for (auto const& [name, spec] : keyIconTable()) {
+        (void)spec;
+        names.push_back(name);
+    }
+    return names;
+}
+
+std::vector<std::string> iconNames() {
+    std::vector<std::string> names;
+    names.reserve(iconTable().size());
+    for (auto const& [name, spec] : iconTable()) {
         (void)spec;
         names.push_back(name);
     }

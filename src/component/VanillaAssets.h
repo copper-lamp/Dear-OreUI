@@ -22,12 +22,19 @@ namespace VanillaAssets {
 // Background-image key icon (keyIcon component) by name, or nullptr.
 [[nodiscard]] KeyIconSpec const* keyIcon(std::string_view name);
 
+// Icon asset (icon/image component) by semantic name, or nullptr. Maps a
+// stable name (e.g. "checkmark", "chevronDown", "search") to a concrete
+// /hbui/assets/... URL plus intrinsic display size.
+[[nodiscard]] KeyIconSpec const* icon(std::string_view name);
+
 [[nodiscard]] std::size_t textureCount();
 [[nodiscard]] std::size_t keyIconCount();
+[[nodiscard]] std::size_t iconCount();
 
 // Test helpers: complete key/name listing for integrity assertions.
 [[nodiscard]] std::vector<std::string> textureKeys();
 [[nodiscard]] std::vector<std::string> keyIconNames();
+[[nodiscard]] std::vector<std::string> iconNames();
 
 } // namespace VanillaAssets
 } // namespace dearoreui::component

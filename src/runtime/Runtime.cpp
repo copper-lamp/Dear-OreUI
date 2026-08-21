@@ -707,6 +707,178 @@ void Runtime::registerComponentShowcase() {
         root.children.push_back(progress);
     }
 
+    // Stage 8.1.4: layout components (stack / grid / section / spacer).
+    root.children.push_back(section("Layout (Stack / Grid / Section)"));
+    {
+        component::ComponentSpec stack;
+        stack.kind = component::ComponentKind::Stack;
+        component::ComponentSpec a;
+        a.kind  = component::ComponentKind::Button;
+        a.label = "A";
+        component::ComponentSpec b;
+        b.kind  = component::ComponentKind::Button;
+        b.label = "B";
+        stack.children.push_back(a);
+        stack.children.push_back(b);
+        root.children.push_back(stack);
+    }
+    {
+        component::ComponentSpec grid;
+        grid.kind    = component::ComponentKind::Grid;
+        grid.columns = 3;
+        for (int i = 0; i < 3; ++i) {
+            component::ComponentSpec slot;
+            slot.kind = component::ComponentKind::ContainerSlot;
+            grid.children.push_back(slot);
+        }
+        root.children.push_back(grid);
+    }
+    {
+        component::ComponentSpec section;
+        section.kind  = component::ComponentKind::Section;
+        section.label = "Section title";
+        component::ComponentSpec tip;
+        tip.kind  = component::ComponentKind::Tooltip;
+        tip.label = "Section content";
+        section.children.push_back(tip);
+        root.children.push_back(section);
+    }
+
+    // Stage 8.1.4: composite components (modal / menu / dropdown / form /
+    // navigationBar / toast / searchField / toggle / badge).
+    root.children.push_back(section("Composite (Modal / Menu / Dropdown / Form)"));
+    {
+        component::ComponentSpec modal;
+        modal.kind  = component::ComponentKind::Modal;
+        modal.label = "Confirm";
+        component::ComponentSpec ok;
+        ok.kind    = component::ComponentKind::Button;
+        ok.variant = "primary";
+        ok.label   = "OK";
+        modal.children.push_back(ok);
+        root.children.push_back(modal);
+    }
+    {
+        component::ComponentSpec menu;
+        menu.kind = component::ComponentKind::Menu;
+        for (int i = 0; i < 2; ++i) {
+            component::ComponentSpec item;
+            item.kind  = component::ComponentKind::ListItem;
+            item.label = "Item " + std::to_string(i + 1);
+            menu.children.push_back(item);
+        }
+        root.children.push_back(menu);
+    }
+    {
+        component::ComponentSpec dropdown;
+        dropdown.kind  = component::ComponentKind::Dropdown;
+        dropdown.label = "Select";
+        component::ComponentSpec opt;
+        opt.kind  = component::ComponentKind::ListItem;
+        opt.label = "Option 1";
+        dropdown.children.push_back(opt);
+        root.children.push_back(dropdown);
+    }
+    {
+        component::ComponentSpec form;
+        form.kind  = component::ComponentKind::Form;
+        form.label = "Settings";
+        component::ComponentSpec input;
+        input.kind  = component::ComponentKind::Input;
+        input.label = "Seed";
+        form.children.push_back(input);
+        root.children.push_back(form);
+    }
+    {
+        component::ComponentSpec nav;
+        nav.kind  = component::ComponentKind::NavigationBar;
+        nav.label = "DearOreUI";
+        root.children.push_back(nav);
+    }
+    {
+        component::ComponentSpec toast;
+        toast.kind  = component::ComponentKind::Toast;
+        toast.label = "Saved!";
+        root.children.push_back(toast);
+    }
+    {
+        component::ComponentSpec search;
+        search.kind  = component::ComponentKind::SearchField;
+        search.label = "Search...";
+        root.children.push_back(search);
+    }
+    {
+        component::ComponentSpec toggle;
+        toggle.kind  = component::ComponentKind::Toggle;
+        toggle.state = "on";
+        toggle.label = "Enable";
+        root.children.push_back(toggle);
+    }
+    {
+        component::ComponentSpec badge;
+        badge.kind  = component::ComponentKind::Badge;
+        badge.label = "3";
+        root.children.push_back(badge);
+    }
+
+    // Stage 8.1.4: navigation / interaction / data (breadcrumb / pager /
+    // slider / stepper / picker / icon / image).
+    root.children.push_back(section("Nav / Interaction / Data"));
+    {
+        component::ComponentSpec crumb;
+        crumb.kind = component::ComponentKind::Breadcrumb;
+        component::ComponentSpec home;
+        home.kind  = component::ComponentKind::Text;
+        home.label = "Home";
+        component::ComponentSpec worlds;
+        worlds.kind  = component::ComponentKind::Text;
+        worlds.label = "Worlds";
+        crumb.children.push_back(home);
+        crumb.children.push_back(worlds);
+        root.children.push_back(crumb);
+    }
+    {
+        component::ComponentSpec pager;
+        pager.kind    = component::ComponentKind::Pager;
+        pager.columns = 3;
+        pager.value   = "1";
+        root.children.push_back(pager);
+    }
+    {
+        component::ComponentSpec slider;
+        slider.kind  = component::ComponentKind::Slider;
+        slider.value = "50";
+        root.children.push_back(slider);
+    }
+    {
+        component::ComponentSpec stepper;
+        stepper.kind  = component::ComponentKind::Stepper;
+        stepper.value = "3";
+        root.children.push_back(stepper);
+    }
+    {
+        component::ComponentSpec picker;
+        picker.kind  = component::ComponentKind::Picker;
+        picker.value = "A";
+        component::ComponentSpec opt;
+        opt.kind  = component::ComponentKind::ListItem;
+        opt.label = "A";
+        picker.children.push_back(opt);
+        root.children.push_back(picker);
+    }
+    {
+        component::ComponentSpec icon;
+        icon.kind = component::ComponentKind::Icon;
+        icon.icon = "checkmark";
+        root.children.push_back(icon);
+    }
+    {
+        component::ComponentSpec image;
+        image.kind = component::ComponentKind::Image;
+        image.src  = "/hbui/assets/Play-b8e5aadba97d31b3abd0.png";
+        root.children.push_back(image);
+    }
+
     auto uiResult = mApi->registerComponent(api::ModId{"dearoreui"}, uiManifest, root);
     if (uiResult.isErr()) {
         logger.warning("showcase", "overlay_registration_failed")
