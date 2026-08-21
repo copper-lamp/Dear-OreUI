@@ -150,8 +150,15 @@ std::vector<render::DomNode> renderComponent(
         render::DomNode panel;
         panel.tag = "div";
         // panel texture family: 8 container variants (default/dark/furnace/...).
+        // The "transparent" variant is a review container: no texture, fully
+        // transparent background, scrollable so the underlying UI stays visible.
         auto const variant = (spec.style.empty() || spec.style == "normal") ? "default" : spec.style;
-        panel.style = borderImageStyle("panel." + variant, theme, resolver);
+        if (variant == "transparent") {
+            panel.style = "background:transparent;";
+            panel.style += "height:100%;overflow-y:auto;";
+        } else {
+            panel.style = borderImageStyle("panel." + variant, theme, resolver);
+        }
         panel.style += "display:flex;flex-direction:column;";
         panel.style += "padding:1.6rem 1.6rem 2rem 1.6rem;"; // --panelPadding*
         panel.attrs.push_back(render::DomAttr{"data-component", "panel"});

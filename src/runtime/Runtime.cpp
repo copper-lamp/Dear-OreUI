@@ -573,14 +573,18 @@ void Runtime::registerComponentShowcase() {
     uiManifest.kind          = api::UiKind::Overlay;
     uiManifest.pageScopes    = {api::PageScope::Any};
     uiManifest.anchor        = api::UiAnchor::TopLeft;
-    uiManifest.pointerEvents = false;
+    // Block clicks: the showcase is a review surface, so pointer events must
+    // NOT pass through to the vanilla UI underneath (no accidental clicks).
+    uiManifest.pointerEvents = true;
     uiManifest.fingerprint   = "component-showcase-v1";
 
-    // Build a full component-library showcase: a panel container holding every
-    // vanilla atomic component (stage 8.1) plus representative states/variants.
+    // Build a full component-library showcase: a transparent, scrollable panel
+    // container holding every vanilla atomic component (stage 8.1) plus
+    // representative states/variants. The container blocks pointer events so
+    // clicks never reach the vanilla UI underneath (no accidental clicks).
     component::ComponentSpec root;
     root.kind  = component::ComponentKind::Panel;
-    root.style = "dark";
+    root.style = "transparent";
     root.label = "DearOreUI 组件库展示 (Stage 8.1)";
 
     auto section = [](std::string title) {
@@ -809,6 +813,8 @@ void Runtime::registerComponentShowcase() {
     logger.info("showcase", "overlay_registered")
         .withField("handle", std::to_string(uiResult.value().value()))
         .withField("container_id", api::makeUiContainerId("dearoreui", api::UiKind::Overlay, "component_showcase"))
+        .withField("pointer_events", "auto")
+        .withField("click_blocked", "true")
         .emit();
 }
 

@@ -369,10 +369,12 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     // The container must itself be full-screen: cohtml resolves width:100% of
     // a position:fixed element against its nearest positioned ancestor, not
     // the viewport, so a nested 100% layer inside an unsized container
-    // collapses to 0x0 (verified: layer_rect w=0,h=0).
+    // collapses to 0x0 (verified: layer_rect w=0,h=0). Use inset (top/right/
+    // bottom/left:0) instead of width/height:100% so the container always
+    // spans the viewport regardless of ancestor sizing.
     stream << "            try {\n";
     stream << "                container.style.cssText =\n";
-    stream << "                    'position:fixed;top:0;left:0;width:100%;height:100%;' +\n";
+    stream << "                    'position:fixed;top:0;left:0;right:0;bottom:0;' +\n";
     stream << "                    'z-index:2147483647;' +\n";
     stream << "                    'pointer-events:' + (spec.pointerEvents ? 'auto' : 'none') + ';';\n";
     stream << "                window.__DearOreUI__.ui.dbg('container_style_ok');\n";
