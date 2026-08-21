@@ -88,7 +88,12 @@ private:
     };
     std::vector<PendingScript> mPending;
     mutable std::mutex         mQueueMutex;
-    static constexpr std::size_t kMaxPending = 8;
+    // Stage 8.1.4: the showcase mounts 16 scripts (runtime + machinery + 13
+    // chunked body scripts + demo). A small cap silently dropped the earliest
+    // scripts (including the machinery) once the queue filled, so the UI never
+    // mounted. Keep the cap generous; the queue is flushed at
+    // OnReadyForBindings and drained per view.
+    static constexpr std::size_t kMaxPending = 512;
 };
 
 } // namespace dearoreui::ipc
