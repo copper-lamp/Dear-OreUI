@@ -6,7 +6,9 @@
 #include "diagnostic/Stage7UiTelemetry.h"
 #include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
+#include "page/IPageContextManager.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace dearoreui::api {
@@ -15,12 +17,14 @@ DearOreUIApi::DearOreUIApi(
     registry::IModRegistry&       registry,
     ipc::HostMethodRegistry&      hostMethodRegistry,
     capability::ICapabilityQuery& capabilities,
-    diagnostic::DiagnosticLogger& logger
+    diagnostic::DiagnosticLogger& logger,
+    page::IPageContextManager* pageManager
 )
 : mRegistry(registry),
   mHostMethodRegistry(hostMethodRegistry),
   mCapabilities(capabilities),
-  mLogger(logger) {}
+  mLogger(logger),
+  mPageManager(pageManager) {}
 
 ApiInfo DearOreUIApi::getInfo() const {
     ApiInfo info;
@@ -40,6 +44,65 @@ std::uint32_t DearOreUIApi::getProtocolVersion() const { return DearOreUIProtoco
 bool DearOreUIApi::isReady() const { return mReady.load(std::memory_order_relaxed); }
 
 void DearOreUIApi::setReady(bool ready) { mReady.store(ready, std::memory_order_relaxed); }
+
+void DearOreUIApi::setPageManager(page::IPageContextManager* pageManager) {
+    mPageManager = pageManager;
+}
+
+void DearOreUIApi::notifyPage(PageEvent event, PageContextView const& context) {
+    std::vector<PageCallback> callbacks;
+    {
+        std::lock_guard lock(mPageSubscriptionMutex);
+        for (auto const& [handle, subscription] : mPageSubscriptions) {
+            static_cast<void>(handle);
+            if (subscription.event != event) continue;
+            if (!subscription.scopes.empty()
+                && std::find(subscription.scopes.begin(), subscription.scopes.end(), context.page.scope) == subscription.scopes.end()) {
+                continue;
+            }
+            callbacks.push_back(subscription.callback);
+        }
+    }
+    for (auto const& callback : callbacks) {
+        try { callback(context); } catch (...) {
+            mLogger.error("api", "page_callback_failed").withContext(context.id).emit();
+        }
+    }
+}
+
+Result<SubscriptionHandle> DearOreUIApi::subscribePage(
+    PageSubscriptionOptions options,
+    PageEvent event,
+    PageCallback callback
+) {
+    if (!options.owner.isValid() || !mRegistry.isModRegistered(options.owner)) {
+        return Error{ErrorCode::InvalidArgument, "subscription owner mod is not registered"};
+    }
+    if (!callback) {
+        return Error{ErrorCode::InvalidArgument, "page callback is empty"};
+    }
+    auto handle = SubscriptionHandle{mNextSubscription++};
+    {
+        std::lock_guard lock(mPageSubscriptionMutex);
+        mPageSubscriptions.emplace(handle, PageSubscription{options.owner, std::move(options.scopes), event, std::move(callback)});
+    }
+    return handle;
+}
+
+Result<void> DearOreUIApi::unsubscribePage(SubscriptionHandle handle) {
+    std::lock_guard lock(mPageSubscriptionMutex);
+    if (mPageSubscriptions.erase(handle) == 0) {
+        return Error{ErrorCode::NotFound, "page subscription not found"};
+    }
+    return Result<void>::success();
+}
+
+Result<PageContextView> DearOreUIApi::getPageContext(ContextId id) const {
+    if (mPageManager == nullptr) return Error{ErrorCode::InvalidState, "page manager unavailable"};
+    auto context = mPageManager->find(id);
+    if (!context) return Error{ErrorCode::InvalidContext, "page context not found"};
+    return PageContextView{id, context->page};
+}
 
 Result<RegistrationHandle>
 DearOreUIApi::registerResource(ModId owner, ResourceManifest const& manifest, std::string payload) {
@@ -250,6 +313,12 @@ Result<void> DearOreUIApi::unregisterMod(ModId id) {
     }
 
     std::size_t removedEntries = mRegistry.findByOwner(id).size();
+    {
+        std::lock_guard lock(mPageSubscriptionMutex);
+        for (auto it = mPageSubscriptions.begin(); it != mPageSubscriptions.end();) {
+            it = it->second.owner == id ? mPageSubscriptions.erase(it) : std::next(it);
+        }
+    }
     bool        removed        = mRegistry.unregisterMod(id);
     if (!removed) {
         return Error{ErrorCode::NotFound, "mod is not registered"};

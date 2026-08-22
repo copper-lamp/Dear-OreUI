@@ -10,6 +10,9 @@
 #include <atomic>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
+#include <mutex>
+#include <unordered_map>
 
 namespace dearoreui::page {
 class IPageContextManager;
@@ -24,7 +27,7 @@ public:
         ipc::HostMethodRegistry&      hostMethodRegistry,
         capability::ICapabilityQuery& capabilities,
         diagnostic::DiagnosticLogger& logger,
-        page::IPageContextManager& pageManager
+        page::IPageContextManager* pageManager = nullptr
     );
 
     [[nodiscard]] ApiInfo       getInfo() const override;
@@ -51,6 +54,7 @@ public:
     [[nodiscard]] bool          isModEnabled(ModId id) const override;
 
     [[nodiscard]] Result<SubscriptionHandle> subscribePage(
+        PageSubscriptionOptions options,
         PageEvent event,
         PageCallback callback
     ) override;
@@ -86,20 +90,23 @@ public:
     [[nodiscard]] Result<void> unregisterUi(RegistrationHandle handle) override;
 
     void setReady(bool ready);
-
+    void setPageManager(page::IPageContextManager* pageManager);
+    void notifyPage(PageEvent event, PageContextView const& context);
 
 private:
     registry::IModRegistry&       mRegistry;
     ipc::HostMethodRegistry&      mHostMethodRegistry;
     capability::ICapabilityQuery& mCapabilities;
     diagnostic::DiagnosticLogger& mLogger;
-    page::IPageContextManager&    mPageManager;
+    page::IPageContextManager*   mPageManager{nullptr};
 
     mutable std::mutex mPageSubscriptionMutex;
     std::uint64_t      mNextSubscription{1};
     struct PageSubscription {
-        PageEvent    event;
-        PageCallback callback;
+        ModId                  owner;
+        std::vector<PageScope> scopes;
+        PageEvent              event;
+        PageCallback           callback;
     };
     std::unordered_map<SubscriptionHandle, PageSubscription> mPageSubscriptions;
     std::atomic<bool> mReady{false};

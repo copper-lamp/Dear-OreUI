@@ -124,6 +124,7 @@ bool Runtime::enable() {
     logger.info("lifecycle", "enable").emit();
 
     mPageManager = std::make_unique<page::PageContextManager>();
+    mApi->setPageManager(mPageManager.get());
     mViewRegistry = std::make_unique<ipc::CoherentViewRegistry>();
     mHookAdapter = std::make_unique<hook::OreUIHookAdapter>(
         static_cast<hook::IPageHookCallback&>(*this),
@@ -289,6 +290,9 @@ api::ContextId Runtime::onPageCreated(std::string_view url, std::optional<api::R
     auto contextId = mPageManager->createContext(std::move(info));
 
     if (auto found = mPageManager->find(contextId); found) {
+        if (mApi != nullptr) {
+            mApi->notifyPage(api::PageEvent::Created, api::PageContextView{contextId, found->page});
+        }
         diagnostic::recordStage3PageCreated(contextId, found->page, url);
         logger.info("page", "created")
             .withContext(contextId)
@@ -412,6 +416,9 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
         }
     }
 
+    if (mApi != nullptr) {
+        mApi->notifyPage(api::PageEvent::Ready, api::PageContextView{id, info});
+    }
     logger.info("page", "ready")
         .withContext(id)
         .withPage(info.id)
@@ -442,6 +449,9 @@ void Runtime::onPageDestroyed(api::ContextId id) {
     bool removed = mPageManager->destroyContext(id);
 
     if (context) {
+        if (mApi != nullptr) {
+            mApi->notifyPage(api::PageEvent::Destroyed, api::PageContextView{id, context->page});
+        }
         diagnostic::recordStage3PageDestroyed(id, context->page);
     }
 
