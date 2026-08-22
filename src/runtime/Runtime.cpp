@@ -145,15 +145,15 @@ bool Runtime::enable() {
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
         *mHostMethodRegistry, *mPageManager, logger
     );
-    // Stage 8: the native JS->C++ handler needs the dispatcher to route
-    // engine.trigger("dearoreui_report", ...) payloads (handled via
-    // handleJsPayload). The bridge registers that handler at view_initialize.
+    // The HostDispatcher is shared by the native Facet JS->C++ bridge and the
+    // optional loopback transport. The active page contract currently uses
+    // the game's native facet:request protocol; dynamic BindCall/
+    // RegisterForEvent is deliberately not used on this client.
     mHostBridge->setHostDispatcher(*mHostDispatcher);
-    // Stage 8: the JS->C++ channel moves off the cohtml engine bindings
-    // entirely (BindCall/RegisterForEvent both crash the client on page
-    // teardown). It now runs over the WebSocket loopback: a local server
-    // routes JS frames through handleJsPayload into HostDispatcher. The
-    // bridge stays C++->JS only (ExecuteScript + defer queue).
+    // Keep the loopback server only as an isolated legacy/diagnostic transport
+    // for now. RuntimeInjector currently does not emit its endpoint and uses
+    // the native Facet protocol; see the API status document for the active
+    // contract.
     std::string wsUrl;
     mWsServer = std::make_unique<ipc::LoopbackWsServer>();
     auto wsResult = mWsServer->start(*mHostDispatcher);
