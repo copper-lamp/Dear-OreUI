@@ -8,9 +8,7 @@
     ·
     <a href="CHANGELOG.md">Changelog</a>
     ·
-    <a href="../Docs/DearOreUI-完整API架构设计.md">API architecture</a>
-    ·
-    <a href="../Docs/DearOreUI-模块依赖与开发计划.md">Development plan</a>
+    <a href="https://copper-lamp.github.io/dearoreui-docs/">Documentation</a>
     ·
     <a href="CONTRIBUTING.md">Contributing</a>
     ·
@@ -26,30 +24,11 @@
 </div>
 
 > [!NOTE]
-> DearOreUI has moved past the scaffold stage. The hooks, resource snapshot, multi-mod registry, transforms, injection, Host/Facet bridge, UI mounting, and API facades described below are implemented, and the display chain has been verified against a real client on OreUI-stack pages. It is still version 0.1.0 with no stable release published. JsonUI pages (main menu, in-game screens) are not covered, and each OreUI View currently allows one JS-driven native call. Those limits are listed under Compatibility.
+> DearOreUI has moved past the pure scaffold stage. The hooks, resource snapshot, multi-mod registry, transforms, injection, Host/Facet bridge, UI mounting, and API facades described below are implemented, and the display chain has been verified against a real client on OreUI-stack pages.
 
 ## Overview
 
-DearOreUI is a native Windows x64 client mod for LeviLamina 26.10.x. It reads the OreUI resources loaded by the original Minecraft client, combines changes declared by multiple mods, and injects the verified result back into the active OreUI page.
-
-```text
-Original OreUI
-    ↓
-Runtime hook and page discovery
-    ↓
-Original resource snapshot
-    ↓
-Mod registrations
-    ↓
-Dependency and conflict resolution
-    ↓
-Resource and code transformation
-    ↓
-Validated injection result
-    ↓
-OreUI page, mod UI, and Host API
-```
-
+DearOreUI is a native Windows x64 client mod for LeviLamina 26.10.x. It reads the OreUI resources loaded by the original Minecraft client, combines changes declared by multiple mods, and injects the verified result back into the active OreUI page. This lets you focus on writing your own UI without worrying about UI compatibility with other mods.
 DearOreUI is not a replacement UI and does not directly expose page pointers, compiled bundle internals, or arbitrary local file access to other mods.
 
 ## What Works
@@ -89,8 +68,6 @@ Not covered yet:
 | Diagnostic query facade | Not formed |
 | Versioned transform as public API | Not exposed |
 
-The unit suite (`DearOreUIUnitTests`) covers the registry, transforms, IPC, UI, components, and diagnostics and exits 0 on the current build.
-
 ## Progressive API Model
 
 ```text
@@ -111,7 +88,7 @@ L6  Facet providers and advanced compatibility adapters
 
 Most mods should remain at L1. Higher levels are opt-in because they require more knowledge of page lifecycle, host capabilities, compatibility constraints, or original bundle structure.
 
-## Multi-Mod Model
+## Multi-Mod Collaboration
 
 Mods do not directly mutate the same intermediate string or write to the game installation. They register declarations with DearOreUI, which creates one page-scoped change plan from the original resource snapshot.
 
@@ -145,33 +122,6 @@ The default rules are:
 - A failed mod change is isolated from unrelated changes.
 - An unsupported version preserves the original page.
 - Every conflict, skip, failure, and fallback produces a report.
-
-## Runtime Architecture
-
-```text
-src/
-├── mod/          Mod entry point, lifecycle, and configuration
-├── api/          Public facades and stable API types (IDearOreUIApi)
-├── bridge/       Pure C ABI bridge for external mods
-├── runtime/      Runtime state and subsystem coordination
-├── hook/         OreUI / Coherent lifecycle integration
-├── capability/   Version, page, and capability detection
-├── page/         PageContext and page events
-├── source/       Original OreUI resource snapshots
-├── resource/     Resource index, URIs, and access control
-├── registry/     Mod, resource, and change registrations
-├── transform/    Dependency resolution, conflicts, change plans
-├── render/       HTML DOM parsing and script serialization
-├── component/    Vanilla assets, theme tokens, component renderer
-├── inject/       Result validation and page injection
-├── ipc/          C++ and JavaScript communication
-├── facet/        Host capability adapters
-├── ui/           UI mounting, planning, and state
-├── diagnostic/   Logs, telemetry, reports, crash probes
-└── poc/          Historical navigation proofs of concept (kept for reference)
-```
-
-The dependency order is documented in the module development plan, beginning with runtime facts and public contracts before higher-risk page and bundle operations.
 
 ## Compatibility
 
@@ -212,7 +162,7 @@ The generated files are placed under `bin/`. The package metadata is defined in:
 - [tooth.json](tooth.json)
 - [xmake.lua](xmake.lua)
 
-A successful build validates compilation and packaging. It does not prove runtime OreUI injection. Follow the validation records under `../Docs/` and record target-client evidence before claiming page behavior.
+A successful build validates compilation and packaging. It does not prove runtime OreUI injection.
 
 ## Build From Source
 
@@ -239,36 +189,16 @@ xmake f -a x64 -m debug -p windows --target_type=client -y
 xmake -v -y
 ```
 
-### Output
-
 Build artifacts are written to `bin/`.
-
-## Testing
-
-### Deterministic tests
-
-Run `DearOreUIUnitTests` from the build output. The suite covers:
-
-- Manifest, namespace, version, permission, and result validation
-- Resource URI normalization and path safety
-- Resource fingerprints and replacement conditions
-- Registration, unregistration, dependency, and conflict handling
-- Transform unique-match and fallback behavior
-- IPC request, response, timeout, cancellation, and error serialization
-- PageContext and UI state transitions
-- Component rendering, vanilla assets, and theme tokens
-- Diagnostic record correlation
-
-The current build exits 0.
 
 ### Target-client validation
 
-Already recorded (see `../Docs/`):
+Recorded:
 
 - Hook discovery and page lifecycle events
 - Real `cohtml::View` capture and `OnReadyForBindings` gating
 - C++→JS script execution and CSSOM overlay build
-- One JS→C++ facet roundtrip with `bus.push` response
+- One JS→C++ Facet roundtrip with `bus.push` response
 - A 52-component UI showcase mount and cleanup on the real client
 
 Still open:
@@ -277,8 +207,6 @@ Still open:
 - Multiple JS→C++ dispatches per View
 - Uninstall and lifecycle cleanup regression
 - Version matrix evidence beyond the recorded target
-
-Runtime validation must record the Minecraft, LeviLamina, and DearOreUI versions, page type, resource fingerprint, hook state, diagnostic IDs, and reproducible evidence where applicable.
 
 ## Roadmap
 
@@ -294,28 +222,6 @@ Runtime validation must record the Minecraft, LeviLamina, and DearOreUI versions
 | M7 | Versioned transforms and Facet providers | Mostly done; transform not yet a public API |
 | M8 | App, Web, and example-mod integration | In progress: external mod example and ABI done; App/Web pending |
 
-See the [API status check (2026-08-22)](../Docs/DearOreUI-API状态核对-2026-08-22.md) and the [progress summary and stage 8 plan](../Docs/DearOreUI-当前进度总结与阶段8规划.md) for the current picture and remaining gates.
-
-## Documentation
-
-- [Complete API architecture](../Docs/DearOreUI-完整API架构设计.md)
-- [Progressive API architecture](../Docs/DearOreUI-渐进式API架构设计.md)
-- [Runtime Hook injection design](../Docs/方案A-运行时Hook注入-顶层设计.md)
-- [Module dependency and development plan](../Docs/DearOreUI-模块依赖与开发计划.md)
-- [API status check (2026-08-22)](../Docs/DearOreUI-API状态核对-2026-08-22.md)
-- [Production-grade API completion](../Docs/DearOreUI-生产级API完整化-需求架构执行.md)
-- [External mod API example and ABI contract](../Docs/DearOreUI-外部Mod-API示例与ABI契约.md)
-- [External mod minimal connection validation](../Docs/DearOreUI-外部Mod最小连接验证-需求架构执行.md)
-- [Progress summary and stage 8 plan](../Docs/DearOreUI-当前进度总结与阶段8规划.md)
-- [Development index](../Docs/development-index.md)
-- [OreUI Customizer reference analysis](../Docs/ore-ui-customizer/01-整体架构与应用通信.md)
-
-## Reference Project
-
-[`libs/Ore-UI-Customizer-App`](../libs/Ore-UI-Customizer-App) is a read-only reference project used to study OreUI resource structure, version differences, injection flows, Facet access, diagnostics, and preview behavior.
-
-Its Electron permission model, compiled-bundle regular-expression strategy, and installation-directory modification workflow are not copied into DearOreUI as runtime contracts.
-
 ## Contributing
 
 Before contributing, read the development and API documents listed above. Contributions should:
@@ -327,7 +233,7 @@ Before contributing, read the development and API documents listed above. Contri
 - Avoid committing secrets, personal paths, build caches, game logs, or private player data.
 - Leave the read-only reference project under `libs/` unchanged.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and [SECURITY.md](SECURITY.md) for private vulnerability reporting. 中文入口：[README_ZH.md](README_ZH.md)。
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and [SECURITY.md](SECURITY.md) for private vulnerability reporting.
 
 ## License
 
