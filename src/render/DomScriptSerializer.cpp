@@ -81,6 +81,13 @@ void appendNode(std::ostream& stream, DomNode const& node) {
             appendNode(stream, node.children[index]);
         }
         stream << ']';
+        // 8.1.5 fix: children is NOT the last property when the node also
+        // carries per-state styles (b:/st:) — emitting `c:[...]b:...` without
+        // the comma produced a JS SyntaxError that silently killed the whole
+        // ExecuteScript (observed in-game: the 5 chunk scripts containing
+        // children+states nodes never ran). A trailing comma is legal in
+        // object literals, so emit it unconditionally.
+        stream << ',';
     }
     if (!node.stateStyles.empty()) {
         // M8.1.2: per-state texture cssText (state -> texture-only cssText).
