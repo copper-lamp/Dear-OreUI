@@ -379,7 +379,7 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
                 script = generateUiBodyScript(id, item, &mountBody);
             } else {
                 // Later chunks: append the remaining children into the root.
-                script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex], chunkIndex);
+                script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex]);
             }
             if (script.empty() || !submitScript(script)) {
                 report.success = false;
@@ -699,16 +699,15 @@ std::string RuntimeInjector::generateUiBodyScript(
 // Append-only script for chunked UIs: appends a node forest into an
 // already-mounted container (created by the first chunk's mount script).
 //
-// Stage 8.1.5: on a SUCCESSFUL append, a small numbered chip (chunkIndex) is
-// painted fixed at the bottom-right corner of the viewport. The chips are the
-// only JS-side execution evidence we can observe without a JS->C++ channel
-// (facet terminates the page; the cohtml console is not captured), so the next
-// in-game screenshot shows definitively whether every append chunk ran.
+// Stage 8.1.5 cleanup: the numbered marker chips served their purpose (they
+// proved all 12 append chunks execute and led to the DomScriptSerializer
+// `]b:` fix); they are removed from the shipped scripts. The mount-captured
+// append target (container.__dearOreUiRoot) and the invisible
+// __dearOreUiAppended counter in appendTo remain.
 std::string RuntimeInjector::generateUiAppendScript(
     api::ContextId id,
     std::string const& containerId,
-    std::vector<render::DomNode> const& nodes,
-    std::size_t chunkIndex
+    std::vector<render::DomNode> const& nodes
 ) const {
     static_cast<void>(id);
     std::ostringstream stream;
@@ -718,18 +717,7 @@ std::string RuntimeInjector::generateUiAppendScript(
     stream << "    var nodes = " << render::serializeDomForest(nodes) << ";\n";
     stream << "    function dearOreUiAppend() {\n";
     stream << "        if (!document.body) return false;\n";
-    stream << "        var ok = false;\n";
-    stream << "        try { ok = ui.appendTo(\"" << escapeJsString(containerId) << "\", nodes); } catch (e) { ok = false; }\n";
-    stream << "        if (ok) {\n";
-    stream << "            try {\n";
-    stream << "                var m = document.createElement('div');\n";
-    stream << "                m.style.cssText = 'position:fixed;bottom:2px;right:" << (2 + chunkIndex * 18)
-        << "px;z-index:2147483646;width:14px;height:14px;font-size:9px;line-height:14px;text-align:center;color:#ffff00;background:rgba(0,0,0,0.6);border:1px solid #ffff00;pointer-events:none;';\n";
-    stream << "                m.textContent = \"" << chunkIndex << "\";\n";
-    stream << "                document.body.appendChild(m);\n";
-    stream << "            } catch (e2) {}\n";
-    stream << "        }\n";
-    stream << "        return ok;\n";
+    stream << "        try { return ui.appendTo(\"" << escapeJsString(containerId) << "\", nodes); } catch (e) { return false; }\n";
     stream << "    }\n";
     stream << "    if (!dearOreUiAppend()) {\n";
     stream << "        var iv = setInterval(function() {\n";

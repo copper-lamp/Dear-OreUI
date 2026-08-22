@@ -38,13 +38,12 @@ private:
         std::vector<render::DomNode> const* bodyOverride = nullptr
     ) const;
     // Append-only script for chunked UIs: appends a node forest into an
-    // already-mounted container. `chunkIndex` (1-based) paints a numbered
-    // marker chip on success so in-game screenshots prove chunk execution.
+    // already-mounted container (target captured by mount as
+    // container.__dearOreUiRoot).
     [[nodiscard]] std::string generateUiAppendScript(
         api::ContextId id,
         std::string const& containerId,
-        std::vector<render::DomNode> const& nodes,
-        std::size_t chunkIndex
+        std::vector<render::DomNode> const& nodes
     ) const;
 
     diagnostic::DiagnosticLogger& mLogger;
