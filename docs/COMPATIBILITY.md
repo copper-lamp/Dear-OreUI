@@ -8,8 +8,11 @@
 | Minecraft | Bedrock client | Targeted |
 | LeviLamina | 26.10.x | Targeted |
 | Build target | Native client mod | Targeted |
-| OreUI runtime Hook | Target-version evidence required | Not implemented |
-| UI mounting | Target-version evidence required | Not implemented |
+| OreUI runtime Hook | Target-version evidence required | Implemented; real-client verified on OreUI-stack pages |
+| UI mounting | Target-version evidence required | Implemented; real-client verified on OreUI-stack pages |
+| JS→C++ Host call | Target-version evidence required | Implemented; one roundtrip verified per View |
+| JsonUI pages (main menu, in-game) | Separate tech stack | Not supported |
+| Other Minecraft / LeviLamina versions | Not tested | Unknown |
 
 ## Compatibility Is Multi-Dimensional
 
@@ -59,4 +62,11 @@ Evidence:
 
 ## Known Boundary
 
-The current repository has not yet established the real OreUI or Coherent Hook point, resource interception boundary, JavaScript execution entry, or UI mounting mechanism. These are validation tasks, not current compatibility guarantees.
+Validated compatibility today comes from the stage 7.1 and stage 8-A client records, on the recorded target versions:
+
+- The display chain (capture `cohtml::View` → `OnReadyForBindings` gate → `ExecuteScript` → CSSOM overlay) works on OreUI-stack pages, currently the world list page (`/play/all`).
+- One JS→C++ facet roundtrip has been recorded against the real client.
+- JsonUI pages (main menu `start_screen`, in-game `hud_screen` / `in_game_play_screen`) run on a different stack and are outside this pipeline.
+- Other Minecraft or LeviLamina versions are untested; their status is `Unknown`, which must never be treated as `Supported`.
+
+A validation record must capture the environment and evidence for any claim beyond these boundaries.

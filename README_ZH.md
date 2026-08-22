@@ -4,7 +4,7 @@
   <p>面向 LeviLamina 客户端的原生模组，用于读取、变换和注入 OreUI 资源。</p>
 
   <p>
-    <a href="https://github.com/DearOreUI/DearOreUI/releases">发行版本</a>
+    <a href="https://github.com/copper-lamp/Dear-OreUI/releases">发行版本</a>
     ·
     <a href="CHANGELOG.md">更新日志</a>
     ·
@@ -18,19 +18,19 @@
   </p>
 
   <p>
-    <a href="https://github.com/DearOreUI/DearOreUI/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/DearOreUI/DearOreUI/build.yml?branch=main&amp;style=for-the-badge&amp;label=build" alt="DearOreUI 构建状态"></a>
-    <a href="https://github.com/DearOreUI/DearOreUI/releases"><img src="https://img.shields.io/github/v/release/DearOreUI/DearOreUI?style=for-the-badge&amp;label=release" alt="DearOreUI 最新发行版本"></a>
+    <a href="https://github.com/copper-lamp/Dear-OreUI/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/copper-lamp/Dear-OreUI/build.yml?branch=main&amp;style=for-the-badge&amp;label=build" alt="DearOreUI 构建状态"></a>
+    <a href="https://github.com/copper-lamp/Dear-OreUI/releases"><img src="https://img.shields.io/github/v/release/copper-lamp/Dear-OreUI?style=for-the-badge&amp;label=release" alt="DearOreUI 最新发行版本"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-CC0--1.0-2f6f9f?style=for-the-badge" alt="CC0-1.0 许可证"></a>
-    <a href="https://github.com/DearOreUI/DearOreUI/issues"><img src="https://img.shields.io/github/issues/DearOreUI/DearOreUI?style=for-the-badge" alt="DearOreUI 未关闭 Issue"></a>
+    <a href="https://github.com/copper-lamp/Dear-OreUI/issues"><img src="https://img.shields.io/github/issues/copper-lamp/Dear-OreUI?style=for-the-badge" alt="DearOreUI 未关闭 Issue"></a>
   </p>
 </div>
 
-> [!WARNING]
-> DearOreUI 目前处于早期开发阶段。当前仓库提供 LeviLamina 模组脚手架和构建配置；OreUI Hook、资源拦截、运行时注入、UI 挂载和公共 API 尚未成为稳定功能。
+> [!NOTE]
+> DearOreUI 已经走过了纯脚手架阶段。下面描述的 Hook、资源快照、多 Mod 注册表、变换、注入、Host/Facet 桥、UI 挂载和 API 门面都已实现，显示链路也在真实客户端、OreUI 技术栈页面上验证过。版本仍是 0.1.0，还没有公开发行版。JsonUI 页面（主菜单、世界内界面）不在覆盖范围内，每个 OreUI View 目前只允许一次 JS 发起的原生调用。这些边界列在「兼容性」一节。
 
 ## 项目概览
 
-DearOreUI 是面向 LeviLamina 26.10.x 的 Windows x64 客户端原生模组。项目目标是在 Minecraft 客户端运行期间读取原版 OreUI 资源，合并多个 Mod 声明的变更，并将经过校验的结果注入当前 OreUI 页面。
+DearOreUI 是面向 LeviLamina 26.10.x 的 Windows x64 客户端原生模组。它在 Minecraft 客户端运行期间读取原版 OreUI 资源，合并多个 Mod 声明的变更，并把校验后的结果注入当前 OreUI 页面。
 
 ```text
 原版 OreUI
@@ -52,33 +52,44 @@ OreUI 页面、Mod UI 与 Host API
 
 DearOreUI 不是独立 UI 替代品，也不会向其他 Mod 直接暴露页面指针、编译后 Bundle 内部变量或任意本地文件访问。
 
-## 功能方向
+## 已实现的能力
 
-以下能力属于项目规划，具体实现状态见下表。
-
-- **运行时 OreUI 接入**：发现 Minecraft 客户端中的 OreUI 和 Coherent 页面生命周期。
-- **资源拦截**：读取当前 OreUI 的 HTML、CSS、JavaScript 和二进制资源。
-- **多 Mod 扩展**：统一收集多个 Mod 的资源、脚本、样式、UI 和变更声明。
-- **冲突感知变换**：在修改目标前校验版本、指纹、依赖、冲突和唯一匹配。
-- **运行时注入**：不修改游戏原始安装目录，将校验后的结果提交给当前 OreUI 页面。
-- **渐进式 API**：从运行时查询和资源注册开始，逐步扩展到页面事件、UI 挂载、Host API 和高级变换。
-- **宿主桥接**：提供显式注册、权限校验的页面 JavaScript 与原生代码通信能力。
-- **运行时诊断**：为注册、变换、注入、运行时和清理失败生成结构化记录。
+- **运行时 Hook。** 模组挂钩了 TechStack 选择、SceneProvider 场景创建、Router 导航、`OreUI::View::initialize`、`OnReadyForBindings`、`triggerEvent` 和 `ClientInstance::update`。
+- **真实显示链路。** 捕获 `cohtml::View` 后，脚本以 `OnReadyForBindings` 为门控，通过 `CoherentHostBridge::sendScript` 执行；DOM Overlay 用 CSSOM 构建，不用 `innerHTML`。这条链路已在世界列表页（`/play/all`）真实验证过。
+- **资源快照。** `FileSystemSourceReader` 读取原版 `gui/dist/hbui` 资源；`ResourceUri` 和 `ResourceIndex` 负责路径与访问管理。
+- **多 Mod 注册表。** Mod 注册资源、脚本、样式、UI 和变更；统一注册表做依赖排序、冲突检测，并为每个页面生成一份变更计划。
+- **声明式 UI。** `registerMod` / `registerOverlay` 进入 `UiPlanner`、`MountManager` 和 `UiStateMachine`。52 个组件的 showcase 已在真实客户端完整显示。
+- **Host 桥。** `HostDispatcher` 和 `HostMethodRegistry` 把 JS 请求路由到原生方法并做权限校验。JS→C++ 走游戏原生 Facet 协议：`DearOreUI.call` → `facet:request` → `OreUIFacetBridge` → `HostDispatcher` → `bus.push`。
+- **公共 API。** `IDearOreUIApi` 合并了 Runtime、Resource、Mod、Host、UI、Page、Event、Transform、Diagnostic、Frame、RuntimeReport 等门面。外部 Mod 通过纯 C ABI 桥（`DearOreUI_QueryApi`）获取实例。
+- **JS 命名空间。** 页面内注入 `window.__DearOreUI__`（协议信息、`bus`、`ipc`）和 `window.DearOreUI`（`call`、`report`），以及基础的 `oreui.*` 命名空间。
+- **诊断。** JSONL 事件流、各阶段遥测、注入报告和崩溃探针，全程不修改游戏安装目录。
 
 ## 开发状态
 
 | 能力 | 状态 |
 | --- | --- |
-| LeviLamina 模组生命周期 | 脚手架已具备 |
-| Windows x64 客户端构建 | 已配置 |
-| OreUI / Coherent 运行时 Hook | 规划中，需目标版本验证 |
-| 原版 OreUI 资源快照 | 规划中，需目标版本验证 |
-| 多 Mod 资源注册表 | 规划中 |
-| C++ 与 JavaScript Host API | 规划中 |
-| UI 挂载与页面生命周期 | 规划中，需目标版本验证 |
-| 版本化代码变换 | 规划中 |
+| LeviLamina 模组生命周期 | 已实现 |
+| Windows x64 客户端构建 | 可用（xmake + Clang-CL） |
+| OreUI / Coherent 运行时 Hook | 已实现，客户端验证通过 |
+| 原版 OreUI 资源快照 | 已实现 |
+| 多 Mod 资源注册表 | 已实现 |
+| 依赖排序与冲突检测 | 已实现 |
+| 资源与代码变换 | 内部已实现（ChangePlanner） |
+| UI 挂载与页面生命周期 | 已实现，客户端验证通过 |
+| C++ 与 JavaScript Host API | 基础 API 已实现，JS 侧已注入 |
+| 崩溃隔离实验 | 已实现 |
 
-当前仓库不能被视为完整运行时实现。构建成功只能证明当前模组脚手架和构建配置可用。
+尚未覆盖：
+
+| 能力 | 状态 |
+| --- | --- |
+| JsonUI 页面（主菜单、世界内界面） | 不支持 |
+| 同一 View 内多次 JS→C++ 调用 | 仅支持一次有效派发 |
+| 公开事件 / 页面订阅门面 | 未形成 |
+| 诊断查询门面 | 未形成 |
+| 版本化变换作为公共 API | 未开放 |
+
+单元测试套件（`DearOreUIUnitTests`）覆盖注册表、变换、IPC、UI、组件和诊断，当前构建退出码为 0。
 
 ## 渐进式 API 模型
 
@@ -140,23 +151,27 @@ Mod C 注册
 ```text
 src/
 ├── mod/          模组入口、生命周期和配置
-├── api/          公共门面和稳定 API 类型
+├── api/          公共门面和稳定 API 类型（IDearOreUIApi）
+├── bridge/       供外部 Mod 使用的纯 C ABI 桥
 ├── runtime/      运行时状态和子系统协调
 ├── hook/         OreUI / Coherent 生命周期接入
 ├── capability/   版本、页面和能力探测
 ├── page/         PageContext 和页面事件
 ├── source/       原版 OreUI 资源快照
-├── registry/     Mod、资源和变更注册表
-├── transform/    资源和代码变换
 ├── resource/     资源索引、URI 和权限控制
+├── registry/     Mod、资源和变更注册表
+├── transform/    依赖解析、冲突检测、变更计划
+├── render/       HTML DOM 解析与脚本序列化
+├── component/    原版资源、主题令牌、组件渲染器
 ├── inject/       结果校验和页面注入
 ├── ipc/          C++ 与 JavaScript 通信
 ├── facet/        宿主能力适配
-├── ui/           UI 挂载和显示抽象
-└── diagnostic/   日志、错误和执行报告
+├── ui/           UI 挂载、规划和状态
+├── diagnostic/   日志、遥测、报告、崩溃探针
+└── poc/          历史导航 PoC（保留作参考）
 ```
 
-当前实现以 `mod/` 下的脚手架为中心。其余模块会按照依赖顺序逐步加入，先验证运行时事实和公共契约，再实现高风险的页面与 Bundle 操作。
+模块的依赖顺序见「模块依赖与开发计划」，先验证运行时事实和公共契约，再实现高风险的页面与 Bundle 操作。
 
 ## 兼容性
 
@@ -174,6 +189,13 @@ src/
 
 OreUI Bundle 的兼容性不能只依据 Minecraft 版本判断，还取决于检测到的 OreUI 资源、Coherent 宿主、页面类型、资源指纹和可用能力。
 
+已验证的边界（来自阶段 7.1 和阶段 8-A 的客户端记录）：
+
+- 显示链路在 OreUI 技术栈页面上可用，当前验证目标是世界列表页。
+- 真实客户端上记录到一次完整的 JS→C++ roundtrip。
+- JsonUI 页面（主菜单、世界内界面）走的是另一套技术栈，不在本管线内。
+- 其他 Minecraft / LeviLamina 版本未验证。「未知」绝不能当作「支持」。
+
 ## 快速开始
 
 DearOreUI 尚未发布稳定运行时版本。开发构建需要准备 Windows x64 LeviLamina 26.10.x 客户端环境，然后在 `DearOreUI/` 目录执行：
@@ -190,7 +212,7 @@ xmake -v -y
 - [tooth.json](tooth.json)
 - [xmake.lua](xmake.lua)
 
-构建成功不代表运行时 OreUI 注入已经可用。测试 Hook 或页面变更前，请先按照目标版本验证计划收集证据。
+构建成功只证明编译和打包可用，不等于运行时 OreUI 注入已可用。验证页面行为前，请先参照 `../Docs/` 下的验证记录收集目标客户端证据。
 
 ## 从源码构建
 
@@ -217,17 +239,13 @@ xmake f -a x64 -m debug -p windows --target_type=client -y
 xmake -v -y
 ```
 
-构建产物位于：
-
-```text
-bin/
-```
+构建产物位于 `bin/`。
 
 ## 测试
 
-开发计划将确定性测试与目标客户端验证分开。
-
 ### 确定性测试
+
+在构建输出中运行 `DearOreUIUnitTests`。套件覆盖：
 
 - Manifest、命名空间、版本、权限和结果校验
 - 资源 URI 规范化和路径安全
@@ -236,36 +254,45 @@ bin/
 - 变换唯一命中和回退行为
 - IPC 请求、响应、超时、取消和错误序列化
 - PageContext 与 UI 状态转换
+- 组件渲染、原版资源和主题令牌
 - 诊断记录关联
+
+当前构建退出码为 0。
 
 ### 目标客户端验证
 
+已记录（见 `../Docs/`）：
+
 - Hook 发现和页面生命周期事件
-- 原始 HTML、CSS、JavaScript 和二进制资源访问
-- 无副作用 JavaScript 最小注入
-- 页面重载、导航、并行页面和销毁
-- C++ 到 JavaScript、JavaScript 到 C++ 通信
-- 最小 UI 挂载和清理闭环
-- 多个 Mod 同时参与同一页面
-- 不支持版本安全禁用
+- 真实 `cohtml::View` 捕获与 `OnReadyForBindings` 门控
+- C++→JS 脚本执行与 CSSOM Overlay 构建
+- 一次 JS→C++ Facet roundtrip，含 `bus.push` 响应
+- 52 个组件的 UI showcase 在真实客户端挂载与清理
+
+仍待解决：
+
+- JsonUI 页面注入（主菜单、世界内界面）
+- 同一 View 内多次 JS→C++ 派发
+- 卸载与生命周期清理回归
+- 目标版本之外的版本矩阵证据
 
 真实运行时验证必须记录 Minecraft、LeviLamina 和 DearOreUI 版本、页面类型、资源指纹、Hook 状态、诊断 ID 和可复现证据。
 
 ## 开发路线
 
-| 里程碑 | 范围 |
-| --- | --- |
-| M0 | 运行时事实与 Hook 可行性 |
-| M1 | 公共类型、Manifest 与诊断 |
-| M2 | 页面生命周期与 PageContext |
-| M3 | 资源快照与最小注入 |
-| M4 | C++ 到 JavaScript 的 Host 通信 |
-| M5 | 多 Mod 变更、依赖与冲突 |
-| M6 | UI 挂载与页面显示 |
-| M7 | 版本化变换与 Facet Provider |
-| M8 | App、Web 与示例 Mod 对接 |
+| 里程碑 | 范围 | 状态 |
+| --- | --- | --- |
+| M0 | 运行时事实与 Hook 可行性 | 完成 |
+| M1 | 公共类型、Manifest 与诊断 | 完成 |
+| M2 | 页面生命周期与 PageContext | 完成 |
+| M3 | 资源快照与最小注入 | 完成 |
+| M4 | C++ 到 JavaScript 的 Host 通信 | 完成 |
+| M5 | 多 Mod 变更、依赖与冲突 | 完成 |
+| M6 | UI 挂载与页面显示 | 完成 |
+| M7 | 版本化变换与 Facet Provider | 基本完成；变换尚未开放为公共 API |
+| M8 | App、Web 与示例 Mod 对接 | 进行中：外部 Mod 示例与 ABI 已完成；App/Web 待推进 |
 
-完整的模块依赖、测试计划、里程碑门禁和风险见[模块依赖与开发计划](../Docs/DearOreUI-模块依赖与开发计划.md)。
+当前状态与剩余门禁见 [API 状态核对（2026-08-22）](../Docs/DearOreUI-API状态核对-2026-08-22.md) 和[进度总结与阶段 8 规划](../Docs/DearOreUI-当前进度总结与阶段8规划.md)。
 
 ## 文档
 
@@ -273,6 +300,11 @@ bin/
 - [渐进式 API 架构](../Docs/DearOreUI-渐进式API架构设计.md)
 - [运行时 Hook 注入设计](../Docs/方案A-运行时Hook注入-顶层设计.md)
 - [模块依赖与开发计划](../Docs/DearOreUI-模块依赖与开发计划.md)
+- [API 状态核对（2026-08-22）](../Docs/DearOreUI-API状态核对-2026-08-22.md)
+- [生产级 API 完整化](../Docs/DearOreUI-生产级API完整化-需求架构执行.md)
+- [外部 Mod API 示例与 ABI 契约](../Docs/DearOreUI-外部Mod-API示例与ABI契约.md)
+- [外部 Mod 最小连接验证](../Docs/DearOreUI-外部Mod最小连接验证-需求架构执行.md)
+- [进度总结与阶段 8 规划](../Docs/DearOreUI-当前进度总结与阶段8规划.md)
 - [开发索引](../Docs/development-index.md)
 - [OreUI Customizer 参考分析](../Docs/ore-ui-customizer/01-整体架构与应用通信.md)
 
@@ -287,7 +319,7 @@ bin/
 贡献前请阅读上方列出的开发和 API 文档。贡献应当：
 
 - 区分已验证事实、设计目标和未解决的运行时问题。
-- 在目标 Hook 和资源边界验证前，避免高风险 Bundle 变换。
+- 让运行时敏感的改动维持在既有验证记录之内。
 - 为运行时敏感的修改补充测试或目标客户端验证。
 - 修改 API、兼容性、诊断或开发契约时同步更新相关文档。
 - 不提交密钥、个人路径、构建缓存、游戏日志或玩家隐私数据。
