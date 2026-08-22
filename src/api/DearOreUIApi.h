@@ -34,6 +34,7 @@ public:
     [[nodiscard]] std::uint32_t       getProtocolVersion() const override;
     [[nodiscard]] bool                isReady() const override;
     [[nodiscard]] CompatibilityReport checkCompatibility(CompatibilityRequirement const& requirement) const override;
+    [[nodiscard]] Result<DiagnosticList> queryDiagnostics(DiagnosticQuery const& query) const override;
 
     [[nodiscard]] Result<RegistrationHandle>
     registerResource(ModId owner, ResourceManifest const& manifest, std::string payload) override;

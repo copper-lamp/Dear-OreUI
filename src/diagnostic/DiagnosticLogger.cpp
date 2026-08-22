@@ -46,6 +46,7 @@ void DiagnosticLogger::emit(const DiagnosticEvent& event) {
     {
         std::lock_guard lock(mMutex);
         sinks = mSinks;
+        mEvents.push_back(event);
     }
     for (auto const& sink : sinks) {
         if (sink) sink->consume(event);
@@ -66,6 +67,11 @@ void DiagnosticLogger::flush() {
 void DiagnosticLogger::clearSinks() {
     std::lock_guard lock(mMutex);
     mSinks.clear();
+}
+
+std::vector<DiagnosticEvent> DiagnosticLogger::snapshot() const {
+    std::lock_guard lock(mMutex);
+    return mEvents;
 }
 
 api::DiagnosticId DiagnosticLogger::nextId() { return api::DiagnosticId{mNextId.fetch_add(1)}; }

@@ -74,12 +74,14 @@ public:
     void emit(const DiagnosticEvent& event);
     void flush();
     void clearSinks();
+    [[nodiscard]] std::vector<DiagnosticEvent> snapshot() const;
 
     [[nodiscard]] api::DiagnosticId nextId();
 
 private:
-    std::mutex                                    mMutex;
+    mutable std::mutex                            mMutex;
     std::vector<std::shared_ptr<IDiagnosticSink>> mSinks;
+    std::vector<DiagnosticEvent>                  mEvents;
     std::atomic<std::uint64_t>                    mNextId{1};
 };
 

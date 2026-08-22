@@ -45,6 +45,23 @@ std::uint32_t DearOreUIApi::getProtocolVersion() const { return DearOreUIProtoco
 
 bool DearOreUIApi::isReady() const { return mReady.load(std::memory_order_relaxed); }
 
+Result<DiagnosticList> DearOreUIApi::queryDiagnostics(DiagnosticQuery const& query) const {
+    if (!query.requester.isValid() || !mRegistry.isModRegistered(query.requester)) return Error{ErrorCode::PermissionDenied, "requester mod is not registered"};
+    if (query.limit == 0 || query.limit > 1000) return Error{ErrorCode::InvalidArgument, "diagnostic limit is invalid"};
+    DiagnosticList result;
+    auto events = mLogger.snapshot();
+    for (auto const& event : events) {
+        if (query.context && (!event.contextId || *event.contextId != *query.context)) continue;
+        if (query.mod && (!event.modId || *event.modId != *query.mod)) continue;
+        if (query.since && event.timestamp < *query.since) continue;
+        if (event.modId && *event.modId != query.requester) continue;
+        if (result.items.size() >= query.limit) { result.truncated = true; break; }
+        DiagnosticInfo info{event.id, event.timestamp, static_cast<DiagnosticSeverity>(event.severity), event.category, event.event, event.contextId, event.modId, event.pageId, event.errorCode, event.message};
+        result.items.push_back(std::move(info));
+    }
+    return result;
+}
+
 CompatibilityReport DearOreUIApi::checkCompatibility(CompatibilityRequirement const& requirement) const {
     auto                info = getInfo();
     CompatibilityReport report;
