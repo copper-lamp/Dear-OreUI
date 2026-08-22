@@ -134,6 +134,7 @@ bool Runtime::enable() {
     mPageTransformer = std::make_unique<transform::PageTransformer>();
 
     mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(*mViewRegistry, ipc::defaultCoherentExecutor);
+    mApi->setEventBridge(mHostBridge.get());
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(*mHostMethodRegistry, *mPageManager, logger);
     // The HostDispatcher is shared by the native Facet JS->C++ bridge and the
     // optional loopback transport. The active page contract currently uses

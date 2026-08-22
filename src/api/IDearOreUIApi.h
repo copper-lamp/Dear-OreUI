@@ -2,6 +2,8 @@
 
 #include "api/IHostApi.h"
 #include "api/IDiagnosticApi.h"
+#include "api/IEventApi.h"
+#include "api/ITransformApi.h"
 #include "api/IModApi.h"
 #include "api/IPageApi.h"
 #include "api/IResourceApi.h"
@@ -15,6 +17,8 @@ class IDearOreUIApi
       public IResourceApi,
       public IHostApi,
       public IDiagnosticApi,
+      public IEventApi,
+      public ITransformApi,
       public IModApi,
       public IPageApi,
       public IUiApi {

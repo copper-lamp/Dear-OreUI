@@ -8,6 +8,7 @@
 #include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
 #include "resource/ResourceUri.h"
+#include "transform/ChangePlanner.h"
 
 #include <algorithm>
 #include <chrono>
@@ -93,6 +94,26 @@ CompatibilityReport DearOreUIApi::checkCompatibility(CompatibilityRequirement co
 
 void DearOreUIApi::setReady(bool ready) { mReady.store(ready, std::memory_order_relaxed); }
 
+void DearOreUIApi::setEventBridge(ipc::IHostBridge* bridge) { mEventBridge = bridge; }
+
+Result<EventPublishResult> DearOreUIApi::publishEvent(EventPublishOptions options) {
+    if (!options.owner.isValid() || !mRegistry.isModRegistered(options.owner)) return Error{ErrorCode::PermissionDenied, "event owner mod is not registered"};
+    if (!options.context.isValid() || !mPageManager || !mPageManager->find(options.context)) return Error{ErrorCode::InvalidContext, "event context not found"};
+    auto nameResult = validateEventName(options.name);
+    if (nameResult.isErr()) return nameResult.error();
+    auto payloadResult = validateJsonPayload(options.payload);
+    if (payloadResult.isErr()) return payloadResult.error();
+    if (options.payload.size() > 256 * 1024) return Error{ErrorCode::InvalidFormat, "event payload exceeds 256 KiB"};
+    if (!mEventBridge || !mEventBridge->isAvailable()) return Error{ErrorCode::InvalidState, "event bridge is unavailable"};
+    std::string safeName;
+    safeName.reserve(options.name.size() + 8);
+    for (char c : options.name) { if (c == '\\' || c == '"') safeName.push_back('\\'); safeName.push_back(c); }
+    std::string script = "try{window.__DearOreUI__.events.push(\"" + safeName + "\"," + options.payload + ");}catch(e){}";
+    auto sent = mEventBridge->sendScript(options.context, script);
+    if (sent.isErr()) return sent.error();
+    return EventPublishResult{options.payload.size(), false};
+}
+
 void DearOreUIApi::setPageManager(page::IPageContextManager* pageManager) { mPageManager = pageManager; }
 
 void DearOreUIApi::notifyPage(PageEvent event, PageContextView const& context) {
@@ -117,6 +138,36 @@ void DearOreUIApi::notifyPage(PageEvent event, PageContextView const& context) {
             mLogger.error("api", "page_callback_failed").withContext(context.id).emit();
         }
     }
+}
+
+Result<TransformReport> DearOreUIApi::previewTransform(TransformRequest request) const {
+    TransformReport report;
+    report.context = request.context;
+    report.scope = request.scope;
+    if (!request.owner.isValid() || !mRegistry.isModRegistered(request.owner)) return Error{ErrorCode::PermissionDenied, "transform owner mod is not registered"};
+    auto ownerRecord = mRegistry.findMod(request.owner);
+    if (!ownerRecord || std::find(ownerRecord->manifest.permissions.begin(), ownerRecord->manifest.permissions.end(), Permission::TransformResource) == ownerRecord->manifest.permissions.end()) return Error{ErrorCode::PermissionDenied, "transform.resource permission is required"};
+    auto context = (!mPageManager || !request.context.isValid()) ? std::optional<page::PageContext>{} : mPageManager->find(request.context);
+    if (!context) return Error{ErrorCode::InvalidContext, "transform context not found"};
+    if (request.scope != PageScope::Any && context->page.scope != request.scope) return Error{ErrorCode::InvalidArgument, "transform scope does not match context"};
+    if (request.targetFingerprint.empty()) report.errors.push_back(Error{ErrorCode::InvalidArgument, "target fingerprint is required"});
+    for (auto const& entry : mRegistry.listEntries()) {
+        TransformOperationInfo info;
+        bool include = false;
+        std::visit([&](auto const& item) {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (!std::is_same_v<T, registry::UiEntry>) {
+                if (item.owner != request.owner) return;
+                info.handle = item.handle; info.owner = item.owner; info.path = item.manifest.path; info.fingerprint = item.manifest.fingerprint;
+                include = !request.targetFingerprint.empty() && info.fingerprint == request.targetFingerprint;
+            }
+        }, entry);
+        if (!include) continue;
+        info.applicable = true; info.reason = "fingerprint matched"; report.operations.push_back(std::move(info)); ++report.applicable;
+    }
+    if (request.requireUniqueMatch && report.applicable != 1) { report.success = false; report.blocked = report.applicable; report.errors.push_back(Error{ErrorCode::ResourceConflict, "transform requires exactly one matching operation"}); }
+    else report.success = report.errors.empty();
+    return report;
 }
 
 Result<SubscriptionHandle>

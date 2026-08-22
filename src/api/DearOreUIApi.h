@@ -5,6 +5,7 @@
 #include "capability/ICapabilityQuery.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "ipc/HostMethodRegistry.h"
+#include "ipc/IHostBridge.h"
 #include "registry/IModRegistry.h"
 
 #include <atomic>
@@ -35,6 +36,9 @@ public:
     [[nodiscard]] bool                isReady() const override;
     [[nodiscard]] CompatibilityReport checkCompatibility(CompatibilityRequirement const& requirement) const override;
     [[nodiscard]] Result<DiagnosticList> queryDiagnostics(DiagnosticQuery const& query) const override;
+    [[nodiscard]] Result<EventPublishResult> publishEvent(EventPublishOptions options) override;
+    [[nodiscard]] Result<TransformReport> previewTransform(TransformRequest request) const override;
+    void setEventBridge(ipc::IHostBridge* bridge);
 
     [[nodiscard]] Result<RegistrationHandle>
     registerResource(ModId owner, ResourceManifest const& manifest, std::string payload) override;
@@ -100,6 +104,7 @@ private:
     capability::ICapabilityQuery& mCapabilities;
     diagnostic::DiagnosticLogger& mLogger;
     page::IPageContextManager*    mPageManager{nullptr};
+    ipc::IHostBridge*             mEventBridge{nullptr};
 
     mutable std::mutex mPageSubscriptionMutex;
     std::uint64_t      mNextSubscription{1};

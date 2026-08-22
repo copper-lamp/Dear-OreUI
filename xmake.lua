@@ -11,7 +11,7 @@ option_end()
 add_requires("levilamina 26.10.*", {configs = {target_type = get_config("target_type")}})
 
 -- Keep libcurl and its zlib dependency on the same static linkage path on Windows.
-add_requires("zlib 1.3.2", {configs = {shared = false}})
+add_requires("zlib 1.3.1", {configs = {shared = false}})
 add_requires("libcurl 8.21.0", {configs = {shared = false}})
 
 add_requires("levibuildscript")
