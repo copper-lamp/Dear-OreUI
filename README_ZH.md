@@ -20,6 +20,7 @@
     <a href="https://github.com/copper-lamp/Dear-OreUI/releases"><img src="https://img.shields.io/github/v/release/copper-lamp/Dear-OreUI?style=for-the-badge&amp;label=release" alt="DearOreUI 最新发行版本"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-CC0--1.0-2f6f9f?style=for-the-badge" alt="CC0-1.0 许可证"></a>
     <a href="https://github.com/copper-lamp/Dear-OreUI/issues"><img src="https://img.shields.io/github/issues/copper-lamp/Dear-OreUI?style=for-the-badge" alt="DearOreUI 未关闭 Issue"></a>
+    <a href="https://qm.qq.com/q/HvKKPKdSwi"><img src="https://img.shields.io/badge/QQ-%E5%8A%A0%E5%85%A5%E7%BE%A4%E8%81%8A-EA0000?style=for-the-badge&amp;logo=qq&amp;logoColor=white" alt="加入QQ群"></a>
   </p>
 </div>
 
