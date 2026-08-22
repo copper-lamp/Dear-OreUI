@@ -1,5 +1,6 @@
 #include "mod/MyMod.h"
 
+#include "bridge/BridgeInternal.h"
 #include "runtime/Runtime.h"
 
 #include "ll/api/mod/RegisterHelper.h"
@@ -69,22 +70,28 @@ bool DearOreUI::load() {
     getSelf().getLogger().info("DearOreUI data dir: {}", getSelf().getDataDir().string());
 
     runtime::RuntimeConfig config;
-    config.dataDirectory           = getSelf().getDataDir();
-    config.minecraftDirectory      = detectMinecraftDirectory();
-    config.enableDemoOverlay       = true; // Stage 7.1 real-client display verification.
-    config.enableComponentShowcase = true; // Stage 8.1 full component library showcase.
-    mRuntime                       = std::make_unique<runtime::Runtime>(std::move(config));
+    config.dataDirectory      = getSelf().getDataDir();
+    config.minecraftDirectory = detectMinecraftDirectory();
+    // Production release: demo overlay and component showcase are off by
+    // default. Enable them only for real-client verification via the
+    // stage8-switch.txt mechanism documented in the repo.
+    mRuntime = std::make_unique<runtime::Runtime>(std::move(config));
 
     return mRuntime->initialize();
 }
 
 bool DearOreUI::enable() {
     getSelf().getLogger().debug("Enabling...");
-    return mRuntime && mRuntime->enable();
+    bool result = mRuntime && mRuntime->enable();
+    if (result) {
+        bridge::setApi(mRuntime->api());
+    }
+    return result;
 }
 
 bool DearOreUI::disable() {
     getSelf().getLogger().debug("Disabling...");
+    bridge::clearApi();
     return mRuntime && mRuntime->disable();
 }
 

@@ -40,15 +40,19 @@ void recordStage5HostCall(
     api::ContextId   id,
     api::RequestId   requestId,
     std::string_view method,
-    std::string_view payload
+    std::string_view payload,
+    std::optional<api::ModId> owner
 ) {
-    globalLogger()
-        .info("stage5", "host_call")
-        .withContext(id)
-        .withField("request_id", std::to_string(requestId.value()))
-        .withField("method", std::string{method})
-        .withField("payload_length", std::to_string(payload.size()))
-        .emit();
+    auto&& builder = globalLogger()
+                         .info("stage5", "host_call")
+                         .withContext(id)
+                         .withField("request_id", std::to_string(requestId.value()))
+                         .withField("method", std::string{method})
+                         .withField("payload_length", std::to_string(payload.size()));
+    if (owner && owner->isValid()) {
+        builder.withMod(*owner);
+    }
+    builder.emit();
 }
 
 void recordStage5HostResponse(api::ContextId id, api::RequestId requestId, std::string_view method, bool hasError) {

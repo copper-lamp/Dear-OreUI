@@ -22,7 +22,14 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         return api::Error{api::ErrorCode::InvalidArgument, "only Request messages can be dispatched"};
     }
 
-    diagnostic::recordStage5HostCall(request.contextId, request.id, request.method, request.payload);
+    auto entry = mRegistry.findByName(request.method);
+    diagnostic::recordStage5HostCall(
+        request.contextId,
+        request.id,
+        request.method,
+        request.payload,
+        entry ? std::optional<api::ModId>{entry->owner} : std::nullopt
+    );
 
     {
         std::lock_guard lock(mMutex);
@@ -46,7 +53,6 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         return api::Error{api::ErrorCode::InvalidFormat, "host request payload exceeds safety limit"};
     }
 
-    auto entry = mRegistry.findByName(request.method);
     if (!entry) {
 
         diagnostic::recordStage5HostError(

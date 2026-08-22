@@ -1,7 +1,6 @@
 #pragma once
 
 #include "api/types/Error.h"
-#include "diagnostic/DiagnosticSeverity.h"
 #include "api/types/Id.h"
 
 #include <chrono>

@@ -3,6 +3,7 @@
 #include "api/types/Error.h"
 #include "api/types/Id.h"
 
+#include <optional>
 #include <string_view>
 
 namespace dearoreui::diagnostic {
@@ -20,7 +21,8 @@ void recordStage5HostCall(
     api::ContextId   id,
     api::RequestId   requestId,
     std::string_view method,
-    std::string_view payload
+    std::string_view payload,
+    std::optional<api::ModId> owner = std::nullopt
 );
 
 void recordStage5HostResponse(api::ContextId id, api::RequestId requestId, std::string_view method, bool hasError);

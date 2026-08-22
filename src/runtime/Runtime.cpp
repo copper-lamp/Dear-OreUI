@@ -51,9 +51,19 @@ bool Runtime::initialize() {
             if (line.rfind("disable_hooks=1", 0) == 0) {
                 mConfig.enableHooks = false;
             }
+            if (line.rfind("demo_overlay=1", 0) == 0) {
+                mConfig.enableDemoOverlay = true;
+            }
+            if (line.rfind("component_showcase=1", 0) == 0) {
+                mConfig.enableComponentShowcase = true;
+            }
         }
     }
-    logger.info("stage8", "switch_loaded").withField("disable_hooks", mConfig.enableHooks ? "0" : "1").emit();
+    logger.info("stage8", "switch_loaded")
+        .withField("disable_hooks", mConfig.enableHooks ? "0" : "1")
+        .withField("demo_overlay", mConfig.enableDemoOverlay ? "1" : "0")
+        .withField("component_showcase", mConfig.enableComponentShowcase ? "1" : "0")
+        .emit();
 
     if (mConfig.enableFileDiagnostics) {
         logger.addSink(

@@ -145,7 +145,21 @@ Result<EventPublishResult> DearOreUIApi::publishEvent(EventPublishOptions option
     for (char c : options.name) { if (c == '\\' || c == '"') safeName.push_back('\\'); safeName.push_back(c); }
     std::string script = "try{window.__DearOreUI__.events.push(\"" + safeName + "\"," + options.payload + ");}catch(e){}";
     auto sent = mEventBridge->sendScript(options.context, script);
-    if (sent.isErr()) return sent.error();
+    if (sent.isErr()) {
+        mLogger.warning("api", "event_publish_failed")
+            .withMod(options.owner)
+            .withContext(options.context)
+            .withField("name", options.name)
+            .withField("reason", sent.error().message)
+            .emit();
+        return sent.error();
+    }
+    mLogger.info("api", "event_published")
+        .withMod(options.owner)
+        .withContext(options.context)
+        .withField("name", options.name)
+        .withField("payload_bytes", std::to_string(options.payload.size()))
+        .emit();
     return EventPublishResult{options.payload.size(), false};
 }
 
