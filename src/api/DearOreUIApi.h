@@ -6,6 +6,7 @@
 #include "diagnostic/DiagnosticLogger.h"
 #include "ipc/HostMethodRegistry.h"
 #include "ipc/IHostBridge.h"
+#include "api/IHostMethod.h"
 #include "registry/IModRegistry.h"
 
 #include <atomic>
@@ -70,11 +71,11 @@ public:
     [[nodiscard]] Result<RegistrationHandle> registerHostMethod(
         ModId                             owner,
         PermissionSet const&              permissions,
-        std::shared_ptr<ipc::IHostMethod> method
+        std::shared_ptr<IHostMethod> method
     ) override;
 
     [[nodiscard]] Result<RegistrationHandle>
-    registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<ipc::IHostMethod> method) override;
+    registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<IHostMethod> method) override;
 
     [[nodiscard]] Result<void> unregisterHostMethod(RegistrationHandle handle) override;
 
@@ -91,7 +92,7 @@ public:
     registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) override;
 
     [[nodiscard]] Result<RegistrationHandle>
-    registerComponent(ModId owner, UiManifest const& manifest, component::ComponentSpec const& spec) override;
+    registerComponent(ModId owner, UiManifest const& manifest, ComponentSpec const& spec) override;
 
     [[nodiscard]] Result<void> unregisterUi(RegistrationHandle handle) override;
 

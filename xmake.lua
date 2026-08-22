@@ -89,3 +89,14 @@ target("DearOreUIUnitTests")
     add_files("src/ui/*.cpp")
     add_files("src/render/*.cpp")
     add_files("src/component/*.cpp")
+
+target("DearOreUIExternalModApiExample")
+    set_default(false)
+    set_kind("static")
+    set_languages("c++20")
+    if is_plat("windows") then
+        add_defines("NOMINMAX", "UNICODE", "_CRT_SECURE_NO_WARNINGS")
+        add_cxflags("/utf-8", "/W4", "/EHa")
+    end
+    add_includedirs("src")
+    add_files("examples/external_mod/ExternalModExample.cpp")

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "api/IHostMethod.h"
 #include "api/manifest/Permission.h"
 #include "api/types/HostMethodManifest.h"
 #include "api/types/Id.h"
 #include "api/types/Result.h"
-#include "ipc/IHostMethod.h"
 
 #include <memory>
 
@@ -15,10 +15,10 @@ public:
     virtual ~IHostApi() = default;
 
     [[nodiscard]] virtual Result<RegistrationHandle>
-    registerHostMethod(ModId owner, PermissionSet const& permissions, std::shared_ptr<ipc::IHostMethod> method) = 0;
+    registerHostMethod(ModId owner, PermissionSet const& permissions, std::shared_ptr<IHostMethod> method) = 0;
 
     [[nodiscard]] virtual Result<RegistrationHandle>
-    registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<ipc::IHostMethod> method) = 0;
+    registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<IHostMethod> method) = 0;
 
     [[nodiscard]] virtual Result<void> unregisterHostMethod(RegistrationHandle handle) = 0;
 };

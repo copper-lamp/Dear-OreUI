@@ -529,7 +529,7 @@ bool DearOreUIApi::isModEnabled(ModId id) const { return mRegistry.isModEnabled(
 Result<RegistrationHandle> DearOreUIApi::registerHostMethod(
     ModId                             owner,
     PermissionSet const&              permissions,
-    std::shared_ptr<ipc::IHostMethod> method
+    std::shared_ptr<IHostMethod> method
 ) {
     if (!owner.isValid()) {
         return Error{ErrorCode::InvalidArgument, "owner is invalid"};
@@ -557,7 +557,7 @@ Result<RegistrationHandle> DearOreUIApi::registerHostMethod(
 }
 
 Result<RegistrationHandle>
-DearOreUIApi::registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<ipc::IHostMethod> method) {
+DearOreUIApi::registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<IHostMethod> method) {
     if (!owner.isValid() || !mRegistry.isModRegistered(owner)) {
         return Error{ErrorCode::InvalidArgument, "owner mod is not registered"};
     }
@@ -672,7 +672,7 @@ Result<RegistrationHandle> DearOreUIApi::registerPage(ModId owner, UiManifest co
 }
 
 Result<RegistrationHandle>
-DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, component::ComponentSpec const& spec) {
+DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, ComponentSpec const& spec) {
     // Stage 8: render the declarative component into an htmlBody through the
     // component renderer, then reuse the standard overlay registration path.
     // The htmlBody is later parsed back into a DomNode forest by the universal

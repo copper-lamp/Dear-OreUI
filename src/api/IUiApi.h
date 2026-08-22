@@ -1,9 +1,9 @@
 #pragma once
 
 #include "api/manifest/UiManifest.h"
+#include "api/types/ComponentSpec.h"
 #include "api/types/Id.h"
 #include "api/types/Result.h"
-#include "component/ComponentSpec.h"
 
 #include <string>
 
@@ -29,7 +29,7 @@ public:
     // ComponentRenderer into an htmlBody and flows through the same
     // register/plan/mount/inject pipeline as raw htmlBody overlays.
     [[nodiscard]] virtual Result<RegistrationHandle>
-    registerComponent(ModId owner, UiManifest const& manifest, component::ComponentSpec const& spec) = 0;
+    registerComponent(ModId owner, UiManifest const& manifest, ComponentSpec const& spec) = 0;
 
     [[nodiscard]] virtual Result<void> unregisterUi(RegistrationHandle handle) = 0;
 };
