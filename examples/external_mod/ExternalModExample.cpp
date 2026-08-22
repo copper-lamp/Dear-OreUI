@@ -22,6 +22,7 @@ public:
 // supplies IDearOreUIApi obtained from Runtime::api() or its ABI adapter.
 api::Result<void> registerExternalMod(api::IDearOreUIApi& oreui) {
     api::ModManifest manifest;
+    // id == modNamespace (owner-namespace contract); dotted names are valid.
     manifest.id = api::ModId{"example.external_mod"};
     manifest.modNamespace = "example.external_mod";
     manifest.displayName = "External Mod Example";

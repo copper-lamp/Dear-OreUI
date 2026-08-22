@@ -12,7 +12,7 @@ bool allOf(std::string_view text, bool (*predicate)(char)) {
     return std::all_of(text.begin(), text.end(), [predicate](char c) { return predicate(c); });
 }
 
-bool isIdChar(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
+bool isIdChar(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '-' || c == '_'; }
 
 bool isNamespaceChar(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '-' || c == '_'; }
 
@@ -20,11 +20,23 @@ bool isPathControlChar(char c) { return c == '\\' || c == ':'; }
 
 } // namespace
 
+// ModId is the same string as the mod namespace (owner == modNamespace across
+// every registration), so the id charset follows the namespace rules: dotted
+// names are allowed but must not start/end with '.' or contain '..'.
 bool ManifestValidator::isValidId(std::string_view id) {
     if (id.empty() || id.size() > 64) {
         return false;
     }
-    return allOf(id, isIdChar);
+    if (!allOf(id, isIdChar)) {
+        return false;
+    }
+    if (id.front() == '.' || id.back() == '.') {
+        return false;
+    }
+    if (id.find("..") != std::string_view::npos) {
+        return false;
+    }
+    return true;
 }
 
 bool ManifestValidator::isValidNamespace(std::string_view ns) {
