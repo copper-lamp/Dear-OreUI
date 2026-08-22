@@ -172,7 +172,14 @@ void DearOreUIApi::notifyPage(PageEvent event, PageContextView const& context) {
         for (auto const& [handle, subscription] : mPageSubscriptions) {
             static_cast<void>(handle);
             if (subscription.event != event) continue;
+            // Scope match: a subscription with an empty scope list or with
+            // PageScope::Any listens to every page. (Any must be treated as a
+            // wildcard: Any == 0 while concrete scopes like MainMenu == 1, so
+            // a plain equality check silently skips Any subscriptions — this
+            // was observed on the real client: Ready/Destroyed never fired.)
             if (!subscription.scopes.empty()
+                && std::find(subscription.scopes.begin(), subscription.scopes.end(), PageScope::Any)
+                       == subscription.scopes.end()
                 && std::find(subscription.scopes.begin(), subscription.scopes.end(), context.page.scope)
                        == subscription.scopes.end()) {
                 continue;
@@ -246,6 +253,47 @@ Result<void> DearOreUIApi::unsubscribePage(SubscriptionHandle handle) {
     // explicit Mod shutdown without turning a successful cleanup into an error.
     mPageSubscriptions.erase(handle);
     return Result<void>::success();
+}
+
+Result<SubscriptionHandle> DearOreUIApi::subscribeFrame(FrameSubscriptionOptions options, FrameCallback callback) {
+    if (!options.owner.isValid() || !mRegistry.isModRegistered(options.owner)) {
+        return Error{ErrorCode::InvalidArgument, "frame subscription owner mod is not registered"};
+    }
+    if (!callback) {
+        return Error{ErrorCode::InvalidArgument, "frame callback is empty"};
+    }
+    auto handle = SubscriptionHandle{mNextSubscription++};
+    {
+        std::lock_guard lock(mFrameMutex);
+        mFrameSubscriptions.emplace(handle, FrameSubscription{options.owner, std::move(callback)});
+    }
+    return handle;
+}
+
+Result<void> DearOreUIApi::unsubscribeFrame(SubscriptionHandle handle) {
+    std::lock_guard lock(mFrameMutex);
+    mFrameSubscriptions.erase(handle);
+    return Result<void>::success();
+}
+
+void DearOreUIApi::frameTick() {
+    std::vector<FrameCallback> callbacks;
+    {
+        std::lock_guard lock(mFrameMutex);
+        callbacks.reserve(mFrameSubscriptions.size());
+        for (auto const& [handle, subscription] : mFrameSubscriptions) {
+            static_cast<void>(handle);
+            callbacks.push_back(subscription.callback);
+        }
+    }
+    for (auto const& callback : callbacks) {
+        try {
+            callback();
+        } catch (...) {
+            // A misbehaving frame callback must never take the client loop
+            // down; the subscription stays registered.
+        }
+    }
 }
 
 Result<PageContextView> DearOreUIApi::getPageContext(ContextId id) const {

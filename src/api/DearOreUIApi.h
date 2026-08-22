@@ -68,6 +68,12 @@ public:
 
     [[nodiscard]] Result<PageContextView> getPageContext(ContextId id) const override;
 
+    [[nodiscard]] Result<SubscriptionHandle>
+    subscribeFrame(FrameSubscriptionOptions options, FrameCallback callback) override;
+
+    [[nodiscard]] Result<void> unsubscribeFrame(SubscriptionHandle handle) override;
+    void                       frameTick() override;
+
     [[nodiscard]] Result<RegistrationHandle> registerHostMethod(
         ModId                             owner,
         PermissionSet const&              permissions,
@@ -123,6 +129,14 @@ private:
         PageCallback           callback;
     };
     std::unordered_map<SubscriptionHandle, PageSubscription> mPageSubscriptions;
+
+    // Frame service (ClientInstance::update hook drives frameTick).
+    mutable std::mutex mFrameMutex;
+    struct FrameSubscription {
+        ModId         owner;
+        FrameCallback callback;
+    };
+    std::unordered_map<SubscriptionHandle, FrameSubscription> mFrameSubscriptions;
     std::atomic<bool>                                        mReady{false};
 };
 

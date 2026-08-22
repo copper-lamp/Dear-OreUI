@@ -26,11 +26,13 @@ private:
     [[nodiscard]] std::string generateUiBootstrapScript(api::ContextId id, ui::UiMountItem const& item) const;
     // Body-only follow-up for UIs after the first: reuses the machinery already
     // injected by the bootstrap script so each additional UI stays small.
-    // `bodyOverride` (optional) replaces the spec's body for chunked injection.
+    // `bodyOverride` (optional) replaces the spec's body for chunked injection;
+    // `pageScripts` (optional) runs after the container mounts.
     [[nodiscard]] std::string generateUiBodyScript(
         api::ContextId                      id,
         ui::UiMountItem const&              item,
-        std::vector<render::DomNode> const* bodyOverride = nullptr
+        std::vector<render::DomNode> const* bodyOverride = nullptr,
+        std::string const&                  pageScripts  = {}
     ) const;
     // Append-only script for chunked UIs: appends a node forest into an
     // already-mounted container (target captured by mount as

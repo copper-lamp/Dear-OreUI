@@ -250,6 +250,12 @@ LL_TYPE_INSTANCE_HOOK(
         "hook",
         "event=clientupdate_entered\tinit=" + std::string(isInitFinished ? "true" : "false")
     );
+    // Frame service: drive UI periodic pushes from the client main loop (the
+    // only reliable cadence on this client — world tick emitters are not
+    // ready during enable and the coroutine executor does not run).
+    if (auto& adapterState = state(); adapterState.callback != nullptr) {
+        adapterState.callback->onClientFrame();
+    }
     auto result = origin(isInitFinished);
     // Stage 1 navigation PoC is disabled in stage 3.
     // if (isInitFinished) poc::consumeStage1Navigation();
@@ -602,6 +608,13 @@ void destroyAllContexts() {
     std::vector<api::ContextId> contexts;
     {
         std::lock_guard lock{adapterState.mutex};
+        // Defensive bound: a corrupted routerContexts (heap damage elsewhere)
+        // must not turn into a giant reserve() that crashes on first push.
+        // 4096 contexts is far beyond anything a normal session produces.
+        if (adapterState.routerContexts.size() > 4096) {
+            adapterState.routerContexts.clear();
+            return;
+        }
         contexts.reserve(adapterState.routerContexts.size());
         for (auto const& [router, contextId] : adapterState.routerContexts) {
             static_cast<void>(router);
@@ -632,7 +645,14 @@ OreUIHookAdapter::OreUIHookAdapter(
   mDataDirectory(std::move(dataDirectory)),
   mProbe(logger) {}
 
-OreUIHookAdapter::~OreUIHookAdapter() { static_cast<void>(uninstall()); }
+OreUIHookAdapter::~OreUIHookAdapter() {
+    // Deliberately empty. All hook and page-state cleanup happens in
+    // disable()/uninstall(). This destructor can run during DLL_PROCESS_DETACH
+    // (observed real-client crash: process exit -> ~Runtime ->
+    // ~OreUIHookAdapter -> uninstall -> destroyAllContexts crashed in
+    // std::vector::push_back because static AdapterState was already torn
+    // down), so it must not touch any global state.
+}
 
 void OreUIHookAdapter::setOnFacetRegistryCreated(std::function<void(void*)> callback) {
     std::lock_guard lock{state().mutex};

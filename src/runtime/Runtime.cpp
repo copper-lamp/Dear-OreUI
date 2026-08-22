@@ -490,6 +490,20 @@ capability::ICapabilityQuery& Runtime::capabilities() { return mCapabilities; }
 
 api::IDearOreUIApi* Runtime::api() { return mApi.get(); }
 
+// Frame service entry: called by the OreUIHookAdapter from the
+// ClientInstance::update hook (client main loop, game thread). Drives frame
+// subscribers only while the runtime is enabled and at least one page context
+// exists, so periodic C++->JS pushes stay tied to a live page.
+void Runtime::onClientFrame() {
+    if (!mEnabled || mApi == nullptr || mPageManager == nullptr) {
+        return;
+    }
+    if (mPageManager->activeContexts().empty()) {
+        return;
+    }
+    mApi->frameTick();
+}
+
 page::IPageContextManager* Runtime::pageManager() { return mPageManager.get(); }
 
 ipc::HostDispatcher* Runtime::hostDispatcher() { return mHostDispatcher.get(); }

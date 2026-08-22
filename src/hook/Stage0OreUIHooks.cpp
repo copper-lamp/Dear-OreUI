@@ -18,6 +18,7 @@ struct NullPageHookCallback : IPageHookCallback {
     }
 
     void onPageDestroyed(api::ContextId) override {}
+    void onClientFrame() override {}
 };
 
 OreUIHookAdapter& sharedAdapter() {

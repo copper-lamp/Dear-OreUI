@@ -3,6 +3,7 @@
 #include "api/IHostApi.h"
 #include "api/IDiagnosticApi.h"
 #include "api/IEventApi.h"
+#include "api/IFrameApi.h"
 #include "api/ITransformApi.h"
 #include "api/IRuntimeReportApi.h"
 #include "api/IModApi.h"
@@ -19,6 +20,7 @@ class IDearOreUIApi
       public IHostApi,
       public IDiagnosticApi,
       public IEventApi,
+      public IFrameApi,
       public ITransformApi,
       public IRuntimeReportApi,
       public IModApi,

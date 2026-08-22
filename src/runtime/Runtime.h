@@ -46,6 +46,7 @@ private:
     [[nodiscard]] api::ContextId
          onPageCreated(std::string_view url, std::optional<api::RouterLocationSnapshot> location) override;
     void onPageDestroyed(api::ContextId id) override;
+    void onClientFrame() override;
 
     void runStage4Injection(api::ContextId id, api::PageInfo const& info);
 

@@ -315,6 +315,26 @@ chunkUiBody(std::vector<render::DomNode> const& body, std::size_t maxChunkNodes)
     return chunks;
 }
 
+// Collects page <script> node text (depth-first, any depth) and REMOVES the
+// nodes from the forest: page scripts never become DOM <script> elements
+// (the engine does not execute them) and never run inside the builder. The
+// text is executed through the native ExecuteScript channel after the UI's
+// container is mounted (see generateUiBodyScript), the same verified channel
+// the bootstrap machinery uses.
+std::string extractScriptNodes(std::vector<render::DomNode>& nodes) {
+    std::string out;
+    for (auto it = nodes.begin(); it != nodes.end();) {
+        if (it->tag == "script") {
+            out += it->text;
+            it = nodes.erase(it);
+        } else {
+            out += extractScriptNodes(it->children);
+            ++it;
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::UiMountPlan const& plan) {
@@ -375,8 +395,11 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
         if (item.decision != ui::UiMountDecision::Mount) {
             continue;
         }
-        auto body   = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
-        auto chunks = chunkUiBody(body, 4);
+        auto body = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
+        // Page scripts are pulled out of the mounted DOM and re-attached to
+        // the first (mount) chunk, which runs them after the container exists.
+        std::string pageScripts = extractScriptNodes(body);
+        auto        chunks      = chunkUiBody(body, 4);
         for (std::size_t chunkIndex = 0; chunkIndex < chunks.size(); ++chunkIndex) {
             std::string script;
             if (chunkIndex == 0) {
@@ -389,7 +412,7 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
                 } else {
                     mountBody = chunks[0];
                 }
-                script = generateUiBodyScript(id, item, &mountBody);
+                script = generateUiBodyScript(id, item, &mountBody, pageScripts);
             } else {
                 // Later chunks: append the remaining children into the root.
                 script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex]);
@@ -449,6 +472,11 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        var last = null;\n";
     stream << "        for (var i = 0; i < nodes.length; i++) {\n";
     stream << "            var n = nodes[i];\n";
+    // script nodes never become DOM elements nor run here: their text is
+    // extracted by the C++ injector and executed through the native
+    // ExecuteScript channel after mount (generateUiBodyScript). Running them
+    // inside the builder (eval) crashed the verified engine build.
+    stream << "            if (n.t && n.t.toLowerCase() === 'script') { continue; }\n";
     stream << "            var el = document.createElement(n.t || 'div');\n";
     stream << "            if (n.s) {\n";
     stream << "                try { el.style.cssText = n.s; } catch (e) { window.__DearOreUI__.ui.dbg('style_err:' + "
@@ -686,10 +714,13 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
 // so each additional UI stays small — cohtml ExecuteScript silently drops
 // large scripts, so the machinery must not be duplicated per UI.
 // `bodyOverride` (optional) replaces the spec's body for chunked injection.
+// `pageScripts` (optional) is the UI's <script> node text, executed through
+// this same ExecuteScript channel once the container is mounted.
 std::string RuntimeInjector::generateUiBodyScript(
     api::ContextId                      id,
     ui::UiMountItem const&              item,
-    std::vector<render::DomNode> const* bodyOverride
+    std::vector<render::DomNode> const* bodyOverride,
+    std::string const&                  pageScripts
 ) const {
     static_cast<void>(id);
     std::ostringstream stream;
@@ -703,7 +734,23 @@ std::string RuntimeInjector::generateUiBodyScript(
     stream << "    function dearOreUiBodyMount() {\n";
     stream << "        if (!document.body) return false;\n";
     stream << "        try { ui.mount(spec); } catch (e) { return false; }\n";
-    stream << "        return !!document.getElementById(spec.containerId);\n";
+    stream << "        var container = document.getElementById(spec.containerId);\n";
+    stream << "        if (!container) return false;\n";
+    // Page scripts run once per container, right after mount. Their text was
+    // extracted by the C++ injector; running it here keeps it on the native
+    // ExecuteScript channel (same one the bootstrap uses), avoids the DOM
+    // <script> elements the engine ignores, and the crash from eval.
+    if (!pageScripts.empty()) {
+        stream << "        if (!container.__dearOreUiPageScriptsRun) {\n";
+        stream << "            container.__dearOreUiPageScriptsRun = true;\n";
+        stream << "            try {\n";
+        stream << pageScripts;
+        stream << "\n            } catch (e) {\n";
+        stream << "                try { ui.report('page_script_err:' + (e && e.message)); } catch (e2) {}\n";
+        stream << "            }\n";
+        stream << "        }\n";
+    }
+    stream << "        return true;\n";
     stream << "    }\n";
     stream << "    if (!dearOreUiBodyMount()) {\n";
     stream << "        var iv = setInterval(function() {\n";
