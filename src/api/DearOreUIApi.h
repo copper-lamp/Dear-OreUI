@@ -38,6 +38,7 @@ public:
     [[nodiscard]] Result<DiagnosticList> queryDiagnostics(DiagnosticQuery const& query) const override;
     [[nodiscard]] Result<EventPublishResult> publishEvent(EventPublishOptions options) override;
     [[nodiscard]] Result<TransformReport> previewTransform(TransformRequest request) const override;
+    [[nodiscard]] Result<RuntimeReports> queryRuntimeReports(RuntimeReportQuery query) const override;
     void setEventBridge(ipc::IHostBridge* bridge);
 
     [[nodiscard]] Result<RegistrationHandle>
@@ -97,6 +98,9 @@ public:
     void setReady(bool ready);
     void setPageManager(page::IPageContextManager* pageManager);
     void notifyPage(PageEvent event, PageContextView const& context);
+    void recordInjectionReport(InjectionReportView report);
+    void recordHostCallReport(HostCallReportView report);
+    void recordTransformReport(TransformReport report);
 
 private:
     registry::IModRegistry&       mRegistry;
@@ -105,6 +109,8 @@ private:
     diagnostic::DiagnosticLogger& mLogger;
     page::IPageContextManager*    mPageManager{nullptr};
     ipc::IHostBridge*             mEventBridge{nullptr};
+    mutable std::mutex             mReportMutex;
+    std::unordered_map<ContextId, RuntimeReports> mRuntimeReports;
 
     mutable std::mutex mPageSubscriptionMutex;
     std::uint64_t      mNextSubscription{1};

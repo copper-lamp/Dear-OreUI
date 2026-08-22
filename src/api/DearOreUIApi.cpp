@@ -92,7 +92,37 @@ CompatibilityReport DearOreUIApi::checkCompatibility(CompatibilityRequirement co
     return report;
 }
 
+Result<RuntimeReports> DearOreUIApi::queryRuntimeReports(RuntimeReportQuery query) const {
+    if (!query.requester.isValid() || !mRegistry.isModRegistered(query.requester)) return Error{ErrorCode::PermissionDenied, "report requester mod is not registered"};
+    if (!query.context.isValid() || !mPageManager || !mPageManager->find(query.context)) return Error{ErrorCode::InvalidContext, "report context not found"};
+    std::lock_guard lock(mReportMutex);
+    auto found = mRuntimeReports.find(query.context);
+    if (found == mRuntimeReports.end()) return RuntimeReports{};
+    auto result = found->second;
+    for (auto& call : result.hostCalls) {
+        if (call.method.find(query.requester.value()) != 0) return Error{ErrorCode::PermissionDenied, "report contains another owner method"};
+    }
+    return result;
+}
+
 void DearOreUIApi::setReady(bool ready) { mReady.store(ready, std::memory_order_relaxed); }
+
+void DearOreUIApi::recordInjectionReport(InjectionReportView report) {
+    std::lock_guard lock(mReportMutex);
+    mRuntimeReports[report.context].injection = std::move(report);
+}
+
+void DearOreUIApi::recordHostCallReport(HostCallReportView report) {
+    std::lock_guard lock(mReportMutex);
+    auto& calls = mRuntimeReports[report.context].hostCalls;
+    calls.push_back(std::move(report));
+    if (calls.size() > 128) calls.erase(calls.begin(), calls.begin() + static_cast<std::ptrdiff_t>(calls.size() - 128));
+}
+
+void DearOreUIApi::recordTransformReport(TransformReport report) {
+    std::lock_guard lock(mReportMutex);
+    mRuntimeReports[report.context].transform = std::move(report);
+}
 
 void DearOreUIApi::setEventBridge(ipc::IHostBridge* bridge) { mEventBridge = bridge; }
 
@@ -159,7 +189,9 @@ Result<TransformReport> DearOreUIApi::previewTransform(TransformRequest request)
             if constexpr (!std::is_same_v<T, registry::UiEntry>) {
                 if (item.owner != request.owner) return;
                 info.handle = item.handle; info.owner = item.owner; info.path = item.manifest.path; info.fingerprint = item.manifest.fingerprint;
-                include = !request.targetFingerprint.empty() && info.fingerprint == request.targetFingerprint;
+                auto const& scopes = item.manifest.pageScopes;
+                bool scopeMatches = scopes.empty() || request.scope == PageScope::Any || std::find(scopes.begin(), scopes.end(), PageScope::Any) != scopes.end() || std::find(scopes.begin(), scopes.end(), request.scope) != scopes.end();
+                include = scopeMatches && !request.targetFingerprint.empty() && info.fingerprint == request.targetFingerprint;
             }
         }, entry);
         if (!include) continue;

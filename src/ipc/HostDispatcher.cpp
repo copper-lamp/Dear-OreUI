@@ -72,6 +72,7 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
     auto start   = std::chrono::steady_clock::now();
     auto result  = entry->method->execute(request.contextId, request.payload);
     auto elapsed = std::chrono::steady_clock::now() - start;
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
 
     {
         std::lock_guard lock(mMutex);
@@ -98,6 +99,8 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
     response.id        = request.id;
     response.contextId = request.contextId;
 
+    if (mReportCallback) mReportCallback(request.contextId, request.id, request.method, elapsedMs, request.payload.size(), result.isOk() ? result.value().size() : 0, result.isErr() ? result.error().code : api::ErrorCode::None);
+
     if (result.isErr()) {
         response.error   = result.error().code;
         response.payload = result.error().message;
@@ -123,6 +126,8 @@ void HostDispatcher::cancel(api::RequestId id) {
     std::lock_guard lock(mMutex);
     mCancelled.insert(id);
 }
+
+void HostDispatcher::setReportCallback(ReportCallback callback) { mReportCallback = std::move(callback); }
 
 void HostDispatcher::invalidateContext(api::ContextId id) {
     std::lock_guard lock(mMutex);

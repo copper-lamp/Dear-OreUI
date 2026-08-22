@@ -8,6 +8,7 @@
 #include "page/IPageContextManager.h"
 
 #include <chrono>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -25,6 +26,8 @@ public:
 
     void cancel(api::RequestId id);
     void invalidateContext(api::ContextId id);
+    using ReportCallback = std::function<void(api::ContextId, api::RequestId, std::string_view, std::chrono::milliseconds, std::size_t, std::size_t, api::ErrorCode)>;
+    void setReportCallback(ReportCallback callback);
 
 private:
     HostMethodRegistry&           mRegistry;
@@ -34,6 +37,7 @@ private:
     std::mutex                         mMutex;
     std::unordered_set<api::RequestId> mCancelled;
     std::unordered_set<api::ContextId> mInvalidated;
+    ReportCallback mReportCallback;
 };
 
 } // namespace dearoreui::ipc

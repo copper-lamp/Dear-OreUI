@@ -136,6 +136,9 @@ bool Runtime::enable() {
     mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(*mViewRegistry, ipc::defaultCoherentExecutor);
     mApi->setEventBridge(mHostBridge.get());
     mHostDispatcher = std::make_unique<ipc::HostDispatcher>(*mHostMethodRegistry, *mPageManager, logger);
+    mHostDispatcher->setReportCallback([this](api::ContextId context, api::RequestId request, std::string_view method, std::chrono::milliseconds elapsed, std::size_t requestBytes, std::size_t responseBytes, api::ErrorCode result) {
+        if (mApi != nullptr) mApi->recordHostCallReport(api::HostCallReportView{context, request, std::string{method}, elapsed, requestBytes, responseBytes, result});
+    });
     // The HostDispatcher is shared by the native Facet JS->C++ bridge and the
     // optional loopback transport. The active page contract currently uses
     // the game's native facet:request protocol; dynamic BindCall/
