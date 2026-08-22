@@ -16,6 +16,7 @@ public:
     inject(api::ContextId id, resource::IResourceIndex const& index) override;
 
     [[nodiscard]] api::Result<InjectionReport> injectUi(api::ContextId id, ui::UiMountPlan const& plan) override;
+    [[nodiscard]] std::string generateRuntimeScriptForTest(api::ContextId id, resource::IResourceIndex const& index) const;
 
 private:
     [[nodiscard]] std::string generateRuntimeScript(api::ContextId id, resource::IResourceIndex const& index) const;

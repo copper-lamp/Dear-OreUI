@@ -53,6 +53,7 @@ Result<DiagnosticList> DearOreUIApi::queryDiagnostics(DiagnosticQuery const& que
     for (auto const& event : events) {
         if (query.context && (!event.contextId || *event.contextId != *query.context)) continue;
         if (query.mod && (!event.modId || *event.modId != *query.mod)) continue;
+        if (query.minimumSeverity && static_cast<int>(event.severity) < static_cast<int>(*query.minimumSeverity)) continue;
         if (query.since && event.timestamp < *query.since) continue;
         if (event.modId && *event.modId != query.requester) continue;
         if (result.items.size() >= query.limit) { result.truncated = true; break; }

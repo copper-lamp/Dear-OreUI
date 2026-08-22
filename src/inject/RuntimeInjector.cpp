@@ -44,6 +44,10 @@ RuntimeInjector::RuntimeInjector(diagnostic::DiagnosticLogger& logger, ipc::IHos
 : mLogger(logger),
   mBridge(bridge) {}
 
+std::string RuntimeInjector::generateRuntimeScriptForTest(api::ContextId id, resource::IResourceIndex const& index) const {
+    return generateRuntimeScript(id, index);
+}
+
 api::Result<InjectionReport> RuntimeInjector::inject(api::ContextId id, resource::IResourceIndex const& index) {
     InjectionReport report;
     report.contextId = id;
@@ -141,12 +145,16 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "            return true;\n";
     stream << "        } catch (e) { return false; }\n";
     stream << "    }\n";
+    stream << "    window.__DearOreUI__.dispatchUsed = false;\n";
+    stream << "    window.__DearOreUI__.events = window.__DearOreUI__.events || (function(){ var listeners = {}; return { on:function(name, cb){ if(typeof cb !== 'function') return false; (listeners[name] = listeners[name] || []).push(cb); return true; }, off:function(name, cb){ var list=listeners[name]||[]; listeners[name]=list.filter(function(x){return x!==cb;}); }, push:function(name, payload){ (listeners[name]||[]).slice().forEach(function(cb){ try{cb(payload);}catch(e){} }); } }; })();\n";
     stream << "    window.__DearOreUI__.ipc = {\n";
     stream << "        isAvailable: function() { return hasFacet; },\n";
     stream << "        callHost: function(method, args) {\n";
     stream << "            return new Promise(function(resolve, reject) {\n";
     stream << "                try {\n";
+    stream << "                    if (window.__DearOreUI__.dispatchUsed) throw new Error('ViewDispatchAlreadyUsed');\n";
     stream << "                    if (!hasFacet) throw new Error('HostBridgeUnavailable');\n";
+    stream << "                    window.__DearOreUI__.dispatchUsed = true;\n";
     stream << "                    var id = (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId "
               "|| 0) + 1);\n";
     stream << "                    var request = {\n";
@@ -176,8 +184,14 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "        },\n";
     stream << "        send: function(msg) { return this.report(msg); }\n";
     stream << "    };\n";
+    stream << "    window.oreui = window.oreui || {};\n";
+    stream << "    window.oreui.runtime = { protocolVersion: function(){ return window.__DearOreUI__.protocolVersion; }, contextId: function(){ return Number(window.__DearOreUI__.contextId || 0); }, isReady: function(){ return !!window.__DearOreUI__.ipc.isAvailable(); } };\n";
+    stream << "    window.oreui.page = { contextId: function(){ return Number(window.__DearOreUI__.contextId || 0); } };\n";
+    stream << "    window.oreui.host = { isAvailable: function(){ return window.__DearOreUI__.ipc.isAvailable(); }, call: function(method, args){ return window.__DearOreUI__.ipc.callHost(method, args); } };\n";
+    stream << "    window.oreui.event = { on: function(name, cb){ return window.__DearOreUI__.events.on(name, cb); }, off: function(name, cb){ return window.__DearOreUI__.events.off(name, cb); } };\n";
+    stream << "    window.oreui.diagnostic = { report: function(msg){ return window.__DearOreUI__.ipc.report(msg); } };\n";
     stream << "    window.DearOreUI = window.DearOreUI || {\n";
-    stream << "        call: function(method, args) { return window.__DearOreUI__.ipc.callHost(method, args); },\n";
+    stream << "        call: function(method, args) { return window.oreui.host.call(method, args); },\n";
     stream << "        report: function(msg) { return window.__DearOreUI__.ipc.report(msg); }\n";
     stream << "    };\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";

@@ -32,27 +32,17 @@ jobs:
         with:
           path: |
             ~/AppData/Local/.xmake
-          key: xmake-${{ hashFiles('xmake.lua') }}-v5
+          key: xmake-${{ hashFiles('xmake.lua') }}-v6
           restore-keys: |
             xmake-
 
-      - name: Reset cached zlib and libcurl packages
+      - name: Reset cached xmake packages
         shell: pwsh
         run: |
           $xmakeRoot = Join-Path $env:LOCALAPPDATA '.xmake'
-          $packagePaths = @(
-            (Join-Path $xmakeRoot 'packages/z/zlib'),
-            (Join-Path $xmakeRoot 'packages/l/libcurl')
-          )
-          foreach ($path in $packagePaths) {
+          foreach ($relativePath in @('packages', 'cache/packages')) {
+            $path = Join-Path $xmakeRoot $relativePath
             if (Test-Path $path) { Remove-Item $path -Recurse -Force }
-          }
-          $buildCache = Join-Path $xmakeRoot 'cache/packages'
-          if (Test-Path $buildCache) {
-            Get-ChildItem $buildCache -Directory -Recurse -Force |
-              Where-Object { $_.Name -in @('zlib', 'libcurl') } |
-              Sort-Object FullName -Descending |
-              ForEach-Object { Remove-Item $_.FullName -Recurse -Force }
           }
 
       - run: |

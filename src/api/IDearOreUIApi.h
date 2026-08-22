@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "api/IHostApi.h"
 #include "api/IDiagnosticApi.h"
@@ -10,12 +10,14 @@
 
 namespace dearoreui::api {
 
-class IDearOreUIApi : public IRuntimeApi,
-                      public IResourceApi,
-                      public IHostApi,                       public IDiagnosticApi,
-                       public IModApi,
-                      public IPageApi,
-                      public IUiApi {
+class IDearOreUIApi
+    : public IRuntimeApi,
+      public IResourceApi,
+      public IHostApi,
+      public IDiagnosticApi,
+      public IModApi,
+      public IPageApi,
+      public IUiApi {
 public:
     ~IDearOreUIApi() override = default;
 };

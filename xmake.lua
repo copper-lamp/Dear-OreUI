@@ -11,8 +11,8 @@ option_end()
 add_requires("levilamina 26.10.*", {configs = {target_type = get_config("target_type")}})
 
 -- Keep libcurl and its zlib dependency on the same static linkage path on Windows.
-add_requires("zlib", {configs = {shared = false}})
-add_requires("libcurl", {configs = {shared = false}})
+add_requires("zlib 1.3.2", {configs = {shared = false}})
+add_requires("libcurl 8.21.0", {configs = {shared = false}})
 
 add_requires("levibuildscript")
 
@@ -27,7 +27,7 @@ target("DearOreUI")
         add_defines("NOMINMAX", "UNICODE", "_CRT_SECURE_NO_WARNINGS")
         set_exceptions("none")
         add_cxflags( "/EHa", "/utf-8", "/W4", "/w44265", "/w44289", "/w44296", "/w45263", "/w44738", "/w45204")
-        add_syslinks("ws2_32") -- LoopbackWsServer (Stage 8 WebSocket loopback)
+        -- Native Facet/ExecuteScript transport requires no loopback socket.
     end
     add_packages("levilamina", "libcurl", "zlib")
     set_kind("shared")
@@ -45,7 +45,7 @@ target("DearOreUIUnitTests")
         add_defines("NOMINMAX", "UNICODE", "_CRT_SECURE_NO_WARNINGS")
         set_exceptions("none")
         add_cxflags("/EHa", "/utf-8", "/W4", "/w44265", "/w44289", "/w44296", "/w45263", "/w44738", "/w45204")
-        add_syslinks("ws2_32") -- LoopbackWsServer (Stage 8 WebSocket loopback)
+        -- Native Facet/ExecuteScript transport requires no loopback socket.
     end
     add_packages("levilamina", "libcurl", "zlib")
     add_includedirs("src")
