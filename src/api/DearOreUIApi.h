@@ -45,6 +45,8 @@ public:
     registerStyleSheet(ModId owner, StyleSheetManifest const& manifest, std::string source) override;
 
     [[nodiscard]] Result<void> unregister(RegistrationHandle handle) override;
+    [[nodiscard]] Result<ResourceInfo> describeResource(ModId requester, std::string_view uri) const override;
+    [[nodiscard]] Result<ResourceBytes> readResource(ModId requester, std::string_view uri, ResourceReadOptions options) const override;
 
     [[nodiscard]] Result<ModId> registerMod(ModManifest const& manifest) override;
     [[nodiscard]] Result<void>  unregisterMod(ModId id) override;

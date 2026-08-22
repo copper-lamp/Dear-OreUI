@@ -10,6 +10,10 @@ option_end()
 
 add_requires("levilamina 26.10.*", {configs = {target_type = get_config("target_type")}})
 
+-- Keep libcurl and its zlib dependency on the same static linkage path on Windows.
+add_requires("zlib", {configs = {shared = false}})
+add_requires("libcurl", {configs = {shared = false}})
+
 add_requires("levibuildscript")
 
 if not has_config("vs_runtime") then
@@ -25,7 +29,7 @@ target("DearOreUI")
         add_cxflags( "/EHa", "/utf-8", "/W4", "/w44265", "/w44289", "/w44296", "/w45263", "/w44738", "/w45204")
         add_syslinks("ws2_32") -- LoopbackWsServer (Stage 8 WebSocket loopback)
     end
-    add_packages("levilamina")
+    add_packages("levilamina", "libcurl", "zlib")
     set_kind("shared")
     set_languages("c++20")
     set_symbols("debug")
@@ -43,7 +47,7 @@ target("DearOreUIUnitTests")
         add_cxflags("/EHa", "/utf-8", "/W4", "/w44265", "/w44289", "/w44296", "/w45263", "/w44738", "/w45204")
         add_syslinks("ws2_32") -- LoopbackWsServer (Stage 8 WebSocket loopback)
     end
-    add_packages("levilamina")
+    add_packages("levilamina", "libcurl", "zlib")
     add_includedirs("src")
     add_includedirs("tests")
     add_includedirs(".")

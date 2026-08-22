@@ -90,6 +90,15 @@ std::optional<HostMethodEntry> HostMethodRegistry::findEntry(api::RegistrationHa
     return iterator->second;
 }
 
+std::optional<HostMethodEntry> HostMethodRegistry::findByName(std::string_view name) const {
+    std::lock_guard lock(mMutex);
+    auto byName = mByName.find(std::string{name});
+    if (byName == mByName.end()) return std::nullopt;
+    auto entry = mEntries.find(byName->second);
+    if (entry == mEntries.end()) return std::nullopt;
+    return entry->second;
+}
+
 std::size_t HostMethodRegistry::size() const {
     std::lock_guard lock(mMutex);
     return mEntries.size();

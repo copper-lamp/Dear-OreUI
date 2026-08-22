@@ -7,9 +7,11 @@
 #include "page/IPageContextManager.h"
 #include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
+#include "resource/ResourceUri.h"
 
 #include <algorithm>
 #include <chrono>
+#include <type_traits>
 
 namespace dearoreui::api {
 
@@ -301,6 +303,51 @@ Result<void> DearOreUIApi::unregister(RegistrationHandle handle) {
 
     mLogger.info("registry", "unregistered").withField("handle", std::to_string(handle.value())).emit();
     return Result<void>::success();
+}
+
+Result<ResourceInfo> DearOreUIApi::describeResource(ModId requester, std::string_view uri) const {
+    if (!requester.isValid() || !mRegistry.isModRegistered(requester)) return Error{ErrorCode::PermissionDenied, "requester mod is not registered"};
+    auto requesterRecord = mRegistry.findMod(requester);
+    if (!requesterRecord || std::find(requesterRecord->manifest.permissions.begin(), requesterRecord->manifest.permissions.end(), Permission::ResourceRead) == requesterRecord->manifest.permissions.end()) {
+        return Error{ErrorCode::PermissionDenied, "resource.read permission is required"};
+    }
+    auto parsed = resource::ResourceUri::parse(uri);
+    if (parsed.isErr()) return parsed.error();
+    if (parsed.value().modNamespace != requester.value()) return Error{ErrorCode::PermissionDenied, "cross-namespace resource access denied"};
+    for (auto const& entry : mRegistry.listEntries()) {
+        ResourceInfo info;
+        bool match = false;
+        std::visit([&](auto const& item) {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<T, registry::ResourceEntry>) {
+                info = ResourceInfo{resource::ResourceUri{resource::ResourceUriScheme::Resource, item.manifest.modNamespace, item.manifest.path}.toString(), std::string{resourceKindName(item.manifest.kind)}, item.payload.size(), item.manifest.pageScopes.empty() ? PageScope::Any : item.manifest.pageScopes.front()}; match = info.uri == uri;
+            } else if constexpr (std::is_same_v<T, registry::ScriptEntry>) {
+                info = ResourceInfo{resource::ResourceUri{resource::ResourceUriScheme::Script, item.manifest.modNamespace, item.manifest.path}.toString(), "text/javascript", item.source.size(), item.manifest.pageScopes.empty() ? PageScope::Any : item.manifest.pageScopes.front()}; match = info.uri == uri;
+            } else if constexpr (std::is_same_v<T, registry::StyleSheetEntry>) {
+                info = ResourceInfo{resource::ResourceUri{resource::ResourceUriScheme::Style, item.manifest.modNamespace, item.manifest.path}.toString(), "text/css", item.source.size(), item.manifest.pageScopes.empty() ? PageScope::Any : item.manifest.pageScopes.front()}; match = info.uri == uri;
+            }
+        }, entry);
+        if (match) return info;
+    }
+    return Error{ErrorCode::ResourceNotFound, "resource not found"};
+}
+
+Result<ResourceBytes> DearOreUIApi::readResource(ModId requester, std::string_view uri, ResourceReadOptions options) const {
+    auto info = describeResource(requester, uri);
+    if (info.isErr()) return info.error();
+    if (options.maxBytes == 0 || options.maxBytes > 1024 * 1024) return Error{ErrorCode::InvalidArgument, "resource read limit is invalid"};
+    for (auto const& entry : mRegistry.listEntries()) {
+        ResourceBytes bytes;
+        bool match = false;
+        std::visit([&](auto const& item) {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<T, registry::ResourceEntry>) { bytes.data = item.payload; match = info.value().uri == uri; }
+            else if constexpr (std::is_same_v<T, registry::ScriptEntry>) { bytes.data = item.source; match = info.value().uri == uri; }
+            else if constexpr (std::is_same_v<T, registry::StyleSheetEntry>) { bytes.data = item.source; match = info.value().uri == uri; }
+        }, entry);
+        if (match) { if (bytes.data.size() > options.maxBytes) return Error{ErrorCode::InvalidArgument, "resource exceeds requested limit"}; bytes.info = info.value(); return bytes; }
+    }
+    return Error{ErrorCode::ResourceNotFound, "resource not found"};
 }
 
 Result<ModId> DearOreUIApi::registerMod(ModManifest const& manifest) {

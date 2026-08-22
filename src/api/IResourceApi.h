@@ -5,8 +5,10 @@
 #include "api/manifest/StyleSheetManifest.h"
 #include "api/types/Id.h"
 #include "api/types/Result.h"
+#include "api/types/ResourceRead.h"
 
 #include <string>
+#include <string_view>
 
 namespace dearoreui::api {
 
@@ -24,6 +26,9 @@ public:
     registerStyleSheet(ModId owner, StyleSheetManifest const& manifest, std::string source) = 0;
 
     [[nodiscard]] virtual Result<void> unregister(RegistrationHandle handle) = 0;
+
+    [[nodiscard]] virtual Result<ResourceInfo> describeResource(ModId requester, std::string_view uri) const = 0;
+    [[nodiscard]] virtual Result<ResourceBytes> readResource(ModId requester, std::string_view uri, ResourceReadOptions options) const = 0;
 };
 
 } // namespace dearoreui::api

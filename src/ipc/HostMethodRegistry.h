@@ -41,6 +41,7 @@ public:
     [[nodiscard]] bool unregister(api::RegistrationHandle handle);
 
     [[nodiscard]] std::shared_ptr<IHostMethod>   find(std::string_view name) const;
+    [[nodiscard]] std::optional<HostMethodEntry> findByName(std::string_view name) const;
     [[nodiscard]] std::optional<HostMethodEntry> findEntry(api::RegistrationHandle handle) const;
     [[nodiscard]] std::size_t                    size() const;
     void                                         clear();

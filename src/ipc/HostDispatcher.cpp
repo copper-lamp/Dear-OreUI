@@ -3,6 +3,7 @@
 #include "api/types/Error.h"
 #include "diagnostic/Stage5IpcTelemetry.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace dearoreui::ipc {
@@ -45,8 +46,9 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         return api::Error{api::ErrorCode::InvalidFormat, "host request payload exceeds safety limit"};
     }
 
-    auto method = mRegistry.find(request.method);
-    if (!method) {
+    auto entry = mRegistry.findByName(request.method);
+    if (!entry) {
+
         diagnostic::recordStage5HostError(
             request.contextId,
             request.id,
@@ -57,8 +59,18 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         return api::Error{api::ErrorCode::HostMethodNotFound, "host method not found"};
     }
 
+    auto const& manifest = entry->manifest;
+    if (request.payload.size() > manifest.maxRequestBytes) {
+        return api::Error{api::ErrorCode::InvalidFormat, "host request payload exceeds method limit"};
+    }
+    if (!manifest.pageScopes.empty()) {
+        auto allowed = std::find(manifest.pageScopes.begin(), manifest.pageScopes.end(), context->page.scope) != manifest.pageScopes.end();
+        if (!allowed && std::find(manifest.pageScopes.begin(), manifest.pageScopes.end(), api::PageScope::Any) == manifest.pageScopes.end()) {
+            return api::Error{api::ErrorCode::PermissionDenied, "host method is not available on this page scope"};
+        }
+    }
     auto start   = std::chrono::steady_clock::now();
-    auto result  = method->execute(request.contextId, request.payload);
+    auto result  = entry->method->execute(request.contextId, request.payload);
     auto elapsed = std::chrono::steady_clock::now() - start;
 
     {
@@ -69,7 +81,8 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         }
     }
 
-    if (elapsed > timeout) {
+    auto effectiveTimeout = std::min(timeout, manifest.timeout);
+    if (elapsed > effectiveTimeout) {
         diagnostic::recordStage5HostError(
             request.contextId,
             request.id,
@@ -97,6 +110,9 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         );
     } else {
         response.payload = std::move(result.value());
+        if (response.payload.size() > manifest.maxResponseBytes) {
+            return api::Error{api::ErrorCode::InvalidFormat, "host response payload exceeds method limit"};
+        }
         diagnostic::recordStage5HostResponse(request.contextId, request.id, request.method, false);
     }
 
