@@ -13,10 +13,7 @@ void Stage5CoherentProbe::onViewInitialized(void* gamefaceView) {
     mExecuteScriptFound = true;
     mSummary            = "coherent View::initialize hit; executeScript available";
 
-    diagnostic::recordStage5ViewInitialized(
-        reinterpret_cast<std::uintptr_t>(gamefaceView),
-        mExecuteScriptFound.load()
-    );
+    diagnostic::recordStage5ViewInitialized(reinterpret_cast<std::uintptr_t>(gamefaceView), mExecuteScriptFound.load());
 }
 
 void Stage5CoherentProbe::onSceneCreated(std::string_view url, void* sceneOrView) {

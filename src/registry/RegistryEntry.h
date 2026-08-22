@@ -38,10 +38,10 @@ struct StyleSheetEntry {
 };
 
 struct UiEntry {
-    api::RegistrationHandle               handle;
-    api::ModId                            owner;
-    api::UiManifest                       manifest;
-    std::string                           htmlBody;
+    api::RegistrationHandle handle;
+    api::ModId              owner;
+    api::UiManifest         manifest;
+    std::string             htmlBody;
     // M8.1.2: pre-rendered DomNode forest (component-registered UIs only).
     // Carries per-state cssText (stateStyles) that the htmlBody round-trip
     // cannot represent; injection prefers this over parsing htmlBody.

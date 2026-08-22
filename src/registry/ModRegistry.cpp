@@ -135,7 +135,7 @@ api::Result<api::ModId> ModRegistry::registerMod(ModRecord record) {
         }
     }
 
-    api::ModId id = manifest.id; // Copy before `record` is moved into the registry.
+    api::ModId id       = manifest.id; // Copy before `record` is moved into the registry.
     record.registeredAt = std::chrono::system_clock::now();
     mMods.emplace(id, std::move(record));
     return id;
@@ -185,7 +185,7 @@ bool ModRegistry::isModEnabled(api::ModId id) const {
 }
 
 std::vector<ModRecord> ModRegistry::allMods() const {
-    std::lock_guard lock{mMutex};
+    std::lock_guard        lock{mMutex};
     std::vector<ModRecord> result;
     result.reserve(mMods.size());
     for (auto const& [id, record] : mMods) {
@@ -294,7 +294,7 @@ std::vector<api::RegistrationHandle> ModRegistry::findByNamespace(std::string_vi
 }
 
 std::vector<RegistryEntry> ModRegistry::listEntries() const {
-    std::lock_guard           lock{mMutex};
+    std::lock_guard            lock{mMutex};
     std::vector<RegistryEntry> result;
     result.reserve(mEntries.size());
     for (auto const& [handle, entry] : mEntries) {
@@ -305,7 +305,7 @@ std::vector<RegistryEntry> ModRegistry::listEntries() const {
 }
 
 std::vector<UiEntry> ModRegistry::listUiEntries() const {
-    std::lock_guard    lock{mMutex};
+    std::lock_guard      lock{mMutex};
     std::vector<UiEntry> result;
     for (auto const& [handle, entry] : mEntries) {
         static_cast<void>(handle);

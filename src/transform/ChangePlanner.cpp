@@ -19,30 +19,30 @@ ChangeOperation ChangePlanner::toOperation(registry::RegistryEntry const& entry)
     return std::visit(
         [](auto const& e) {
             ChangeOperation operation;
-            operation.handle             = e.handle;
-            operation.owner              = e.owner;
-            operation.modNamespace       = e.manifest.modNamespace;
-            operation.fingerprint        = e.manifest.fingerprint;
-            operation.pageScopes         = e.manifest.pageScopes;
-            operation.declaredConflicts  = e.manifest.conflicts;
-            operation.dependencies       = e.manifest.dependencies;
+            operation.handle            = e.handle;
+            operation.owner             = e.owner;
+            operation.modNamespace      = e.manifest.modNamespace;
+            operation.fingerprint       = e.manifest.fingerprint;
+            operation.pageScopes        = e.manifest.pageScopes;
+            operation.declaredConflicts = e.manifest.conflicts;
+            operation.dependencies      = e.manifest.dependencies;
 
             using EntryType = std::decay_t<decltype(e)>;
             if constexpr (std::is_same_v<EntryType, registry::ScriptEntry>) {
-                operation.path      = e.manifest.path;
-                operation.kind      = ChangeOperationKind::AddScript;
-                operation.content   = e.source;
+                operation.path               = e.manifest.path;
+                operation.kind               = ChangeOperationKind::AddScript;
+                operation.content            = e.source;
                 operation.versionConstrained = e.manifest.versionConstraint.has_value();
             } else if constexpr (std::is_same_v<EntryType, registry::StyleSheetEntry>) {
-                operation.path      = e.manifest.path;
-                operation.kind      = ChangeOperationKind::AddStyleSheet;
-                operation.content   = e.source;
+                operation.path               = e.manifest.path;
+                operation.kind               = ChangeOperationKind::AddStyleSheet;
+                operation.content            = e.source;
                 operation.versionConstrained = e.manifest.versionConstraint.has_value();
             } else if constexpr (std::is_same_v<EntryType, registry::ResourceEntry>) {
-                operation.path       = e.manifest.path;
-                operation.kind       = ChangeOperationKind::AddResource;
-                operation.resourceKind = e.manifest.kind;
-                operation.content    = e.payload;
+                operation.path               = e.manifest.path;
+                operation.kind               = ChangeOperationKind::AddResource;
+                operation.resourceKind       = e.manifest.kind;
+                operation.content            = e.payload;
                 operation.versionConstrained = e.manifest.versionConstraint.has_value();
             } else if constexpr (std::is_same_v<EntryType, registry::UiEntry>) {
                 operation.path       = e.manifest.id;
@@ -99,7 +99,7 @@ ChangePlan ChangePlanner::plan(api::ContextId contextId, api::PageScope scope) c
     }
 
     // 2. Resolve the mod-level dependency graph over enabled mods.
-    auto resolution = DependencyResolver::resolve(enabledRecords);
+    auto resolution         = DependencyResolver::resolve(enabledRecords);
     plan.modOrder           = resolution.order;
     plan.dependencyProblems = resolution.problems;
 
@@ -123,34 +123,28 @@ ChangePlan ChangePlanner::plan(api::ContextId contextId, api::PageScope scope) c
 
         if (registeredIds.count(operation.owner.value()) == 0) {
             operation.status = ChangeOperationStatus::BlockedPermissionDenied;
-            operation.error  = api::Error{
-                api::ErrorCode::InvalidState, "owner mod is not registered: " + operation.owner.value()
-            };
+            operation.error =
+                api::Error{api::ErrorCode::InvalidState, "owner mod is not registered: " + operation.owner.value()};
         } else if (disabledIds.count(operation.owner.value()) != 0) {
             operation.status = ChangeOperationStatus::SkippedDisabled;
-            operation.error  = api::Error{
-                api::ErrorCode::InvalidState, "owner mod is disabled: " + operation.owner.value()
-            };
+            operation.error =
+                api::Error{api::ErrorCode::InvalidState, "owner mod is disabled: " + operation.owner.value()};
         } else if (orderedIds.count(operation.owner.value()) == 0) {
             switch (problemKindFor(operation.owner, resolution.problems)) {
             case DependencyProblem::Kind::Cycle:
                 operation.status = ChangeOperationStatus::BlockedConflict;
-                operation.error  = api::Error{
-                    api::ErrorCode::DependencyCycle, "owner mod is part of a dependency cycle"
-                };
+                operation.error =
+                    api::Error{api::ErrorCode::DependencyCycle, "owner mod is part of a dependency cycle"};
                 break;
             case DependencyProblem::Kind::VersionMismatch:
             case DependencyProblem::Kind::InvalidRange:
                 operation.status = ChangeOperationStatus::SkippedVersionMismatch;
-                operation.error  = api::Error{
-                    api::ErrorCode::VersionMismatch, "owner mod fails dependency version check"
-                };
+                operation.error =
+                    api::Error{api::ErrorCode::VersionMismatch, "owner mod fails dependency version check"};
                 break;
             default:
                 operation.status = ChangeOperationStatus::SkippedDependencyMissing;
-                operation.error  = api::Error{
-                    api::ErrorCode::DependencyMissing, "owner mod has a missing dependency"
-                };
+                operation.error  = api::Error{api::ErrorCode::DependencyMissing, "owner mod has a missing dependency"};
                 break;
             }
         } else if (operation.versionConstrained) {

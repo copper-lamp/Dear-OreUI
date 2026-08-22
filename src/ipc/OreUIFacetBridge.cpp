@@ -18,7 +18,7 @@ namespace dearoreui::ipc {
 
 namespace {
 
-constexpr char const*            kFacetName           = "dearoreui";
+constexpr char const*               kFacetName = "dearoreui";
 constexpr std::chrono::milliseconds kFacetDispatchTimeout{3000};
 
 // Escape a value into a double-quoted JS string literal (used when embedding
@@ -62,9 +62,8 @@ public:
 
     char const* name() const override { return kFacetName; }
 
-    OreUI::Status init(
-        std::unordered_map<std::string, std::variant<double, bool, std::string>> const& payload
-    ) override {
+    OreUI::Status
+    init(std::unordered_map<std::string, std::variant<double, bool, std::string>> const& payload) override {
         return mBridge.onFacetInit(payload) ? OreUI::Status::Ok : OreUI::Status::Error;
     }
 
@@ -75,7 +74,8 @@ private:
 } // namespace
 
 OreUIFacetBridge::OreUIFacetBridge(HostDispatcher& dispatcher, IHostBridge& bridge)
-: mDispatcher(dispatcher), mBridge(bridge) {}
+: mDispatcher(dispatcher),
+  mBridge(bridge) {}
 
 OreUIFacetBridge::~OreUIFacetBridge() = default;
 
@@ -101,13 +101,9 @@ void OreUIFacetBridge::registerIntoRegistry(void* registryPtr) {
     // FacetRegistry implements it by pushing a FacetPrototype. Called on the
     // game thread (view initialize). std::function ABI matches (MSVC STL).
     registry->registerFacet(kFacetName, [this]() { return std::make_unique<DearOreUIFacet>(*this); });
-    mRegistered          = true;
+    mRegistered         = true;
     mRegisteredRegistry = registryPtr;
-    diagnostic::recordStage5FacetRegistered(
-        kFacetName,
-        "ok",
-        reinterpret_cast<std::uintptr_t>(registryPtr)
-    );
+    diagnostic::recordStage5FacetRegistered(kFacetName, "ok", reinterpret_cast<std::uintptr_t>(registryPtr));
 }
 
 bool OreUIFacetBridge::onFacetInit(
@@ -138,7 +134,9 @@ bool OreUIFacetBridge::onFacetInit(
     auto parsed = parseIpcMessage(params);
     if (parsed.isErr()) {
         diagnostic::recordStage5FacetError(
-            api::RequestId{}, api::ErrorCode::InvalidFormat, "facet params is not a valid IpcMessage"
+            api::RequestId{},
+            api::ErrorCode::InvalidFormat,
+            "facet params is not a valid IpcMessage"
         );
         return false;
     }
@@ -162,8 +160,7 @@ bool OreUIFacetBridge::onFacetInit(
     //       window.__DearOreUI__.bus.push(<id>, "<responseJson>")
     std::ostringstream script;
     script << "window.__DearOreUI__&&window.__DearOreUI__.bus&&"
-           << "window.__DearOreUI__.bus.push(" << request.id.value() << ",\""
-           << escapeJsString(response) << "\");";
+           << "window.__DearOreUI__.bus.push(" << request.id.value() << ",\"" << escapeJsString(response) << "\");";
     static_cast<void>(mBridge.sendScript(request.contextId, script.str()));
     return true;
 }

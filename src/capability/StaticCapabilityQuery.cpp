@@ -81,7 +81,8 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
         CapabilityEntry{
             .capability = Capability::MultiModTransformPlanning,
             .level      = SupportLevel::Experimental,
-            .note       = "Change planning and reporting available; real multi-mod page injection pending client verification",
+            .note =
+                "Change planning and reporting available; real multi-mod page injection pending client verification",
         }
     );
     mCapabilities.set(
@@ -144,7 +145,8 @@ StaticCapabilityQuery::StaticCapabilityQuery() {
         CapabilityEntry{
             .capability = Capability::JsToNativeCall,
             .level      = SupportLevel::Experimental,
-            .note       = "JS->C++ via WebSocket loopback (ws://127.0.0.1:port/dearoreui?token=...); engine bindings avoided; real-client verification pending",
+            .note       = "JS->C++ via WebSocket loopback (ws://127.0.0.1:port/dearoreui?token=...); engine bindings "
+                          "avoided; real-client verification pending",
         }
     );
 }
@@ -154,11 +156,13 @@ api::SupportLevel StaticCapabilityQuery::query(api::Capability capability) const
 }
 
 void StaticCapabilityQuery::setLevel(api::Capability capability, api::SupportLevel level, std::string note) {
-    mCapabilities.set(api::CapabilityEntry{
-        .capability = capability,
-        .level      = level,
-        .note       = std::move(note),
-    });
+    mCapabilities.set(
+        api::CapabilityEntry{
+            .capability = capability,
+            .level      = level,
+            .note       = std::move(note),
+        }
+    );
 }
 
 api::CapabilitySet StaticCapabilityQuery::all() const { return mCapabilities; }

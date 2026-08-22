@@ -13,14 +13,14 @@ public:
     ModRegistry() = default;
 
     // Mod-level registration and lifecycle.
-    [[nodiscard]] api::Result<api::ModId> registerMod(ModRecord record) override;
-    [[nodiscard]] bool                    unregisterMod(api::ModId id) override;
+    [[nodiscard]] api::Result<api::ModId>  registerMod(ModRecord record) override;
+    [[nodiscard]] bool                     unregisterMod(api::ModId id) override;
     [[nodiscard]] std::optional<ModRecord> findMod(api::ModId id) const override;
-    [[nodiscard]] bool                    isModRegistered(api::ModId id) const override;
-    [[nodiscard]] bool                    setModEnabled(api::ModId id, bool enabled) override;
-    [[nodiscard]] bool                    isModEnabled(api::ModId id) const override;
-    [[nodiscard]] std::vector<ModRecord>  allMods() const override;
-    [[nodiscard]] std::size_t             modCount() const override;
+    [[nodiscard]] bool                     isModRegistered(api::ModId id) const override;
+    [[nodiscard]] bool                     setModEnabled(api::ModId id, bool enabled) override;
+    [[nodiscard]] bool                     isModEnabled(api::ModId id) const override;
+    [[nodiscard]] std::vector<ModRecord>   allMods() const override;
+    [[nodiscard]] std::size_t              modCount() const override;
 
     // Entry-level registration and lifecycle.
     [[nodiscard]] api::Result<api::RegistrationHandle> insert(ResourceEntry entry) override;
@@ -77,8 +77,8 @@ private:
         }
     };
 
-    using ConflictIndex    = std::unordered_map<ConflictKey, api::RegistrationHandle, ConflictKeyHash>;
-    using UiConflictIndex  = std::unordered_map<UiConflictKey, api::RegistrationHandle, UiConflictKeyHash>;
+    using ConflictIndex   = std::unordered_map<ConflictKey, api::RegistrationHandle, ConflictKeyHash>;
+    using UiConflictIndex = std::unordered_map<UiConflictKey, api::RegistrationHandle, UiConflictKeyHash>;
 
     template <typename Entry>
     [[nodiscard]] api::Result<api::RegistrationHandle> insertImpl(Entry entry);

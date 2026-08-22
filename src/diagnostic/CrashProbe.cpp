@@ -13,22 +13,15 @@ namespace dearoreui::diagnostic {
 
 namespace {
 
-std::atomic<LONG>        gProbeBusy{0};
-char                     gCrashPath[MAX_PATH]{};
+std::atomic<LONG> gProbeBusy{0};
+char              gCrashPath[MAX_PATH]{};
 // Writes a single formatted line to the crash file. Uses only raw Win32
 // (no std::ofstream, no locks) because the handler may run on a thread whose
 // CRT state is already corrupted.
 void rawWriteCrashLine(char const* line) {
     if (gCrashPath[0] == '\0') return;
-    HANDLE file = CreateFileA(
-        gCrashPath,
-        GENERIC_WRITE,
-        FILE_SHARE_READ,
-        nullptr,
-        OPEN_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr
-    );
+    HANDLE file =
+        CreateFileA(gCrashPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return;
     SetFilePointer(file, 0, nullptr, FILE_END);
     DWORD written = 0;
@@ -38,11 +31,11 @@ void rawWriteCrashLine(char const* line) {
 
 void rawAppendHex(char* buf, std::uint64_t value) {
     static constexpr char kHex[] = "0123456789abcdef";
-    char  tmp[20];
-    int   n = 0;
+    char                  tmp[20];
+    int                   n = 0;
     do {
-        tmp[n++] = kHex[value & 0xF];
-        value >>= 4;
+        tmp[n++]   = kHex[value & 0xF];
+        value    >>= 4;
     } while (value != 0);
     for (int i = 0; i < n; ++i) buf[i] = tmp[n - 1 - i];
     buf[n] = '\0';
@@ -52,26 +45,30 @@ void rawAppendHex(char* buf, std::uint64_t value) {
 // CaptureStackBackTrace which is safe inside a VEH handler. 24 frames was too
 // short: the msxml6 XML-parse crash had its caller (game code) truncated.
 void writeBacktrace() {
-    void* frames[64]{};
+    void*  frames[64]{};
     USHORT count = CaptureStackBackTrace(0, 64, frames, nullptr);
     if (count == 0) return;
     for (USHORT i = 0; i < count; ++i) {
         void* address = frames[i];
         if (address == nullptr) continue;
         HMODULE module = nullptr;
-        if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, static_cast<char const*>(address), &module)
+        if (!GetModuleHandleExA(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                static_cast<char const*>(address),
+                &module
+            )
             || module == nullptr) {
-            char  unknown[128];
-            int   n = std::snprintf(unknown, sizeof(unknown), "\n  #%u 0x%p", i, address);
+            char unknown[128];
+            int  n = std::snprintf(unknown, sizeof(unknown), "\n  #%u 0x%p", i, address);
             if (n > 0 && n < static_cast<int>(sizeof(unknown))) rawWriteCrashLine(unknown);
             continue;
         }
-        char  modName[MAX_PATH]{};
+        char modName[MAX_PATH]{};
         GetModuleFileNameA(module, modName, MAX_PATH);
         std::uintptr_t base = reinterpret_cast<std::uintptr_t>(module);
         std::uintptr_t rva  = reinterpret_cast<std::uintptr_t>(address) - base;
-        char  detail[512];
-        int   n = std::snprintf(
+        char           detail[512];
+        int            n = std::snprintf(
             detail,
             sizeof(detail),
             "\n  #%u %s+0x%llx",
@@ -98,14 +95,18 @@ void describeCrash(DWORD code, void* address) {
     rawWriteCrashLine(line);
 
     HMODULE module = nullptr;
-    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, static_cast<char const*>(address), &module)
+    if (GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            static_cast<char const*>(address),
+            &module
+        )
         && module != nullptr) {
-        char  modName[MAX_PATH]{};
-        DWORD modLen = GetModuleFileNameA(module, modName, MAX_PATH);
-        std::uintptr_t base = reinterpret_cast<std::uintptr_t>(module);
-        std::uintptr_t rva  = reinterpret_cast<std::uintptr_t>(address) - base;
-        char  detail[512];
-        int   n = std::snprintf(
+        char           modName[MAX_PATH]{};
+        DWORD          modLen = GetModuleFileNameA(module, modName, MAX_PATH);
+        std::uintptr_t base   = reinterpret_cast<std::uintptr_t>(module);
+        std::uintptr_t rva    = reinterpret_cast<std::uintptr_t>(address) - base;
+        char           detail[512];
+        int            n = std::snprintf(
             detail,
             sizeof(detail),
             " in %s+0x%llx",
@@ -137,7 +138,7 @@ LONG WINAPI crashProbeHandler(EXCEPTION_POINTERS* pointers) {
 } // namespace
 
 void installCrashProbe(std::filesystem::path const& dataDirectory) {
-    auto crashDir = dataDirectory / "crash";
+    auto            crashDir = dataDirectory / "crash";
     std::error_code ec;
     std::filesystem::create_directories(crashDir, ec);
     auto filePath = (crashDir / "crash-last.txt").string();

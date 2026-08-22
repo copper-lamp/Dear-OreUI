@@ -38,10 +38,7 @@ void defaultCoherentExecutor(void* gamefaceView, std::string const& script);
 // crashes and engine.trigger("dearoreui_report", json) reaches handleJsPayload.
 class CoherentHostBridge : public IHostBridge {
 public:
-    CoherentHostBridge(
-        CoherentViewRegistry& registry,
-        ScriptExecutor        executor = defaultCoherentExecutor
-    );
+    CoherentHostBridge(CoherentViewRegistry& registry, ScriptExecutor executor = defaultCoherentExecutor);
     ~CoherentHostBridge() override;
 
     [[nodiscard]] bool isAvailable() const override;

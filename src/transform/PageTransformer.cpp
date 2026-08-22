@@ -12,30 +12,30 @@ namespace {
 [[nodiscard]] registry::ScriptEntry
 toScriptEntry(ChangeOperation const& op, api::PageScope scope, std::chrono::system_clock::time_point at) {
     registry::ScriptEntry entry;
-    entry.handle                 = op.handle;
-    entry.owner                  = op.owner;
-    entry.manifest.modNamespace  = op.modNamespace;
-    entry.manifest.path          = op.path;
-    entry.manifest.fingerprint   = op.fingerprint;
-    entry.manifest.pageScopes    = {scope};
-    entry.manifest.source        = op.content;
-    entry.source                 = op.content;
-    entry.registeredAt           = at;
+    entry.handle                = op.handle;
+    entry.owner                 = op.owner;
+    entry.manifest.modNamespace = op.modNamespace;
+    entry.manifest.path         = op.path;
+    entry.manifest.fingerprint  = op.fingerprint;
+    entry.manifest.pageScopes   = {scope};
+    entry.manifest.source       = op.content;
+    entry.source                = op.content;
+    entry.registeredAt          = at;
     return entry;
 }
 
 [[nodiscard]] registry::StyleSheetEntry
 toStyleSheetEntry(ChangeOperation const& op, api::PageScope scope, std::chrono::system_clock::time_point at) {
     registry::StyleSheetEntry entry;
-    entry.handle                 = op.handle;
-    entry.owner                  = op.owner;
-    entry.manifest.modNamespace  = op.modNamespace;
-    entry.manifest.path          = op.path;
-    entry.manifest.fingerprint   = op.fingerprint;
-    entry.manifest.pageScopes    = {scope};
-    entry.manifest.source        = op.content;
-    entry.source                 = op.content;
-    entry.registeredAt           = at;
+    entry.handle                = op.handle;
+    entry.owner                 = op.owner;
+    entry.manifest.modNamespace = op.modNamespace;
+    entry.manifest.path         = op.path;
+    entry.manifest.fingerprint  = op.fingerprint;
+    entry.manifest.pageScopes   = {scope};
+    entry.manifest.source       = op.content;
+    entry.source                = op.content;
+    entry.registeredAt          = at;
     return entry;
 }
 
@@ -57,9 +57,9 @@ toResourceEntry(ChangeOperation const& op, api::PageScope scope, std::chrono::sy
 [[nodiscard]] registry::UiEntry
 toUiEntry(ChangeOperation const& op, api::PageScope scope, std::chrono::system_clock::time_point at) {
     registry::UiEntry entry;
-    entry.handle    = op.handle;
-    entry.owner     = op.owner;
-    entry.manifest  = op.uiManifest.value_or(api::UiManifest{});
+    entry.handle                = op.handle;
+    entry.owner                 = op.owner;
+    entry.manifest              = op.uiManifest.value_or(api::UiManifest{});
     entry.manifest.modNamespace = op.modNamespace;
     if (!op.path.empty()) {
         entry.manifest.id = op.path;
@@ -82,7 +82,7 @@ TransformedPage PageTransformer::transform(ChangePlan const& plan, source::PageS
             continue;
         }
 
-        auto applied = operation;
+        auto applied   = operation;
         applied.status = ChangeOperationStatus::Applied;
 
         switch (applied.kind) {

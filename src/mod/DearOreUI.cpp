@@ -66,17 +66,14 @@ bool DearOreUI::load() {
 
     // Stage 7.1 troubleshooting: print the data directory so diagnostics.jsonl
     // and the stage0 telemetry file can be located in the game instance.
-    getSelf().getLogger().info(
-        "DearOreUI data dir: {}",
-        getSelf().getDataDir().string()
-    );
+    getSelf().getLogger().info("DearOreUI data dir: {}", getSelf().getDataDir().string());
 
     runtime::RuntimeConfig config;
-    config.dataDirectory      = getSelf().getDataDir();
-    config.minecraftDirectory = detectMinecraftDirectory();
-    config.enableDemoOverlay  = true; // Stage 7.1 real-client display verification.
+    config.dataDirectory           = getSelf().getDataDir();
+    config.minecraftDirectory      = detectMinecraftDirectory();
+    config.enableDemoOverlay       = true; // Stage 7.1 real-client display verification.
     config.enableComponentShowcase = true; // Stage 8.1 full component library showcase.
-    mRuntime                  = std::make_unique<runtime::Runtime>(std::move(config));
+    mRuntime                       = std::make_unique<runtime::Runtime>(std::move(config));
 
     return mRuntime->initialize();
 }

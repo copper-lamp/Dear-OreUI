@@ -70,12 +70,12 @@ public:
     void setOnViewDestroyed(std::function<void(void*)> observer);
 
 private:
-    void*                            mActiveView{nullptr};
-    bool                             mScriptContextReady{false};
-    std::function<void(void*)>       mOnViewRegistered;
-    std::function<void()>            mOnScriptContextReady;
-    std::function<void(void*)>       mOnViewDestroyed;
-    mutable std::mutex               mMutex;
+    void*                      mActiveView{nullptr};
+    bool                       mScriptContextReady{false};
+    std::function<void(void*)> mOnViewRegistered;
+    std::function<void()>      mOnScriptContextReady;
+    std::function<void(void*)> mOnViewDestroyed;
+    mutable std::mutex         mMutex;
 };
 
 } // namespace dearoreui::ipc

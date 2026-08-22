@@ -30,21 +30,21 @@ enum class ChangeOperationStatus {
 };
 
 struct ChangeOperation {
-    api::RegistrationHandle     handle;
-    api::ModId                  owner;
-    std::string                 modNamespace;
-    std::string                 path;
-    std::string                 fingerprint;
-    api::ResourceKind           resourceKind{api::ResourceKind::Binary};
-    ChangeOperationKind         kind{ChangeOperationKind::AddScript};
-    std::size_t                 orderIndex{0};
-    ChangeOperationStatus       status{ChangeOperationStatus::Pending};
-    api::Error                  error;
-    std::string                 content;
-    std::vector<api::PageScope> pageScopes;
-    std::vector<std::string>    declaredConflicts;
-    std::vector<api::Dependency> dependencies;
-    bool                        versionConstrained{false};
+    api::RegistrationHandle        handle;
+    api::ModId                     owner;
+    std::string                    modNamespace;
+    std::string                    path;
+    std::string                    fingerprint;
+    api::ResourceKind              resourceKind{api::ResourceKind::Binary};
+    ChangeOperationKind            kind{ChangeOperationKind::AddScript};
+    std::size_t                    orderIndex{0};
+    ChangeOperationStatus          status{ChangeOperationStatus::Pending};
+    api::Error                     error;
+    std::string                    content;
+    std::vector<api::PageScope>    pageScopes;
+    std::vector<std::string>       declaredConflicts;
+    std::vector<api::Dependency>   dependencies;
+    bool                           versionConstrained{false};
     std::optional<api::UiManifest> uiManifest;
 };
 

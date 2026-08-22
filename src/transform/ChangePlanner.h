@@ -15,12 +15,10 @@ public:
     [[nodiscard]] ChangePlan plan(api::ContextId contextId, api::PageScope scope) const;
 
 private:
-    [[nodiscard]] static ChangeOperation         toOperation(registry::RegistryEntry const& entry);
-    [[nodiscard]] static bool                    scopeMatches(api::PageScope target, std::vector<api::PageScope> const& scopes);
-    [[nodiscard]] static DependencyProblem::Kind problemKindFor(
-        const api::ModId&                             owner,
-        std::vector<DependencyProblem> const& problems
-    );
+    [[nodiscard]] static ChangeOperation toOperation(registry::RegistryEntry const& entry);
+    [[nodiscard]] static bool            scopeMatches(api::PageScope target, std::vector<api::PageScope> const& scopes);
+    [[nodiscard]] static DependencyProblem::Kind
+    problemKindFor(const api::ModId& owner, std::vector<DependencyProblem> const& problems);
 
     registry::IModRegistry& mRegistry;
 };

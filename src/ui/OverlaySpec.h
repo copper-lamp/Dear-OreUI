@@ -22,8 +22,8 @@ struct OverlaySpec {
     // Injection prefers this over parsing htmlBody so per-state cssText
     // (stateStyles) survives to the bootstrap.
     std::vector<render::DomNode> domNodes;
-    std::vector<std::string> scripts;
-    std::vector<std::string> styles;
+    std::vector<std::string>     scripts;
+    std::vector<std::string>     styles;
 };
 
 } // namespace dearoreui::ui

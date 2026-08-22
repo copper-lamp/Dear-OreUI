@@ -27,11 +27,7 @@ void recordStage5BridgeProbed(
         .emit();
 }
 
-void recordStage5BridgeState(
-    api::ContextId   id,
-    bool             available,
-    std::string_view bridgeType
-) {
+void recordStage5BridgeState(api::ContextId id, bool available, std::string_view bridgeType) {
     globalLogger()
         .info("stage5", "bridge_state")
         .withContext(id)
@@ -55,12 +51,7 @@ void recordStage5HostCall(
         .emit();
 }
 
-void recordStage5HostResponse(
-    api::ContextId   id,
-    api::RequestId   requestId,
-    std::string_view method,
-    bool             hasError
-) {
+void recordStage5HostResponse(api::ContextId id, api::RequestId requestId, std::string_view method, bool hasError) {
     globalLogger()
         .info("stage5", "host_response")
         .withContext(id)
@@ -87,11 +78,7 @@ void recordStage5HostError(
         .emit();
 }
 
-void recordStage5HostCancelled(
-    api::ContextId   id,
-    api::RequestId   requestId,
-    std::string_view method
-) {
+void recordStage5HostCancelled(api::ContextId id, api::RequestId requestId, std::string_view method) {
     globalLogger()
         .info("stage5", "host_cancelled")
         .withContext(id)
@@ -100,11 +87,7 @@ void recordStage5HostCancelled(
         .emit();
 }
 
-void recordStage5HostInvalidContext(
-    api::ContextId   id,
-    api::RequestId   requestId,
-    std::string_view method
-) {
+void recordStage5HostInvalidContext(api::ContextId id, api::RequestId requestId, std::string_view method) {
     globalLogger()
         .info("stage5", "host_invalid_context")
         .withContext(id)
@@ -139,11 +122,7 @@ void recordStage5ScriptDeferred(api::ContextId id, std::size_t queueLength) {
 }
 
 void recordStage5ScriptFailed(api::ContextId id, std::string_view message) {
-    globalLogger()
-        .warning("stage5", "script_failed")
-        .withContext(id)
-        .withMessage(std::string{message})
-        .emit();
+    globalLogger().warning("stage5", "script_failed").withContext(id).withMessage(std::string{message}).emit();
 }
 
 void recordStage5ScriptPreview(api::ContextId id, std::string_view phase, std::string_view script) {

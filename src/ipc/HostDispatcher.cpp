@@ -41,6 +41,10 @@ api::Result<IpcMessage> HostDispatcher::dispatch(IpcMessage const& request, std:
         return api::Error{api::ErrorCode::InvalidContext, "context not found"};
     }
 
+    if (request.payload.size() > 1024 * 1024) {
+        return api::Error{api::ErrorCode::InvalidFormat, "host request payload exceeds safety limit"};
+    }
+
     auto method = mRegistry.find(request.method);
     if (!method) {
         diagnostic::recordStage5HostError(

@@ -40,11 +40,9 @@ namespace {
 
 } // namespace
 
-RuntimeInjector::RuntimeInjector(
-    diagnostic::DiagnosticLogger& logger,
-    ipc::IHostBridge&             bridge
-)
-: mLogger(logger), mBridge(bridge) {}
+RuntimeInjector::RuntimeInjector(diagnostic::DiagnosticLogger& logger, ipc::IHostBridge& bridge)
+: mLogger(logger),
+  mBridge(bridge) {}
 
 api::Result<InjectionReport> RuntimeInjector::inject(api::ContextId id, resource::IResourceIndex const& index) {
     InjectionReport report;
@@ -130,7 +128,8 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "                if (!cb) return;\n";
     stream << "                delete pending[id];\n";
     stream << "                var resp = null;\n";
-    stream << "                try { resp = JSON.parse(jsonString); } catch (e) { resp = { type: 'response', id: id, error: 1, payload: 'bad response json' }; }\n";
+    stream << "                try { resp = JSON.parse(jsonString); } catch (e) { resp = { type: 'response', id: id, "
+              "error: 1, payload: 'bad response json' }; }\n";
     stream << "                cb(resp);\n";
     stream << "            }\n";
     stream << "        };\n";
@@ -148,7 +147,8 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "            return new Promise(function(resolve, reject) {\n";
     stream << "                try {\n";
     stream << "                    if (!hasFacet) throw new Error('HostBridgeUnavailable');\n";
-    stream << "                    var id = (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId || 0) + 1);\n";
+    stream << "                    var id = (window.__DearOreUI__.nextRequestId = (window.__DearOreUI__.nextRequestId "
+              "|| 0) + 1);\n";
     stream << "                    var request = {\n";
     stream << "                        type: 'request',\n";
     stream << "                        id: id,\n";
@@ -156,8 +156,10 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "                        method: method,\n";
     stream << "                        payload: (typeof args === 'string' ? args : JSON.stringify(args || {}))\n";
     stream << "                    };\n";
-    stream << "                    var timer = setTimeout(function() { window.__DearOreUI__.bus.off(id); reject(new Error('HostCallTimeout')); }, 5000);\n";
-    stream << "                    window.__DearOreUI__.bus.on(id, function(resp) { clearTimeout(timer); resolve(resp); });\n";
+    stream << "                    var timer = setTimeout(function() { window.__DearOreUI__.bus.off(id); reject(new "
+              "Error('HostCallTimeout')); }, 5000);\n";
+    stream << "                    window.__DearOreUI__.bus.on(id, function(resp) { clearTimeout(timer); "
+              "resolve(resp); });\n";
     stream << "                    if (!dearOreUiFacetTrigger(JSON.stringify(request))) {\n";
     stream << "                        clearTimeout(timer);\n";
     stream << "                        window.__DearOreUI__.bus.off(id);\n";
@@ -180,8 +182,8 @@ std::string RuntimeInjector::generateRuntimeScript(api::ContextId id, resource::
     stream << "    };\n";
     stream << "    if (typeof console !== 'undefined' && console.log) {\n";
     stream << "        console.log('[DearOreUI] stage8 runtime injected, contextId="
-           << escapeJsString(std::to_string(id.value())) << ", bridge="
-           << (bridgeAvailable ? "true" : "false") << ", facet=' + (hasFacet ? 'yes' : 'no') + '');\n";
+           << escapeJsString(std::to_string(id.value())) << ", bridge=" << (bridgeAvailable ? "true" : "false")
+           << ", facet=' + (hasFacet ? 'yes' : 'no') + '');\n";
     stream << "    }\n";
     // Stage 8-A final contract: the facet channel is SINGLE-SHOT per view.
     // The first facet:request dispatch on a view terminates that page's JS
@@ -233,8 +235,8 @@ namespace {
 // `bodyOverride` (optional) replaces the spec's own body — used when a large
 // UI is injected in chunks.
 void appendUiSpec(
-    std::ostream& stream,
-    ui::OverlaySpec const& spec,
+    std::ostream&                       stream,
+    ui::OverlaySpec const&              spec,
     std::vector<render::DomNode> const* bodyOverride = nullptr
 ) {
     // Stage 8: parse the Mod-provided htmlBody into a DomNode forest and
@@ -246,8 +248,8 @@ void appendUiSpec(
     // (spec.domNodes) with per-state cssText (stateStyles) that the htmlBody
     // round-trip cannot represent; prefer it over parsing htmlBody.
     auto domNodes = bodyOverride != nullptr
-        ? *bodyOverride
-        : (spec.domNodes.empty() ? render::parseHtmlFragment(spec.htmlBody) : spec.domNodes);
+                      ? *bodyOverride
+                      : (spec.domNodes.empty() ? render::parseHtmlFragment(spec.htmlBody) : spec.domNodes);
     stream << "        {\n";
     stream << "            containerId: \"" << escapeJsString(spec.containerId) << "\",\n";
     stream << "            modNamespace: \"" << escapeJsString(spec.modNamespace) << "\",\n";
@@ -280,16 +282,14 @@ void appendUiSpec(
 // the showcase root panel) is split by children; otherwise the body is one
 // chunk. Returns groups of the root's children (NOT wrapped in the root) so
 // the first chunk mounts the root and later chunks append into it.
-std::vector<std::vector<render::DomNode>> chunkUiBody(
-    std::vector<render::DomNode> const& body,
-    std::size_t maxChunkNodes
-) {
+std::vector<std::vector<render::DomNode>>
+chunkUiBody(std::vector<render::DomNode> const& body, std::size_t maxChunkNodes) {
     std::vector<std::vector<render::DomNode>> chunks;
     if (body.size() == 1 && body[0].children.size() > maxChunkNodes) {
         auto const& root = body[0];
         for (std::size_t i = 0; i < root.children.size(); i += maxChunkNodes) {
             std::vector<render::DomNode> group;
-            auto const end = std::min(i + maxChunkNodes, root.children.size());
+            auto const                   end = std::min(i + maxChunkNodes, root.children.size());
             for (std::size_t j = i; j < end; ++j) {
                 group.push_back(root.children[j]);
             }
@@ -323,7 +323,7 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
     // per UI that reuses it. No single ExecuteScript exceeds the limit, and a
     // failure in one UI cannot take down the others.
     std::size_t submitted{0};
-    auto submitScript = [&](std::string const& script) -> bool {
+    auto        submitScript = [&](std::string const& script) -> bool {
         if (mBridge.isAvailable()) {
             auto sendResult = mBridge.sendScript(id, script);
             if (sendResult.isErr()) {
@@ -361,7 +361,7 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
         if (item.decision != ui::UiMountDecision::Mount) {
             continue;
         }
-        auto body = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
+        auto body   = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
         auto chunks = chunkUiBody(body, 4);
         for (std::size_t chunkIndex = 0; chunkIndex < chunks.size(); ++chunkIndex) {
             std::string script;
@@ -370,7 +370,7 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
                 std::vector<render::DomNode> mountBody;
                 if (body.size() == 1 && chunks.size() > 1) {
                     render::DomNode root = body[0];
-                    root.children = chunks[0];
+                    root.children        = chunks[0];
                     mountBody.push_back(std::move(root));
                 } else {
                     mountBody = chunks[0];
@@ -421,7 +421,8 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "    window.__DearOreUI__.ui.debug = [];\n";
     stream << "    window.__DearOreUI__.ui.dbg = function(msg) {\n";
     stream << "        window.__DearOreUI__.ui.debug.push(msg);\n";
-    stream << "        try { if (window.__DearOreUI__ && window.__DearOreUI__.ipc) window.__DearOreUI__.ipc.report('dbg:' + msg); } catch (e) {}\n";
+    stream << "        try { if (window.__DearOreUI__ && window.__DearOreUI__.ipc) "
+              "window.__DearOreUI__.ipc.report('dbg:' + msg); } catch (e) {}\n";
     stream << "    };\n";
     // Stage 8: universal renderer — build the Mod's DOM tree purely through
     // CSSOM. cohtml's HTML parser DROPS style="" attributes entirely
@@ -436,7 +437,8 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            var n = nodes[i];\n";
     stream << "            var el = document.createElement(n.t || 'div');\n";
     stream << "            if (n.s) {\n";
-    stream << "                try { el.style.cssText = n.s; } catch (e) { window.__DearOreUI__.ui.dbg('style_err:' + (e && e.message)); }\n";
+    stream << "                try { el.style.cssText = n.s; } catch (e) { window.__DearOreUI__.ui.dbg('style_err:' + "
+              "(e && e.message)); }\n";
     stream << "            }\n";
     stream << "            if (n.a) {\n";
     stream << "                for (var j = 0; j < n.a.length; j++) {\n";
@@ -615,7 +617,8 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "        }\n";
     stream << "    };\n";
     stream << "    window.__DearOreUI__.ui.report = function(msg) {\n";
-    stream << "        try { if (window.__DearOreUI__ && window.__DearOreUI__.ipc) window.__DearOreUI__.ipc.report(msg); } catch (e) {}\n";
+    stream << "        try { if (window.__DearOreUI__ && window.__DearOreUI__.ipc) "
+              "window.__DearOreUI__.ipc.report(msg); } catch (e) {}\n";
     stream << "    };\n";
     // Stage 7.1 fix: defer mounting until the document body exists. ExecuteScript
     // can run while the Coherent document is still loading; appending to a
@@ -628,10 +631,13 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
     stream << "            try {\n";
     stream << "                window.__DearOreUI__.ui.mount(spec);\n";
     stream << "                window.__DearOreUI__.ui.report('mounted:' + spec.containerId);\n";
-    stream << "                if (window.console && console.log) console.log('[DearOreUI] mounted ' + spec.containerId);\n";
+    stream << "                if (window.console && console.log) console.log('[DearOreUI] mounted ' + "
+              "spec.containerId);\n";
     stream << "            } catch (e) {\n";
-    stream << "                window.__DearOreUI__.ui.report('mount_error:' + spec.containerId + ':' + (e && e.message));\n";
-    stream << "                if (window.console && console.error) console.error('[DearOreUI] mount failed: ' + (e && e.message));\n";
+    stream << "                window.__DearOreUI__.ui.report('mount_error:' + spec.containerId + ':' + (e && "
+              "e.message));\n";
+    stream << "                if (window.console && console.error) console.error('[DearOreUI] mount failed: ' + (e && "
+              "e.message));\n";
     stream << "            }\n";
     stream << "        }\n";
     stream << "    };\n";
@@ -667,8 +673,8 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
 // large scripts, so the machinery must not be duplicated per UI.
 // `bodyOverride` (optional) replaces the spec's body for chunked injection.
 std::string RuntimeInjector::generateUiBodyScript(
-    api::ContextId id,
-    ui::UiMountItem const& item,
+    api::ContextId                      id,
+    ui::UiMountItem const&              item,
     std::vector<render::DomNode> const* bodyOverride
 ) const {
     static_cast<void>(id);
@@ -704,8 +710,8 @@ std::string RuntimeInjector::generateUiBodyScript(
 // append target (container.__dearOreUiRoot) and the invisible
 // __dearOreUiAppended counter in appendTo remain.
 std::string RuntimeInjector::generateUiAppendScript(
-    api::ContextId id,
-    std::string const& containerId,
+    api::ContextId                      id,
+    std::string const&                  containerId,
     std::vector<render::DomNode> const& nodes
 ) const {
     static_cast<void>(id);
@@ -716,7 +722,8 @@ std::string RuntimeInjector::generateUiAppendScript(
     stream << "    var nodes = " << render::serializeDomForest(nodes) << ";\n";
     stream << "    function dearOreUiAppend() {\n";
     stream << "        if (!document.body) return false;\n";
-    stream << "        try { return ui.appendTo(\"" << escapeJsString(containerId) << "\", nodes); } catch (e) { return false; }\n";
+    stream << "        try { return ui.appendTo(\"" << escapeJsString(containerId)
+           << "\", nodes); } catch (e) { return false; }\n";
     stream << "    }\n";
     stream << "    if (!dearOreUiAppend()) {\n";
     stream << "        var iv = setInterval(function() {\n";

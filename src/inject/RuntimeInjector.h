@@ -10,16 +10,12 @@ class RuntimeInjector : public IPageInjector {
 public:
     // JS->C++ uses the game's native Facet protocol. The C++ bridge remains
     // responsible for ExecuteScript and response delivery.
-    RuntimeInjector(
-        diagnostic::DiagnosticLogger& logger,
-        ipc::IHostBridge&             bridge
-    );
+    RuntimeInjector(diagnostic::DiagnosticLogger& logger, ipc::IHostBridge& bridge);
 
     [[nodiscard]] api::Result<InjectionReport>
     inject(api::ContextId id, resource::IResourceIndex const& index) override;
 
-    [[nodiscard]] api::Result<InjectionReport>
-    injectUi(api::ContextId id, ui::UiMountPlan const& plan) override;
+    [[nodiscard]] api::Result<InjectionReport> injectUi(api::ContextId id, ui::UiMountPlan const& plan) override;
 
 private:
     [[nodiscard]] std::string generateRuntimeScript(api::ContextId id, resource::IResourceIndex const& index) const;
@@ -31,16 +27,16 @@ private:
     // injected by the bootstrap script so each additional UI stays small.
     // `bodyOverride` (optional) replaces the spec's body for chunked injection.
     [[nodiscard]] std::string generateUiBodyScript(
-        api::ContextId id,
-        ui::UiMountItem const& item,
+        api::ContextId                      id,
+        ui::UiMountItem const&              item,
         std::vector<render::DomNode> const* bodyOverride = nullptr
     ) const;
     // Append-only script for chunked UIs: appends a node forest into an
     // already-mounted container (target captured by mount as
     // container.__dearOreUiRoot).
     [[nodiscard]] std::string generateUiAppendScript(
-        api::ContextId id,
-        std::string const& containerId,
+        api::ContextId                      id,
+        std::string const&                  containerId,
         std::vector<render::DomNode> const& nodes
     ) const;
 

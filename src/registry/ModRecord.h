@@ -7,8 +7,8 @@
 namespace dearoreui::registry {
 
 struct ModRecord {
-    api::ModManifest manifest;
-    bool             enabled{true};
+    api::ModManifest                      manifest;
+    bool                                  enabled{true};
     std::chrono::system_clock::time_point registeredAt;
 };
 

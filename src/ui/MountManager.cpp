@@ -41,7 +41,12 @@ api::Result<UiMountPlan> MountManager::mountPage(api::ContextId contextId, UiMou
             plan.errors.push_back(stateResult.error());
             ++plan.blocked;
             --plan.mounted;
-            diagnostic::recordStage7UiFailed(contextId, item.spec.modNamespace, item.spec.uiId, stateResult.error().message);
+            diagnostic::recordStage7UiFailed(
+                contextId,
+                item.spec.modNamespace,
+                item.spec.uiId,
+                stateResult.error().message
+            );
             continue;
         }
 
@@ -53,7 +58,12 @@ api::Result<UiMountPlan> MountManager::mountPage(api::ContextId contextId, UiMou
             plan.errors.push_back(hostResult.error());
             ++plan.blocked;
             --plan.mounted;
-            diagnostic::recordStage7UiFailed(contextId, item.spec.modNamespace, item.spec.uiId, hostResult.error().message);
+            diagnostic::recordStage7UiFailed(
+                contextId,
+                item.spec.modNamespace,
+                item.spec.uiId,
+                hostResult.error().message
+            );
             continue;
         }
 

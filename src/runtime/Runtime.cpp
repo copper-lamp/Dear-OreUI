@@ -17,9 +17,9 @@
 #include "inject/RuntimeInjector.h"
 #include "ipc/CoherentHostBridge.h"
 #include "poc/Stage1NavigationPoc.h"
-#include "resource/ResourceIndex.h"
 #include "render/DomScriptSerializer.h"
 #include "render/HtmlDomParser.h"
+#include "resource/ResourceIndex.h"
 #include "source/FileSystemSourceReader.h"
 #include "ui/MountManager.h"
 #include "ui/NullMountHost.h"
@@ -53,9 +53,7 @@ bool Runtime::initialize() {
             }
         }
     }
-    logger.info("stage8", "switch_loaded")
-        .withField("disable_hooks", mConfig.enableHooks ? "0" : "1")
-        .emit();
+    logger.info("stage8", "switch_loaded").withField("disable_hooks", mConfig.enableHooks ? "0" : "1").emit();
 
     if (mConfig.enableFileDiagnostics) {
         logger.addSink(
@@ -78,11 +76,9 @@ bool Runtime::initialize() {
     mRegistry           = std::make_unique<registry::ModRegistry>();
     mHostMethodRegistry = std::make_unique<ipc::HostMethodRegistry>();
     mFacetRegistry      = std::make_unique<facet::FacetRegistry>();
-    mApi                = std::make_unique<api::DearOreUIApi>(
-        *mRegistry, *mHostMethodRegistry, mCapabilities, logger
-    );
+    mApi                = std::make_unique<api::DearOreUIApi>(*mRegistry, *mHostMethodRegistry, mCapabilities, logger);
 
-    auto runtimeInfoFacet = std::make_shared<facet::RuntimeInfoFacet>(*mApi);
+    auto runtimeInfoFacet    = std::make_shared<facet::RuntimeInfoFacet>(*mApi);
     auto facetRegisterResult = mFacetRegistry->registerProvider(runtimeInfoFacet);
     if (facetRegisterResult.isErr()) {
         logger.warning("facet", "builtin_registration_failed")
@@ -91,13 +87,10 @@ bool Runtime::initialize() {
             .emit();
     }
 
-    auto runtimeInfoMethod = std::make_shared<facet::FacetHostMethod>(
-        runtimeInfoFacet, api::Permission::HostReadOnly
-    );
+    auto runtimeInfoMethod = std::make_shared<facet::FacetHostMethod>(runtimeInfoFacet, api::Permission::HostReadOnly);
     api::PermissionSet runtimePermissions{std::vector{api::Permission::HostReadOnly}};
-    auto               facetResult = mHostMethodRegistry->registerMethod(
-        api::ModId{"dearoreui"}, runtimePermissions, runtimeInfoMethod
-    );
+    auto               facetResult =
+        mHostMethodRegistry->registerMethod(api::ModId{"dearoreui"}, runtimePermissions, runtimeInfoMethod);
     if (facetResult.isErr()) {
         logger.warning("host", "builtin_facet_registration_failed")
             .withError(facetResult.error().code)
@@ -126,7 +119,7 @@ bool Runtime::enable() {
     mPageManager = std::make_unique<page::PageContextManager>();
     mApi->setPageManager(mPageManager.get());
     mViewRegistry = std::make_unique<ipc::CoherentViewRegistry>();
-    mHookAdapter = std::make_unique<hook::OreUIHookAdapter>(
+    mHookAdapter  = std::make_unique<hook::OreUIHookAdapter>(
         static_cast<hook::IPageHookCallback&>(*this),
         mCapabilities,
         *mViewRegistry,
@@ -137,36 +130,30 @@ bool Runtime::enable() {
     auto sourceBase = mConfig.minecraftDirectory / "data" / "gui" / "dist" / "hbui";
     mSourceReader   = std::make_unique<source::FileSystemSourceReader>(std::move(sourceBase));
 
-    mChangePlanner    = std::make_unique<transform::ChangePlanner>(*mRegistry);
-    mPageTransformer  = std::make_unique<transform::PageTransformer>();
+    mChangePlanner   = std::make_unique<transform::ChangePlanner>(*mRegistry);
+    mPageTransformer = std::make_unique<transform::PageTransformer>();
 
-    mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(
-        *mViewRegistry, ipc::defaultCoherentExecutor
-    );
-    mHostDispatcher = std::make_unique<ipc::HostDispatcher>(
-        *mHostMethodRegistry, *mPageManager, logger
-    );
+    mHostBridge     = std::make_unique<ipc::CoherentHostBridge>(*mViewRegistry, ipc::defaultCoherentExecutor);
+    mHostDispatcher = std::make_unique<ipc::HostDispatcher>(*mHostMethodRegistry, *mPageManager, logger);
     // The HostDispatcher is shared by the native Facet JS->C++ bridge and the
     // optional loopback transport. The active page contract currently uses
     // the game's native facet:request protocol; dynamic BindCall/
     // RegisterForEvent is deliberately not used on this client.
     mHostBridge->setHostDispatcher(*mHostDispatcher);
-    mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
+    mInjector = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
     // Stage 8-A: native facet JS->C++ channel. The createFacetRegistry hook
     // hands every fresh IFacetRegistry to the bridge, which registers the
     // "dearoreui" facet (game-native dispatch, no engine bindings) and pushes
     // responses back through the C++->JS bridge.
-    mOreUIFacetBridge = std::make_unique<ipc::OreUIFacetBridge>(
-        *mHostDispatcher, *mHostBridge
-    );
+    mOreUIFacetBridge = std::make_unique<ipc::OreUIFacetBridge>(*mHostDispatcher, *mHostBridge);
     mHookAdapter->setOnFacetRegistryCreated([this](void* registryPtr) {
         if (mOreUIFacetBridge != nullptr) {
             mOreUIFacetBridge->onFacetRegistryCreated(registryPtr);
         }
     });
-    mUiPlanner      = std::make_unique<ui::UiPlanner>(*mRegistry);
-    mMountHost      = std::make_unique<ui::NullMountHost>();
-    mMountManager   = std::make_unique<ui::MountManager>(*mMountHost);
+    mUiPlanner    = std::make_unique<ui::UiPlanner>(*mRegistry);
+    mMountHost    = std::make_unique<ui::NullMountHost>();
+    mMountManager = std::make_unique<ui::MountManager>(*mMountHost);
 
     bool result = true;
     if (mConfig.enableHooks) {
@@ -182,11 +169,11 @@ bool Runtime::enable() {
         .withField("minecraft_directory", mConfig.minecraftDirectory.string())
         .withField("hbui_root_exists", std::filesystem::exists(hbuiRoot) ? "true" : "false")
         .withField("hooks_installed", result ? "true" : "false")
+        .withField("bridge_available", mHostBridge != nullptr && mHostBridge->isAvailable() ? "true" : "false")
         .withField(
-            "bridge_available",
-            mHostBridge != nullptr && mHostBridge->isAvailable() ? "true" : "false"
+            "view_registry_has_view",
+            mViewRegistry != nullptr && mViewRegistry->hasActiveView() ? "true" : "false"
         )
-        .withField("view_registry_has_view", mViewRegistry != nullptr && mViewRegistry->hasActiveView() ? "true" : "false")
         .withField("enable_demo_overlay", mConfig.enableDemoOverlay ? "true" : "false")
         .emit();
 
@@ -384,10 +371,7 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
                 .withField("mounted", std::to_string(mountedPlan.mounted))
                 .withField("skipped", std::to_string(mountedPlan.skipped))
                 .withField("blocked", std::to_string(mountedPlan.blocked))
-                .withField(
-                    "bridge_available",
-                    mHostBridge != nullptr && mHostBridge->isAvailable() ? "true" : "false"
-                )
+                .withField("bridge_available", mHostBridge != nullptr && mHostBridge->isAvailable() ? "true" : "false")
                 .emit();
 
             auto uiInjectResult = mInjector->injectUi(id, mountedPlan);
@@ -401,10 +385,7 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
                 logger.info("stage7", "ui_inject_result")
                     .withContext(id)
                     .withField("ui_count", std::to_string(uiInjectResult.value().uiCount))
-                    .withField(
-                        "submitted",
-                        uiInjectResult.value().hostBridgeAvailable ? "true" : "false"
-                    )
+                    .withField("submitted", uiInjectResult.value().hostBridgeAvailable ? "true" : "false")
                     .emit();
             }
         } else {
@@ -477,16 +458,13 @@ void Runtime::registerDemoOverlay() {
         return;
     }
     auto& logger = diagnostic::globalLogger();
-    logger.info("demo", "register_attempt")
-        .withField("mod_id", "dearoreui")
-        .withField("ui_id", "demo")
-        .emit();
+    logger.info("demo", "register_attempt").withField("mod_id", "dearoreui").withField("ui_id", "demo").emit();
 
     api::ModManifest modManifest;
     modManifest.id           = api::ModId{"dearoreui"};
     modManifest.modNamespace = "dearoreui";
     modManifest.modVersion   = api::Version{0, 2, 0};
-    auto modResult = mApi->registerMod(modManifest);
+    auto modResult           = mApi->registerMod(modManifest);
     if (modResult.isErr()) {
         logger.warning("demo", "mod_registration_failed")
             .withError(modResult.error().code)
@@ -541,7 +519,7 @@ void Runtime::registerComponentShowcase() {
     modManifest.id           = api::ModId{"dearoreui"};
     modManifest.modNamespace = "dearoreui";
     modManifest.modVersion   = api::Version{0, 2, 0};
-    auto modResult = mApi->registerMod(modManifest);
+    auto modResult           = mApi->registerMod(modManifest);
     // The mod may already be registered by the demo overlay; that is fine —
     // both overlays share the same "dearoreui" mod. Only a non-already-registered
     // failure is fatal.
@@ -554,11 +532,11 @@ void Runtime::registerComponentShowcase() {
     }
 
     api::UiManifest uiManifest;
-    uiManifest.modNamespace  = "dearoreui";
-    uiManifest.id            = "component_showcase";
-    uiManifest.kind          = api::UiKind::Overlay;
-    uiManifest.pageScopes    = {api::PageScope::Any};
-    uiManifest.anchor        = api::UiAnchor::TopLeft;
+    uiManifest.modNamespace = "dearoreui";
+    uiManifest.id           = "component_showcase";
+    uiManifest.kind         = api::UiKind::Overlay;
+    uiManifest.pageScopes   = {api::PageScope::Any};
+    uiManifest.anchor       = api::UiAnchor::TopLeft;
     // Block clicks: the showcase is a review surface, so pointer events must
     // NOT pass through to the vanilla UI underneath (no accidental clicks).
     uiManifest.pointerEvents = true;
@@ -576,9 +554,9 @@ void Runtime::registerComponentShowcase() {
 
     auto section = [](std::string title) {
         component::ComponentSpec s;
-        s.kind  = component::ComponentKind::Text;
+        s.kind    = component::ComponentKind::Text;
         s.variant = "subheading";
-        s.label = title;
+        s.label   = title;
         return s;
     };
     auto text = [](std::string label, std::string variant) {
@@ -588,15 +566,16 @@ void Runtime::registerComponentShowcase() {
         t.label   = label;
         return t;
     };
-    auto button = [](std::string label, std::string variant, std::string style = "normal", std::string state = "default") {
-        component::ComponentSpec b;
-        b.kind    = component::ComponentKind::Button;
-        b.variant = variant;
-        b.style   = style;
-        b.state   = state;
-        b.label   = label;
-        return b;
-    };
+    auto button =
+        [](std::string label, std::string variant, std::string style = "normal", std::string state = "default") {
+            component::ComponentSpec b;
+            b.kind    = component::ComponentKind::Button;
+            b.variant = variant;
+            b.style   = style;
+            b.state   = state;
+            b.label   = label;
+            return b;
+        };
 
     // Text (representative type scale).
     root.children.push_back(section("Text"));
@@ -923,8 +902,8 @@ void Runtime::registerComponentShowcase() {
     // serialized JS body array so the real-client rendering issue can be
     // inspected without a debugger.
     {
-        auto html = component::renderComponentToHtml(root);
-        auto nodes = render::parseHtmlFragment(html);
+        auto          html  = component::renderComponentToHtml(root);
+        auto          nodes = render::parseHtmlFragment(html);
         std::ofstream dumpHtml(mConfig.dataDirectory / "showcase-html.html");
         dumpHtml << html;
         std::ofstream dumpBody(mConfig.dataDirectory / "showcase-body.js");

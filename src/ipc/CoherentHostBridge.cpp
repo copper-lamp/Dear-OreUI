@@ -19,7 +19,8 @@ void defaultCoherentExecutor(void* gamefaceView, std::string const& script) {
 }
 
 CoherentHostBridge::CoherentHostBridge(CoherentViewRegistry& registry, ScriptExecutor executor)
-: mRegistry(registry), mExecutor(executor) {
+: mRegistry(registry),
+  mExecutor(executor) {
     // The page signals script-context-ready via OnReadyForBindings; only then
     // is ExecuteScript accepted (it is silently dropped before that gate).
     mRegistry.setOnScriptContextReady([this]() { onScriptContextReady(); });
@@ -76,7 +77,7 @@ api::Result<IpcMessage> CoherentHostBridge::callHost(
     api::RequestId /*requestId*/,
     api::ContextId contextId,
     std::string    method,
-    std::string    /*payload*/,
+    std::string /*payload*/,
     std::chrono::milliseconds /*timeout*/
 ) {
     if (!isAvailable()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "api/manifest/Permission.h"
+#include "api/types/HostMethodManifest.h"
 #include "api/types/Id.h"
 #include "api/types/Result.h"
 #include "ipc/IHostMethod.h"
@@ -17,6 +18,7 @@ struct HostMethodEntry {
     api::RegistrationHandle      handle;
     api::ModId                   owner;
     api::PermissionSet           permissions;
+    api::HostMethodManifest      manifest;
     std::shared_ptr<IHostMethod> method;
 };
 
@@ -24,8 +26,17 @@ class HostMethodRegistry {
 public:
     HostMethodRegistry() = default;
 
-    [[nodiscard]] api::Result<api::RegistrationHandle>
-    registerMethod(const api::ModId& owner, api::PermissionSet const& permissions, const std::shared_ptr<IHostMethod>& method);
+    [[nodiscard]] api::Result<api::RegistrationHandle> registerMethod(
+        const api::ModId&                   owner,
+        api::PermissionSet const&           permissions,
+        const std::shared_ptr<IHostMethod>& method
+    );
+
+    [[nodiscard]] api::Result<api::RegistrationHandle> registerMethod(
+        const api::ModId&                   owner,
+        api::HostMethodManifest             manifest,
+        const std::shared_ptr<IHostMethod>& method
+    );
 
     [[nodiscard]] bool unregister(api::RegistrationHandle handle);
 

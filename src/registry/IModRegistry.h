@@ -17,14 +17,14 @@ public:
     virtual ~IModRegistry() = default;
 
     // Mod-level registration and lifecycle.
-    [[nodiscard]] virtual api::Result<api::ModId> registerMod(ModRecord record) = 0;
-    [[nodiscard]] virtual bool                    unregisterMod(api::ModId id)  = 0;
-    [[nodiscard]] virtual std::optional<ModRecord> findMod(api::ModId id) const = 0;
-    [[nodiscard]] virtual bool                    isModRegistered(api::ModId id) const = 0;
-    [[nodiscard]] virtual bool                    setModEnabled(api::ModId id, bool enabled) = 0;
-    [[nodiscard]] virtual bool                    isModEnabled(api::ModId id) const = 0;
-    [[nodiscard]] virtual std::vector<ModRecord>  allMods() const = 0;
-    [[nodiscard]] virtual std::size_t             modCount() const = 0;
+    [[nodiscard]] virtual api::Result<api::ModId>  registerMod(ModRecord record)              = 0;
+    [[nodiscard]] virtual bool                     unregisterMod(api::ModId id)               = 0;
+    [[nodiscard]] virtual std::optional<ModRecord> findMod(api::ModId id) const               = 0;
+    [[nodiscard]] virtual bool                     isModRegistered(api::ModId id) const       = 0;
+    [[nodiscard]] virtual bool                     setModEnabled(api::ModId id, bool enabled) = 0;
+    [[nodiscard]] virtual bool                     isModEnabled(api::ModId id) const          = 0;
+    [[nodiscard]] virtual std::vector<ModRecord>   allMods() const                            = 0;
+    [[nodiscard]] virtual std::size_t              modCount() const                           = 0;
 
     // Entry-level registration and lifecycle.
     [[nodiscard]] virtual api::Result<api::RegistrationHandle> insert(ResourceEntry entry)   = 0;

@@ -11,20 +11,19 @@
 
 namespace dearoreui::hook {
 
-std::mutex                       BindingProbe::sMutex;
+std::mutex                                   BindingProbe::sMutex;
 std::unordered_map<void*, BindingProbeSlots> BindingProbe::sSlots;
 
-using RegisterForEventFn      = void* (__fastcall*)(void*, char const*, void*);
-using UnregisterFromEventFn   = void (__fastcall*)(void*, void*);
-using TriggerEventFn          = void (__fastcall*)(void*, char const*);
+using RegisterForEventFn    = void*(__fastcall*)(void*, char const*, void*);
+using UnregisterFromEventFn = void(__fastcall*)(void*, void*);
+using TriggerEventFn        = void(__fastcall*)(void*, char const*);
 
 namespace {
 
 [[nodiscard]] std::uint64_t nowMs() {
     return static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()
-        ).count()
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+            .count()
     );
 }
 
@@ -164,8 +163,8 @@ void BindingProbe::install(void* gamefaceView) {
     }
 
     std::lock_guard lock{sMutex};
-    auto            [it, inserted] = sSlots.try_emplace(gamefaceView);
-    BindingProbeSlots&          BindingProbeSlots          = it->second;
+    auto [it, inserted]                  = sSlots.try_emplace(gamefaceView);
+    BindingProbeSlots& BindingProbeSlots = it->second;
     if (!inserted && BindingProbeSlots.registerForEvent != nullptr) {
         return; // already installed for this view
     }
@@ -232,5 +231,3 @@ void BindingProbe::clearAll() {
 }
 
 } // namespace dearoreui::hook
-
-

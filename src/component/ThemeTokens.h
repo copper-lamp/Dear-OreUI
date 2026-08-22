@@ -38,7 +38,7 @@ struct ThemeTokens {
     std::string colorPanel{"rgba(0,0,0,0.72)"};
 
     // --fonts*
-    std::string fontHeading{"Minecraft Ten v2"};   // --fontsHeading
+    std::string fontHeading{"Minecraft Ten v2"};     // --fontsHeading
     std::string fontSubheading{"Minecraft Five v2"}; // --fontsSubHeading
     std::string fontUi{"Minecraft Seven v2"};        // --fontsUi
     std::string fontBody{"Noto Sans"};               // --fontsBody

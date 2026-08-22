@@ -4,9 +4,9 @@
 #include "component/ComponentRenderer.h"
 #include "diagnostic/Stage6TransformTelemetry.h"
 #include "diagnostic/Stage7UiTelemetry.h"
+#include "page/IPageContextManager.h"
 #include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
-#include "page/IPageContextManager.h"
 
 #include <algorithm>
 #include <chrono>
@@ -18,7 +18,7 @@ DearOreUIApi::DearOreUIApi(
     ipc::HostMethodRegistry&      hostMethodRegistry,
     capability::ICapabilityQuery& capabilities,
     diagnostic::DiagnosticLogger& logger,
-    page::IPageContextManager* pageManager
+    page::IPageContextManager*    pageManager
 )
 : mRegistry(registry),
   mHostMethodRegistry(hostMethodRegistry),
@@ -43,11 +43,37 @@ std::uint32_t DearOreUIApi::getProtocolVersion() const { return DearOreUIProtoco
 
 bool DearOreUIApi::isReady() const { return mReady.load(std::memory_order_relaxed); }
 
+CompatibilityReport DearOreUIApi::checkCompatibility(CompatibilityRequirement const& requirement) const {
+    auto                info = getInfo();
+    CompatibilityReport report;
+    report.protocolVersion  = info.protocolVersion;
+    report.oreuiVersion     = info.modVersion;
+    report.minecraftVersion = info.minecraftVersion;
+    report.coherentVersion  = info.coherentVersion;
+    report.pageScope        = requirement.pageScope;
+    report.fingerprint      = requirement.fingerprint;
+
+    if (requirement.protocolVersion != 0 && requirement.protocolVersion != info.protocolVersion) {
+        report.status = CompatibilityStatus::Unsupported;
+        report.reasons.push_back("protocol version mismatch");
+    } else if (!requirement.oreuiVersion.toString().empty() && !info.modVersion.satisfies(requirement.oreuiVersion)) {
+        report.status = CompatibilityStatus::Unsupported;
+        report.reasons.push_back("OreUI version does not satisfy requirement");
+    } else if (!requirement.minecraftVersion.empty() && info.minecraftVersion.empty()) {
+        report.status = CompatibilityStatus::Unknown;
+        report.warnings.push_back("Minecraft version is not available");
+    } else if (!requirement.coherentVersion.empty() && info.coherentVersion.empty()) {
+        report.status = CompatibilityStatus::Unknown;
+        report.warnings.push_back("Coherent version is not available");
+    } else {
+        report.status = CompatibilityStatus::Compatible;
+    }
+    return report;
+}
+
 void DearOreUIApi::setReady(bool ready) { mReady.store(ready, std::memory_order_relaxed); }
 
-void DearOreUIApi::setPageManager(page::IPageContextManager* pageManager) {
-    mPageManager = pageManager;
-}
+void DearOreUIApi::setPageManager(page::IPageContextManager* pageManager) { mPageManager = pageManager; }
 
 void DearOreUIApi::notifyPage(PageEvent event, PageContextView const& context) {
     std::vector<PageCallback> callbacks;
@@ -57,24 +83,24 @@ void DearOreUIApi::notifyPage(PageEvent event, PageContextView const& context) {
             static_cast<void>(handle);
             if (subscription.event != event) continue;
             if (!subscription.scopes.empty()
-                && std::find(subscription.scopes.begin(), subscription.scopes.end(), context.page.scope) == subscription.scopes.end()) {
+                && std::find(subscription.scopes.begin(), subscription.scopes.end(), context.page.scope)
+                       == subscription.scopes.end()) {
                 continue;
             }
             callbacks.push_back(subscription.callback);
         }
     }
     for (auto const& callback : callbacks) {
-        try { callback(context); } catch (...) {
+        try {
+            callback(context);
+        } catch (...) {
             mLogger.error("api", "page_callback_failed").withContext(context.id).emit();
         }
     }
 }
 
-Result<SubscriptionHandle> DearOreUIApi::subscribePage(
-    PageSubscriptionOptions options,
-    PageEvent event,
-    PageCallback callback
-) {
+Result<SubscriptionHandle>
+DearOreUIApi::subscribePage(PageSubscriptionOptions options, PageEvent event, PageCallback callback) {
     if (!options.owner.isValid() || !mRegistry.isModRegistered(options.owner)) {
         return Error{ErrorCode::InvalidArgument, "subscription owner mod is not registered"};
     }
@@ -84,16 +110,19 @@ Result<SubscriptionHandle> DearOreUIApi::subscribePage(
     auto handle = SubscriptionHandle{mNextSubscription++};
     {
         std::lock_guard lock(mPageSubscriptionMutex);
-        mPageSubscriptions.emplace(handle, PageSubscription{options.owner, std::move(options.scopes), event, std::move(callback)});
+        mPageSubscriptions.emplace(
+            handle,
+            PageSubscription{options.owner, std::move(options.scopes), event, std::move(callback)}
+        );
     }
     return handle;
 }
 
 Result<void> DearOreUIApi::unsubscribePage(SubscriptionHandle handle) {
     std::lock_guard lock(mPageSubscriptionMutex);
-    if (mPageSubscriptions.erase(handle) == 0) {
-        return Error{ErrorCode::NotFound, "page subscription not found"};
-    }
+    // Unsubscribe is intentionally idempotent: cleanup paths may race with
+    // explicit Mod shutdown without turning a successful cleanup into an error.
+    mPageSubscriptions.erase(handle);
     return Result<void>::success();
 }
 
@@ -319,7 +348,7 @@ Result<void> DearOreUIApi::unregisterMod(ModId id) {
             it = it->second.owner == id ? mPageSubscriptions.erase(it) : std::next(it);
         }
     }
-    bool        removed        = mRegistry.unregisterMod(id);
+    bool removed = mRegistry.unregisterMod(id);
     if (!removed) {
         return Error{ErrorCode::NotFound, "mod is not registered"};
     }
@@ -338,10 +367,9 @@ bool DearOreUIApi::setModEnabled(ModId id, bool enabled) { return mRegistry.setM
 
 bool DearOreUIApi::isModEnabled(ModId id) const { return mRegistry.isModEnabled(id); }
 
-Result<RegistrationHandle>
-DearOreUIApi::registerHostMethod(
-    ModId owner,
-    PermissionSet const& permissions,
+Result<RegistrationHandle> DearOreUIApi::registerHostMethod(
+    ModId                             owner,
+    PermissionSet const&              permissions,
     std::shared_ptr<ipc::IHostMethod> method
 ) {
     if (!owner.isValid()) {
@@ -369,6 +397,22 @@ DearOreUIApi::registerHostMethod(
     return result.value();
 }
 
+Result<RegistrationHandle>
+DearOreUIApi::registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<ipc::IHostMethod> method) {
+    if (!owner.isValid() || !mRegistry.isModRegistered(owner)) {
+        return Error{ErrorCode::InvalidArgument, "owner mod is not registered"};
+    }
+    auto result = mHostMethodRegistry.registerMethod(owner, std::move(manifest), method);
+    if (result.isErr()) {
+        mLogger.warning("host", "method_registration_failed")
+            .withMod(owner)
+            .withError(result.error().code)
+            .withMessage(result.error().message)
+            .emit();
+    }
+    return result;
+}
+
 Result<void> DearOreUIApi::unregisterHostMethod(RegistrationHandle handle) {
     if (!handle.isValid()) {
         return Error{ErrorCode::InvalidArgument, "handle is invalid"};
@@ -386,13 +430,13 @@ Result<void> DearOreUIApi::unregisterHostMethod(RegistrationHandle handle) {
 namespace {
 
 [[nodiscard]] dearoreui::api::Result<dearoreui::api::RegistrationHandle> registerUiImpl(
-    dearoreui::api::ModId                                              owner,
-    dearoreui::api::UiManifest                                         manifest,
-    std::string                                                        htmlBody,
-    dearoreui::api::UiKind                                             expectedKind,
-    dearoreui::registry::IModRegistry&                                 registry,
-    dearoreui::diagnostic::DiagnosticLogger&                           logger,
-    std::vector<dearoreui::render::DomNode>                            domNodes = {}
+    dearoreui::api::ModId                    owner,
+    dearoreui::api::UiManifest               manifest,
+    std::string                              htmlBody,
+    dearoreui::api::UiKind                   expectedKind,
+    dearoreui::registry::IModRegistry&       registry,
+    dearoreui::diagnostic::DiagnosticLogger& logger,
+    std::vector<dearoreui::render::DomNode>  domNodes = {}
 ) {
     using namespace dearoreui::api;
 
@@ -456,18 +500,15 @@ DearOreUIApi::registerOverlay(ModId owner, UiManifest const& manifest, std::stri
     return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Overlay, mRegistry, mLogger);
 }
 
-Result<RegistrationHandle>
-DearOreUIApi::registerPanel(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+Result<RegistrationHandle> DearOreUIApi::registerPanel(ModId owner, UiManifest const& manifest, std::string htmlBody) {
     return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Panel, mRegistry, mLogger);
 }
 
-Result<RegistrationHandle>
-DearOreUIApi::registerButton(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+Result<RegistrationHandle> DearOreUIApi::registerButton(ModId owner, UiManifest const& manifest, std::string htmlBody) {
     return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Button, mRegistry, mLogger);
 }
 
-Result<RegistrationHandle>
-DearOreUIApi::registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) {
+Result<RegistrationHandle> DearOreUIApi::registerPage(ModId owner, UiManifest const& manifest, std::string htmlBody) {
     return registerUiImpl(owner, manifest, std::move(htmlBody), UiKind::Page, mRegistry, mLogger);
 }
 
@@ -480,7 +521,7 @@ DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, compone
     //
     // M8.1.2: also keep the rendered DomNode forest (with per-state cssText
     // stateStyles) so injection can skip the lossy htmlBody round-trip.
-    auto nodes = component::renderComponent(spec);
+    auto        nodes    = component::renderComponent(spec);
     std::string htmlBody = component::renderComponentToHtml(spec);
 
     mLogger.info("ui", "component_registered")
@@ -503,7 +544,7 @@ Result<void> DearOreUIApi::unregisterUi(RegistrationHandle handle) {
         return Error{ErrorCode::NotFound, "ui registration handle not found"};
     }
 
-    auto const& entry = std::get<registry::UiEntry>(found.value());
+    auto const& entry   = std::get<registry::UiEntry>(found.value());
     bool        removed = mRegistry.remove(handle);
     if (!removed) {
         return Error{ErrorCode::NotFound, "ui registration handle not found"};

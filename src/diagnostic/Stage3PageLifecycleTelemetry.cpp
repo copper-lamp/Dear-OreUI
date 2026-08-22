@@ -41,10 +41,7 @@ void initializeStage3FileSink(const std::filesystem::path& dataDirectory, std::s
     auto& logger = globalLogger();
     auto& sink   = stage3Sink();
     if (!sink) {
-        sink = std::make_shared<Stage0FileSink>(
-            dataDirectory / "telemetry" / "stage3-page-lifecycle.txt",
-            sessionId
-        );
+        sink = std::make_shared<Stage0FileSink>(dataDirectory / "telemetry" / "stage3-page-lifecycle.txt", sessionId);
         logger.addSink(sink);
     }
 }

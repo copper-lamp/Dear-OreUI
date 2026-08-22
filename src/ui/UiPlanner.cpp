@@ -9,10 +9,7 @@ namespace dearoreui::ui {
 
 namespace {
 
-[[nodiscard]] std::string conflictReason(
-    api::UiManifest const& manifest,
-    std::vector<std::string> const& blockedBy
-) {
+[[nodiscard]] std::string conflictReason(api::UiManifest const& manifest, std::vector<std::string> const& blockedBy) {
     std::ostringstream stream;
     stream << "UI " << manifest.modNamespace << "/" << manifest.id << " blocked by conflict with:";
     for (auto const& other : blockedBy) {
@@ -48,16 +45,12 @@ std::vector<api::ModId> UiPlanner::buildModOrder(registry::IModRegistry& registr
     // Simple deterministic ordering: by namespace then mod id.
     // Stage 6 already performs full dependency resolution for resource entries;
     // UI ordering follows the same stable principle without re-implementing the resolver.
-    std::sort(
-        enabled.begin(),
-        enabled.end(),
-        [](registry::ModRecord const& a, registry::ModRecord const& b) {
-            if (a.manifest.modNamespace != b.manifest.modNamespace) {
-                return a.manifest.modNamespace < b.manifest.modNamespace;
-            }
-            return a.manifest.id.value() < b.manifest.id.value();
+    std::sort(enabled.begin(), enabled.end(), [](registry::ModRecord const& a, registry::ModRecord const& b) {
+        if (a.manifest.modNamespace != b.manifest.modNamespace) {
+            return a.manifest.modNamespace < b.manifest.modNamespace;
         }
-    );
+        return a.manifest.id.value() < b.manifest.id.value();
+    });
 
     std::vector<api::ModId> order;
     order.reserve(enabled.size());
@@ -72,7 +65,7 @@ UiMountPlan UiPlanner::plan(api::ContextId contextId, api::PageScope scope) cons
     plan.contextId = contextId;
     plan.pageScope = scope;
 
-    auto modOrder = buildModOrder(mRegistry);
+    auto                                         modOrder = buildModOrder(mRegistry);
     std::unordered_map<std::string, std::size_t> modOrderIndex;
     for (std::size_t index = 0; index < modOrder.size(); ++index) {
         modOrderIndex.emplace(modOrder[index].value(), index);
@@ -155,17 +148,17 @@ UiMountPlan UiPlanner::plan(api::ContextId contextId, api::PageScope scope) cons
         }
 
         OverlaySpec spec;
-        spec.handle       = entry.handle;
-        spec.modNamespace = entry.manifest.modNamespace;
-        spec.uiId         = entry.manifest.id;
-        spec.kind         = entry.manifest.kind;
-        spec.containerId  = containerId;
-        spec.anchor       = entry.manifest.anchor;
+        spec.handle        = entry.handle;
+        spec.modNamespace  = entry.manifest.modNamespace;
+        spec.uiId          = entry.manifest.id;
+        spec.kind          = entry.manifest.kind;
+        spec.containerId   = containerId;
+        spec.anchor        = entry.manifest.anchor;
         spec.pointerEvents = entry.manifest.pointerEvents;
-        spec.htmlBody     = entry.htmlBody;
-        spec.domNodes     = entry.domNodes;
-        spec.scripts      = entry.manifest.scripts;
-        spec.styles       = entry.manifest.styles;
+        spec.htmlBody      = entry.htmlBody;
+        spec.domNodes      = entry.domNodes;
+        spec.scripts       = entry.manifest.scripts;
+        spec.styles        = entry.manifest.styles;
 
         UiMountItem item;
         item.handle   = entry.handle;
@@ -180,39 +173,29 @@ UiMountPlan UiPlanner::plan(api::ContextId contextId, api::PageScope scope) cons
     }
 
     // Deterministic ordering: mod order, then namespace, then kind, then id, then handle.
-    std::sort(
-        plan.items.begin(),
-        plan.items.end(),
-        [&modOrderIndex](UiMountItem const& a, UiMountItem const& b) {
-            auto aOwner = modOrderIndex.find(a.manifest.modNamespace);
-            auto bOwner = modOrderIndex.find(b.manifest.modNamespace);
-            std::size_t aIndex = (aOwner == modOrderIndex.end()) ? std::numeric_limits<std::size_t>::max() : aOwner->second;
-            std::size_t bIndex = (bOwner == modOrderIndex.end()) ? std::numeric_limits<std::size_t>::max() : bOwner->second;
-            if (aIndex != bIndex) {
-                return aIndex < bIndex;
-            }
-            if (a.manifest.modNamespace != b.manifest.modNamespace) {
-                return a.manifest.modNamespace < b.manifest.modNamespace;
-            }
-            if (a.manifest.kind != b.manifest.kind) {
-                return static_cast<int>(a.manifest.kind) < static_cast<int>(b.manifest.kind);
-            }
-            if (a.manifest.id != b.manifest.id) {
-                return a.manifest.id < b.manifest.id;
-            }
-            return a.handle.value() < b.handle.value();
+    std::sort(plan.items.begin(), plan.items.end(), [&modOrderIndex](UiMountItem const& a, UiMountItem const& b) {
+        auto        aOwner = modOrderIndex.find(a.manifest.modNamespace);
+        auto        bOwner = modOrderIndex.find(b.manifest.modNamespace);
+        std::size_t aIndex = (aOwner == modOrderIndex.end()) ? std::numeric_limits<std::size_t>::max() : aOwner->second;
+        std::size_t bIndex = (bOwner == modOrderIndex.end()) ? std::numeric_limits<std::size_t>::max() : bOwner->second;
+        if (aIndex != bIndex) {
+            return aIndex < bIndex;
         }
-    );
+        if (a.manifest.modNamespace != b.manifest.modNamespace) {
+            return a.manifest.modNamespace < b.manifest.modNamespace;
+        }
+        if (a.manifest.kind != b.manifest.kind) {
+            return static_cast<int>(a.manifest.kind) < static_cast<int>(b.manifest.kind);
+        }
+        if (a.manifest.id != b.manifest.id) {
+            return a.manifest.id < b.manifest.id;
+        }
+        return a.handle.value() < b.handle.value();
+    });
 
     plan.success = plan.errors.empty();
 
-    diagnostic::recordStage7UiPlanned(
-        contextId,
-        scope,
-        plan.mounted,
-        plan.skipped,
-        plan.blocked
-    );
+    diagnostic::recordStage7UiPlanned(contextId, scope, plan.mounted, plan.skipped, plan.blocked);
 
     return plan;
 }

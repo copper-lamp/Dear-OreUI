@@ -44,19 +44,19 @@ enum class UiAnchor {
 };
 
 struct UiManifest {
-    std::string                modNamespace;
-    std::string                id;
-    UiKind                     kind{UiKind::Overlay};
-    std::vector<PageScope>     pageScopes;
-    UiAnchor                   anchor{UiAnchor::FullScreen};
-    bool                       pointerEvents{false};
-    std::string                containerId;
-    std::vector<std::string>   scripts;
-    std::vector<std::string>   styles;
-    std::vector<Dependency>    dependencies;
-    std::vector<std::string>   conflicts;
-    PermissionSet              permissions;
-    std::string                fingerprint;
+    std::string              modNamespace;
+    std::string              id;
+    UiKind                   kind{UiKind::Overlay};
+    std::vector<PageScope>   pageScopes;
+    UiAnchor                 anchor{UiAnchor::FullScreen};
+    bool                     pointerEvents{false};
+    std::string              containerId;
+    std::vector<std::string> scripts;
+    std::vector<std::string> styles;
+    std::vector<Dependency>  dependencies;
+    std::vector<std::string> conflicts;
+    PermissionSet            permissions;
+    std::string              fingerprint;
 
     [[nodiscard]] bool operator==(UiManifest const& other) const {
         return modNamespace == other.modNamespace && id == other.id && kind == other.kind
@@ -67,12 +67,12 @@ struct UiManifest {
 };
 
 [[nodiscard]] inline std::string makeUiContainerId(std::string_view modNamespace, UiKind kind, std::string_view id) {
-    std::string result = "dearoreui-";
-    result += modNamespace;
-    result += "-";
-    result += uiKindName(kind);
-    result += "-";
-    result += id;
+    std::string result  = "dearoreui-";
+    result             += modNamespace;
+    result             += "-";
+    result             += uiKindName(kind);
+    result             += "-";
+    result             += id;
     return result;
 }
 

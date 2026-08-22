@@ -121,14 +121,10 @@ LL_AUTO_STATIC_HOOK(
     const wchar_t* lpOutputString
 ) {
     if (lpOutputString != nullptr) {
-        int const length = ::WideCharToMultiByte(
-            CP_UTF8, 0, lpOutputString, -1, nullptr, 0, nullptr, nullptr
-        );
+        int const length = ::WideCharToMultiByte(CP_UTF8, 0, lpOutputString, -1, nullptr, 0, nullptr, nullptr);
         if (length > 0) {
             std::string utf8(static_cast<std::size_t>(length), '\0');
-            ::WideCharToMultiByte(
-                CP_UTF8, 0, lpOutputString, -1, utf8.data(), length, nullptr, nullptr
-            );
+            ::WideCharToMultiByte(CP_UTF8, 0, lpOutputString, -1, utf8.data(), length, nullptr, nullptr);
             if (containsDearOreUi(utf8)) {
                 recordOdsLine(utf8);
             }
@@ -310,12 +306,12 @@ LL_TYPE_INSTANCE_HOOK(
 bool readCodeBytesHex(void const* fn, char out[64]) {
     if (fn == nullptr) return false;
     __try {
-        auto const* bytes = static_cast<std::uint8_t const*>(fn);
+        auto const*           bytes  = static_cast<std::uint8_t const*>(fn);
         static constexpr char kHex[] = "0123456789abcdef";
         for (int b = 0; b < 32; ++b) {
             std::uint8_t const byte = bytes[b];
-            out[b * 2]     = kHex[(byte >> 4) & 0xF];
-            out[b * 2 + 1] = kHex[byte & 0xF];
+            out[b * 2]              = kHex[(byte >> 4) & 0xF];
+            out[b * 2 + 1]          = kHex[byte & 0xF];
         }
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -329,11 +325,11 @@ void dumpViewVtable(void* gamefaceView) {
         diagnostic::recordStage0("js", "event=vtable_null");
         return;
     }
-    std::string line = "event=vtable\tptr=";
-    line += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
-    line += "\tvtable=";
-    line += std::to_string(reinterpret_cast<std::uintptr_t>(vtable));
-    line += "\tslots=";
+    std::string line  = "event=vtable\tptr=";
+    line             += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
+    line             += "\tvtable=";
+    line             += std::to_string(reinterpret_cast<std::uintptr_t>(vtable));
+    line             += "\tslots=";
     for (int i = 0; i < 72; ++i) {
         if (i > 0) line += ",";
         line += std::to_string(reinterpret_cast<std::uintptr_t>(vtable[i]));
@@ -346,8 +342,8 @@ void dumpViewVtable(void* gamefaceView) {
     // quickly) and correlate them with the real engine's vtable order, without
     // ever invoking an unverified slot (the BindCall slot corrupted the heap).
     // 72 slots covers the full SDK interface (up to TriggerEvent at index 75).
-    std::string hexLine = "event=vtable_bytes\tptr=";
-    hexLine += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
+    std::string hexLine  = "event=vtable_bytes\tptr=";
+    hexLine             += std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView));
     for (int i = 0; i < 72; ++i) {
         hexLine += "\tslot" + std::to_string(i) + "=";
         char buffer[64];
@@ -501,9 +497,9 @@ LL_TYPE_INSTANCE_HOOK(
     // the first events plus anything that looks like a page/navigation event.
     static std::atomic<int> triggerCount{0};
     int const               n = triggerCount.fetch_add(1);
-    bool const              interesting = eventName.find("Navigation") != std::string::npos
-        || eventName.find("Ready") != std::string::npos || eventName.find("Load") != std::string::npos
-        || eventName.find("Scene") != std::string::npos;
+    bool const interesting    = eventName.find("Navigation") != std::string::npos
+                             || eventName.find("Ready") != std::string::npos || eventName.find("Load") != std::string::npos
+                             || eventName.find("Scene") != std::string::npos;
     if (n < 40 || interesting) {
         diagnostic::recordStage0("js", "event=trigger_entered\tname=" + eventName);
     }
@@ -647,10 +643,10 @@ bool OreUIHookAdapter::install() {
     auto& adapterState = state();
     {
         std::lock_guard lock{adapterState.mutex};
-        adapterState.callback       = &mCallback;
-        adapterState.probe          = &mProbe;
-        adapterState.capabilities   = &mCapabilities;
-        adapterState.viewRegistry   = &mViewRegistry;
+        adapterState.callback     = &mCallback;
+        adapterState.probe        = &mProbe;
+        adapterState.capabilities = &mCapabilities;
+        adapterState.viewRegistry = &mViewRegistry;
     }
     if (allInstalled()) {
         return true;
@@ -674,7 +670,7 @@ bool OreUIHookAdapter::install() {
     // Stage 8-A: optional createFacetRegistry hook — its failure must not
     // block the mod (the mod still delivers C++->JS without it).
     bool const facetRegistryFactoryInstalled = Stage8AFacetRegistryFactoryHook::hook() == 0;
-    adapterState.facetRegistryFactory         = facetRegistryFactoryInstalled;
+    adapterState.facetRegistryFactory        = facetRegistryFactoryInstalled;
 
     // Stage 7.1: triggerEvent is a diagnostic-only hook; its failure must not
     // block the mod (the ODS and vtable diagnostics already cover the rest).

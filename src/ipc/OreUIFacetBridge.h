@@ -29,10 +29,7 @@ namespace dearoreui::ipc {
 // pure-virtual registerFacet (vtable dispatch, no symbol dependency).
 class OreUIFacetBridge {
 public:
-    OreUIFacetBridge(
-        HostDispatcher& dispatcher,
-        IHostBridge&    bridge
-    );
+    OreUIFacetBridge(HostDispatcher& dispatcher, IHostBridge& bridge);
     ~OreUIFacetBridge();
 
     // Called by the createFacetRegistry hook (game thread) for every fresh
@@ -44,9 +41,8 @@ public:
     // Extracts "params" (an IpcMessage JSON string), dispatches it, and pushes
     // the serialized response back to the page bus. Returns false on hard
     // protocol failure (maps to OreUI::Status::Error -> facet:error to JS).
-    [[nodiscard]] bool onFacetInit(
-        std::unordered_map<std::string, std::variant<double, bool, std::string>> const& payload
-    );
+    [[nodiscard]] bool
+    onFacetInit(std::unordered_map<std::string, std::variant<double, bool, std::string>> const& payload);
 
     [[nodiscard]] char const* facetName() const;
 

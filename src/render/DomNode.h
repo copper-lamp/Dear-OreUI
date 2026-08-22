@@ -27,7 +27,7 @@ struct DomNode {
     // cssText (border-image...), and `baseStyle` holds the shared non-texture
     // part. The bootstrap applies `baseStyle + stateStyles[state]` on switch;
     // `style` holds the full cssText of the effective state for initial render.
-    std::string          baseStyle;
+    std::string                                      baseStyle;
     std::vector<std::pair<std::string, std::string>> stateStyles;
 };
 

@@ -134,22 +134,22 @@ enum class ComponentKind {
 }
 
 struct ComponentSpec {
-    ComponentKind             kind{ComponentKind::Panel};
-    std::string               label;    // primary text (button/panel title/input hint)
-    std::string               variant;  // button: primary/secondary/neutral/destructive
-    std::string               style{"normal"}; // button: normal|elevated; panel: default|dark|furnace|chest|...
-    bool                      disabled{false};
-    std::string               state{"default"}; // default|hovered|focused|pressed|disabled (+pressedFocused/disabledFocused)
-    std::vector<std::string>  events;   // "click" / "change" (declared for wiring)
-    std::vector<ComponentSpec> children;
+    ComponentKind kind{ComponentKind::Panel};
+    std::string   label;           // primary text (button/panel title/input hint)
+    std::string   variant;         // button: primary/secondary/neutral/destructive
+    std::string   style{"normal"}; // button: normal|elevated; panel: default|dark|furnace|chest|...
+    bool          disabled{false};
+    std::string   state{"default"};      // default|hovered|focused|pressed|disabled (+pressedFocused/disabledFocused)
+    std::vector<std::string>     events; // "click" / "change" (declared for wiring)
+    std::vector<ComponentSpec>   children;
     std::vector<render::DomNode> body; // raw DOM content (panel/card body)
     // Stage 8.1.4: layout / composite / data component fields.
-    std::string               orientation{"column"}; // stack: column|row
-    int                       columns{1};            // grid: column count
-    std::string               icon;    // icon/image: asset key (VanillaAssets::icon)
-    std::string               src;     // image: explicit URL (overrides icon)
-    std::string               value;   // slider/stepper/pager: current value
-    std::string               min, max; // slider: range
+    std::string orientation{"column"}; // stack: column|row
+    int         columns{1};            // grid: column count
+    std::string icon;                  // icon/image: asset key (VanillaAssets::icon)
+    std::string src;                   // image: explicit URL (overrides icon)
+    std::string value;                 // slider/stepper/pager: current value
+    std::string min, max;              // slider: range
 };
 
 } // namespace dearoreui::component

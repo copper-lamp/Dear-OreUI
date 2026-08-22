@@ -101,7 +101,8 @@ std::vector<Conflict> ConflictDetector::detect(std::vector<ChangeOperation>& ope
                 }
                 auto byFullPathIterator = byFullPath.find(declared);
                 if (byFullPathIterator != byFullPath.end()) {
-                    candidates.insert(candidates.end(), byFullPathIterator->second.begin(), byFullPathIterator->second.end());
+                    candidates
+                        .insert(candidates.end(), byFullPathIterator->second.begin(), byFullPathIterator->second.end());
                 }
                 for (auto index : candidates) {
                     auto& target = operations[index];

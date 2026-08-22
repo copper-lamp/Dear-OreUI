@@ -47,7 +47,7 @@ public:
     static BindingProbeSlots* find(void* view);
 
 private:
-    static std::mutex                                sMutex;
+    static std::mutex                                   sMutex;
     static std::unordered_map<void*, BindingProbeSlots> sSlots;
 };
 

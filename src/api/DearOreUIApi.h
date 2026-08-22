@@ -11,8 +11,6 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
-#include <mutex>
-#include <unordered_map>
 
 namespace dearoreui::page {
 class IPageContextManager;
@@ -27,14 +25,15 @@ public:
         ipc::HostMethodRegistry&      hostMethodRegistry,
         capability::ICapabilityQuery& capabilities,
         diagnostic::DiagnosticLogger& logger,
-        page::IPageContextManager* pageManager = nullptr
+        page::IPageContextManager*    pageManager = nullptr
     );
 
-    [[nodiscard]] ApiInfo       getInfo() const override;
-    [[nodiscard]] CapabilitySet getCapabilities() const override;
-    [[nodiscard]] SupportLevel  checkSupport(Capability capability) const override;
-    [[nodiscard]] std::uint32_t getProtocolVersion() const override;
-    [[nodiscard]] bool          isReady() const override;
+    [[nodiscard]] ApiInfo             getInfo() const override;
+    [[nodiscard]] CapabilitySet       getCapabilities() const override;
+    [[nodiscard]] SupportLevel        checkSupport(Capability capability) const override;
+    [[nodiscard]] std::uint32_t       getProtocolVersion() const override;
+    [[nodiscard]] bool                isReady() const override;
+    [[nodiscard]] CompatibilityReport checkCompatibility(CompatibilityRequirement const& requirement) const override;
 
     [[nodiscard]] Result<RegistrationHandle>
     registerResource(ModId owner, ResourceManifest const& manifest, std::string payload) override;
@@ -53,22 +52,21 @@ public:
     [[nodiscard]] bool          setModEnabled(ModId id, bool enabled) override;
     [[nodiscard]] bool          isModEnabled(ModId id) const override;
 
-    [[nodiscard]] Result<SubscriptionHandle> subscribePage(
-        PageSubscriptionOptions options,
-        PageEvent event,
-        PageCallback callback
-    ) override;
+    [[nodiscard]] Result<SubscriptionHandle>
+    subscribePage(PageSubscriptionOptions options, PageEvent event, PageCallback callback) override;
 
     [[nodiscard]] Result<void> unsubscribePage(SubscriptionHandle handle) override;
 
     [[nodiscard]] Result<PageContextView> getPageContext(ContextId id) const override;
 
-    [[nodiscard]] Result<RegistrationHandle>
-    registerHostMethod(
-        ModId owner,
-        PermissionSet const& permissions,
+    [[nodiscard]] Result<RegistrationHandle> registerHostMethod(
+        ModId                             owner,
+        PermissionSet const&              permissions,
         std::shared_ptr<ipc::IHostMethod> method
     ) override;
+
+    [[nodiscard]] Result<RegistrationHandle>
+    registerHostMethod(ModId owner, HostMethodManifest manifest, std::shared_ptr<ipc::IHostMethod> method) override;
 
     [[nodiscard]] Result<void> unregisterHostMethod(RegistrationHandle handle) override;
 
@@ -98,7 +96,7 @@ private:
     ipc::HostMethodRegistry&      mHostMethodRegistry;
     capability::ICapabilityQuery& mCapabilities;
     diagnostic::DiagnosticLogger& mLogger;
-    page::IPageContextManager*   mPageManager{nullptr};
+    page::IPageContextManager*    mPageManager{nullptr};
 
     mutable std::mutex mPageSubscriptionMutex;
     std::uint64_t      mNextSubscription{1};
@@ -109,7 +107,7 @@ private:
         PageCallback           callback;
     };
     std::unordered_map<SubscriptionHandle, PageSubscription> mPageSubscriptions;
-    std::atomic<bool> mReady{false};
+    std::atomic<bool>                                        mReady{false};
 };
 
 } // namespace dearoreui::api

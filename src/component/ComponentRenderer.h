@@ -21,17 +21,17 @@ namespace dearoreui::component {
 // concrete CSS (url(...) resolved through `resolver`), so runtime and offline
 // toolchain produce visually identical DOM (stage 8.1 plan 2.2).
 [[nodiscard]] std::vector<render::DomNode> renderComponent(
-    ComponentSpec const&   spec,
-    ThemeTokens const&     theme    = defaultThemeTokens(),
-    IAssetResolver const&  resolver = defaultAssetResolver()
+    ComponentSpec const&  spec,
+    ThemeTokens const&    theme    = defaultThemeTokens(),
+    IAssetResolver const& resolver = defaultAssetResolver()
 );
 
 // Renders a ComponentSpec into an htmlBody string (DomNode -> HTML). This lets
 // registerComponent reuse the existing htmlBody injection pipeline unchanged.
 [[nodiscard]] std::string renderComponentToHtml(
-    ComponentSpec const&   spec,
-    ThemeTokens const&     theme    = defaultThemeTokens(),
-    IAssetResolver const&  resolver = defaultAssetResolver()
+    ComponentSpec const&  spec,
+    ThemeTokens const&    theme    = defaultThemeTokens(),
+    IAssetResolver const& resolver = defaultAssetResolver()
 );
 
 } // namespace dearoreui::component

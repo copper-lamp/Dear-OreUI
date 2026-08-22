@@ -26,10 +26,7 @@ namespace dearoreui::ipc {
 // serialized response JSON. Returns an empty string when the payload is a
 // non-protocol diagnostic report (or on hard parse failure the response is a
 // serialized error message so the JS side always gets a definitive answer).
-[[nodiscard]] std::string handleJsPayload(
-    HostDispatcher&                  dispatcher,
-    std::string_view                 payload,
-    std::chrono::milliseconds        timeout
-);
+[[nodiscard]] std::string
+handleJsPayload(HostDispatcher& dispatcher, std::string_view payload, std::chrono::milliseconds timeout);
 
 } // namespace dearoreui::ipc

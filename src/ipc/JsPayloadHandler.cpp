@@ -8,12 +8,8 @@ namespace dearoreui::ipc {
 
 namespace {
 
-[[nodiscard]] std::string serializeErrorResponse(
-    api::RequestId   id,
-    api::ContextId   contextId,
-    api::ErrorCode   code,
-    std::string_view message
-) {
+[[nodiscard]] std::string
+serializeErrorResponse(api::RequestId id, api::ContextId contextId, api::ErrorCode code, std::string_view message) {
     IpcMessage response;
     response.type      = IpcMessageType::Response;
     response.id        = id;
@@ -25,11 +21,7 @@ namespace {
 
 } // namespace
 
-std::string handleJsPayload(
-    HostDispatcher&           dispatcher,
-    std::string_view          payload,
-    std::chrono::milliseconds timeout
-) {
+std::string handleJsPayload(HostDispatcher& dispatcher, std::string_view payload, std::chrono::milliseconds timeout) {
     // Heuristic: payloads that look like a protocol message (start with '{')
     // are parsed strictly; anything else is the Stage 7.1 plain diagnostics
     // report ("runtime_executed:...", "dbg:...") and fire-and-forgets.
@@ -63,12 +55,7 @@ std::string handleJsPayload(
     if (result.isOk()) {
         return serializeIpcMessage(result.value());
     }
-    return serializeErrorResponse(
-        request.id,
-        request.contextId,
-        result.error().code,
-        result.error().message
-    );
+    return serializeErrorResponse(request.id, request.contextId, result.error().code, result.error().message);
 }
 
 } // namespace dearoreui::ipc

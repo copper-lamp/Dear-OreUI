@@ -10,9 +10,7 @@ namespace dearoreui::ui {
 
 class MountHandle {
 public:
-    MountHandle(api::RegistrationHandle handle, OverlaySpec spec)
-    : mHandle(handle),
-      mSpec(std::move(spec)) {}
+    MountHandle(api::RegistrationHandle handle, OverlaySpec spec) : mHandle(handle), mSpec(std::move(spec)) {}
 
     [[nodiscard]] api::RegistrationHandle handle() const { return mHandle; }
     [[nodiscard]] OverlaySpec const&      spec() const { return mSpec; }

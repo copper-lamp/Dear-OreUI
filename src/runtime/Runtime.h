@@ -58,14 +58,14 @@ private:
     // RuntimeConfig::enableComponentShowcase.
     void registerComponentShowcase();
 
-    RuntimeConfig                             mConfig;
-    capability::StaticCapabilityQuery         mCapabilities;
-    std::unique_ptr<registry::ModRegistry>    mRegistry;
-    std::unique_ptr<ipc::HostMethodRegistry>  mHostMethodRegistry;
-    std::unique_ptr<facet::FacetRegistry>     mFacetRegistry;
-    std::unique_ptr<api::DearOreUIApi>        mApi;
-    std::unique_ptr<page::PageContextManager> mPageManager;
-    std::unique_ptr<hook::OreUIHookAdapter>   mHookAdapter;
+    RuntimeConfig                               mConfig;
+    capability::StaticCapabilityQuery           mCapabilities;
+    std::unique_ptr<registry::ModRegistry>      mRegistry;
+    std::unique_ptr<ipc::HostMethodRegistry>    mHostMethodRegistry;
+    std::unique_ptr<facet::FacetRegistry>       mFacetRegistry;
+    std::unique_ptr<api::DearOreUIApi>          mApi;
+    std::unique_ptr<page::PageContextManager>   mPageManager;
+    std::unique_ptr<hook::OreUIHookAdapter>     mHookAdapter;
     std::unique_ptr<source::ISourceReader>      mSourceReader;
     std::unique_ptr<transform::ChangePlanner>   mChangePlanner;
     std::unique_ptr<transform::PageTransformer> mPageTransformer;

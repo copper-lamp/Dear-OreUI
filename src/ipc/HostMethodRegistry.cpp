@@ -2,19 +2,43 @@
 
 #include "api/types/Error.h"
 
+#include <chrono>
+
 namespace dearoreui::ipc {
 
 api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
     const api::ModId&                   owner,
-    api::PermissionSet const&    permissions,
+    api::PermissionSet const&           permissions,
     const std::shared_ptr<IHostMethod>& method
 ) {
-    if (!owner.isValid() || method == nullptr) {
-        return api::Error{api::ErrorCode::InvalidArgument, "invalid owner or method"};
+    api::HostMethodManifest manifest;
+    manifest.name        = method != nullptr ? method->name() : std::string{};
+    manifest.permissions = permissions;
+    return registerMethod(owner, std::move(manifest), method);
+}
+
+api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
+    const api::ModId&                   owner,
+    api::HostMethodManifest             manifest,
+    const std::shared_ptr<IHostMethod>& method
+) {
+    if (!owner.isValid() || method == nullptr || manifest.name.empty()) {
+        return api::Error{api::ErrorCode::InvalidArgument, "invalid owner, manifest or method"};
+    }
+    if (manifest.name != method->name()) {
+        return api::Error{api::ErrorCode::InvalidArgument, "manifest name does not match method"};
+    }
+    if (manifest.name.find('.') == std::string::npos) {
+        return api::Error{api::ErrorCode::NamespaceConflict, "host method must be namespace qualified"};
+    }
+    if (manifest.timeout.count() <= 0 || manifest.timeout > std::chrono::seconds{30} || manifest.maxRequestBytes == 0
+        || manifest.maxRequestBytes > 1024 * 1024 || manifest.maxResponseBytes == 0
+        || manifest.maxResponseBytes > 4 * 1024 * 1024) {
+        return api::Error{api::ErrorCode::InvalidArgument, "host method limits are outside production bounds"};
     }
 
     auto required = method->requiredPermission();
-    if (!permissions.has(required)) {
+    if (!manifest.permissions.has(required)) {
         return api::Error{
             api::ErrorCode::HostPermissionDenied,
             std::string{"mod lacks permission: "} + std::string{api::permissionName(required)}
@@ -22,21 +46,14 @@ api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
     }
 
     std::lock_guard lock(mMutex);
-
-    auto name = method->name();
-    if (mByName.find(name) != mByName.end()) {
+    if (mByName.find(manifest.name) != mByName.end()) {
         return api::Error{api::ErrorCode::AlreadyExists, "host method already registered"};
     }
 
     auto            handle = nextHandle();
-    HostMethodEntry entry;
-    entry.handle      = handle;
-    entry.owner       = owner;
-    entry.permissions = permissions;
-    entry.method      = method;
-
+    HostMethodEntry entry{handle, owner, manifest.permissions, std::move(manifest), method};
     mEntries.emplace(handle, std::move(entry));
-    mByName.emplace(std::move(name), handle);
+    mByName.emplace(method->name(), handle);
     return handle;
 }
 

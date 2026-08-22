@@ -14,8 +14,7 @@ public:
     [[nodiscard]] virtual api::Result<InjectionReport>
     inject(api::ContextId id, resource::IResourceIndex const& index) = 0;
 
-    [[nodiscard]] virtual api::Result<InjectionReport>
-    injectUi(api::ContextId id, ui::UiMountPlan const& plan) = 0;
+    [[nodiscard]] virtual api::Result<InjectionReport> injectUi(api::ContextId id, ui::UiMountPlan const& plan) = 0;
 };
 
 } // namespace dearoreui::inject

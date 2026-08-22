@@ -43,11 +43,7 @@ void recordStage7UiRegistered(
         .emit();
 }
 
-void recordStage7UiUnregistered(
-    api::RegistrationHandle handle,
-    std::string_view        modNamespace,
-    std::string_view        uiId
-) {
+void recordStage7UiUnregistered(api::RegistrationHandle handle, std::string_view modNamespace, std::string_view uiId) {
     auto& logger = globalLogger();
     logger.info("ui", "unregistered")
         .withField("handle", std::to_string(handle.value()))
@@ -103,11 +99,7 @@ void recordStage7UiFailed(
         .emit();
 }
 
-void recordStage7UiUnmounted(
-    api::ContextId   contextId,
-    std::string_view modNamespace,
-    std::string_view uiId
-) {
+void recordStage7UiUnmounted(api::ContextId contextId, std::string_view modNamespace, std::string_view uiId) {
     globalLogger()
         .info("ui", "unmounted")
         .withContext(contextId)
@@ -117,10 +109,7 @@ void recordStage7UiUnmounted(
 }
 
 void recordStage7JsReport(std::string_view report) {
-    globalLogger()
-        .info("js", "report")
-        .withField("report", std::string{report})
-        .emit();
+    globalLogger().info("js", "report").withField("report", std::string{report}).emit();
 }
 
 } // namespace dearoreui::diagnostic

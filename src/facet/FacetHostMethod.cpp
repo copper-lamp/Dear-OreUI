@@ -2,15 +2,11 @@
 
 namespace dearoreui::facet {
 
-FacetHostMethod::FacetHostMethod(
-    std::shared_ptr<IFacetProvider> provider,
-    api::Permission                 requiredPermission
-)
-: mProvider(std::move(provider)), mRequiredPermission(requiredPermission) {}
+FacetHostMethod::FacetHostMethod(std::shared_ptr<IFacetProvider> provider, api::Permission requiredPermission)
+: mProvider(std::move(provider)),
+  mRequiredPermission(requiredPermission) {}
 
-std::string FacetHostMethod::name() const {
-    return mProvider ? mProvider->facetName() : std::string{};
-}
+std::string FacetHostMethod::name() const { return mProvider ? mProvider->facetName() : std::string{}; }
 
 api::Permission FacetHostMethod::requiredPermission() const { return mRequiredPermission; }
 

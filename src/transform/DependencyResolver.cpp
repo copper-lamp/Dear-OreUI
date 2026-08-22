@@ -74,8 +74,8 @@ bool DependencyResolver::rangeSyntaxValid(std::string_view range) {
         if (token.empty()) {
             continue;
         }
-        RangeOp       op;
-        api::Version  version;
+        RangeOp      op;
+        api::Version version;
         if (!parseTerm(token, op, version)) {
             return false;
         }
@@ -140,8 +140,8 @@ namespace {
     std::string           message
 ) {
     DependencyProblem problem;
-    problem.kind               = kind;
-    problem.dependant          = std::move(dependant);
+    problem.kind                = kind;
+    problem.dependant           = std::move(dependant);
     problem.dependencyNamespace = std::move(dependencyNamespace);
     problem.versionRange        = std::move(versionRange);
     problem.message             = std::move(message);
@@ -149,11 +149,11 @@ namespace {
 }
 
 [[nodiscard]] std::vector<api::ModId> findCyclePath(
-    api::ModId                                            start,
+    api::ModId                                                     start,
     std::unordered_map<api::ModId, std::vector<api::ModId>> const& dependsOn,
-    std::unordered_set<api::ModId> const&                         confined
+    std::unordered_set<api::ModId> const&                          confined
 ) {
-    std::vector<api::ModId>       path;
+    std::vector<api::ModId>        path;
     std::unordered_set<api::ModId> seen;
     api::ModId                     current = std::move(start);
     for (std::size_t step = 0; step < confined.size() + 1; ++step) {
@@ -180,8 +180,8 @@ namespace {
 DependencyResolution DependencyResolver::resolve(std::vector<registry::ModRecord> const& records) {
     DependencyResolution resolution;
 
-    std::unordered_map<api::ModId, registry::ModRecord const*>             byId;
-    std::unordered_map<std::string, api::ModId>                            idByNamespace;
+    std::unordered_map<api::ModId, registry::ModRecord const*> byId;
+    std::unordered_map<std::string, api::ModId>                idByNamespace;
     for (auto const& record : records) {
         byId.emplace(record.manifest.id, &record);
         idByNamespace.emplace(record.manifest.modNamespace, record.manifest.id);
@@ -255,7 +255,7 @@ DependencyResolution DependencyResolver::resolve(std::vector<registry::ModRecord
     }
 
     // Transitively exclude dependants of excluded mods.
-    std::vector<api::ModId>      queue(excludedByProblem.begin(), excludedByProblem.end());
+    std::vector<api::ModId>        queue(excludedByProblem.begin(), excludedByProblem.end());
     std::unordered_set<api::ModId> excluded = excludedByProblem;
     while (!queue.empty()) {
         auto id = queue.back();
