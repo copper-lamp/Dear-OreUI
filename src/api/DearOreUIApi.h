@@ -8,6 +8,12 @@
 #include "registry/IModRegistry.h"
 
 #include <atomic>
+#include <mutex>
+#include <unordered_map>
+
+namespace dearoreui::page {
+class IPageContextManager;
+}
 
 namespace dearoreui::api {
 
@@ -17,7 +23,8 @@ public:
         registry::IModRegistry&       registry,
         ipc::HostMethodRegistry&      hostMethodRegistry,
         capability::ICapabilityQuery& capabilities,
-        diagnostic::DiagnosticLogger& logger
+        diagnostic::DiagnosticLogger& logger,
+        page::IPageContextManager& pageManager
     );
 
     [[nodiscard]] ApiInfo       getInfo() const override;
@@ -42,6 +49,15 @@ public:
     [[nodiscard]] bool          isModRegistered(ModId id) const override;
     [[nodiscard]] bool          setModEnabled(ModId id, bool enabled) override;
     [[nodiscard]] bool          isModEnabled(ModId id) const override;
+
+    [[nodiscard]] Result<SubscriptionHandle> subscribePage(
+        PageEvent event,
+        PageCallback callback
+    ) override;
+
+    [[nodiscard]] Result<void> unsubscribePage(SubscriptionHandle handle) override;
+
+    [[nodiscard]] Result<PageContextView> getPageContext(ContextId id) const override;
 
     [[nodiscard]] Result<RegistrationHandle>
     registerHostMethod(
@@ -71,12 +87,22 @@ public:
 
     void setReady(bool ready);
 
+
 private:
     registry::IModRegistry&       mRegistry;
     ipc::HostMethodRegistry&      mHostMethodRegistry;
     capability::ICapabilityQuery& mCapabilities;
     diagnostic::DiagnosticLogger& mLogger;
-    std::atomic<bool>             mReady{false};
+    page::IPageContextManager&    mPageManager;
+
+    mutable std::mutex mPageSubscriptionMutex;
+    std::uint64_t      mNextSubscription{1};
+    struct PageSubscription {
+        PageEvent    event;
+        PageCallback callback;
+    };
+    std::unordered_map<SubscriptionHandle, PageSubscription> mPageSubscriptions;
+    std::atomic<bool> mReady{false};
 };
 
 } // namespace dearoreui::api

@@ -48,6 +48,7 @@ using ChangeId           = StrongId<struct ChangeIdTag, std::uint64_t>;
 using RequestId          = StrongId<struct RequestIdTag, std::uint64_t>;
 using DiagnosticId       = StrongId<struct DiagnosticIdTag, std::uint64_t>;
 using RegistrationHandle = StrongId<struct RegistrationHandleTag, std::uint64_t>;
+using SubscriptionHandle = StrongId<struct SubscriptionHandleTag, std::uint64_t>;
 
 } // namespace dearoreui::api
 
