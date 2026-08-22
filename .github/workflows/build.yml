@@ -9,6 +9,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Install zlib development library
+        shell: cmd
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          C:\vcpkg\vcpkg.exe install zlib:x64-windows
+          echo VCPKG_ROOT=C:\vcpkg>>%GITHUB_ENV%
+          echo VCPKG_INSTALLATION_ROOT=C:\vcpkg>>%GITHUB_ENV%
+          echo VCPKG_DEFAULT_TRIPLET=x64-windows>>%GITHUB_ENV%
+          echo C:\vcpkg>>%GITHUB_PATH%
+          echo C:\vcpkg\installed\x64-windows\bin>>%GITHUB_PATH%
+          if not exist C:\vcpkg\installed\x64-windows\lib\zlib.lib exit /b 1
+
       - uses: xmake-io/github-action-setup-xmake@v1
         # with:
         #   xmake-version: branch@master
@@ -17,7 +32,7 @@ jobs:
         with:
           path: |
             ~/AppData/Local/.xmake
-          key: xmake-${{ hashFiles('xmake.lua') }}-v3
+          key: xmake-${{ hashFiles('xmake.lua') }}-v4
           restore-keys: |
             xmake-
 
