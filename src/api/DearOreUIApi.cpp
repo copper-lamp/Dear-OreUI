@@ -119,6 +119,11 @@ void DearOreUIApi::recordHostCallReport(HostCallReportView report) {
     if (calls.size() > 128) calls.erase(calls.begin(), calls.begin() + static_cast<std::ptrdiff_t>(calls.size() - 128));
 }
 
+void DearOreUIApi::clearRuntimeReports(ContextId context) {
+    std::lock_guard lock(mReportMutex);
+    mRuntimeReports.erase(context);
+}
+
 void DearOreUIApi::recordTransformReport(TransformReport report) {
     std::lock_guard lock(mReportMutex);
     mRuntimeReports[report.context].transform = std::move(report);
@@ -494,6 +499,12 @@ Result<void> DearOreUIApi::unregisterMod(ModId id) {
         std::lock_guard lock(mPageSubscriptionMutex);
         for (auto it = mPageSubscriptions.begin(); it != mPageSubscriptions.end();) {
             it = it->second.owner == id ? mPageSubscriptions.erase(it) : std::next(it);
+        }
+    }
+    {
+        std::lock_guard lock(mReportMutex);
+        for (auto& [context, reports] : mRuntimeReports) {
+            reports.hostCalls.erase(std::remove_if(reports.hostCalls.begin(), reports.hostCalls.end(), [&](HostCallReportView const& call) { return call.method.starts_with(id.value() + "."); }), reports.hostCalls.end());
         }
     }
     bool removed = mRegistry.unregisterMod(id);

@@ -101,6 +101,7 @@ public:
     void recordInjectionReport(InjectionReportView report);
     void recordHostCallReport(HostCallReportView report);
     void recordTransformReport(TransformReport report);
+    void clearRuntimeReports(ContextId context);
 
 private:
     registry::IModRegistry&       mRegistry;

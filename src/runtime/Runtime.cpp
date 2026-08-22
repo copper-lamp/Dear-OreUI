@@ -335,6 +335,20 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
     transform::TransformedPage transformed;
     if (mPageTransformer != nullptr) {
         transformed = mPageTransformer->transform(plan, snapshot);
+        if (mApi != nullptr) {
+            api::TransformReport report;
+            report.context = id;
+            report.scope = info.scope;
+            report.preview = false;
+            report.success = transformed.report.success;
+            report.applicable = transformed.report.applied;
+            report.blocked = transformed.report.blocked;
+            for (auto const& operation : transformed.report.operations) {
+                report.operations.push_back(api::TransformOperationInfo{operation.handle, operation.owner, operation.path, operation.fingerprint, operation.status == transform::ChangeOperationStatus::Applied, operation.status == transform::ChangeOperationStatus::Applied ? "applied" : "not applied"});
+            }
+            for (auto const& error : transformed.report.errors) report.errors.push_back(error);
+            mApi->recordTransformReport(std::move(report));
+        }
     }
 
     auto index = std::make_unique<resource::ResourceIndex>();
@@ -353,6 +367,18 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
     diagnostic::recordStage4ResourceIndexBuilt(id, locations.size());
 
     auto injectResult = mInjector->inject(id, *index);
+    if (mApi != nullptr && injectResult.isOk()) {
+        auto const& r = injectResult.value();
+        api::InjectionReportView view;
+        view.context = r.contextId;
+        view.success = r.success;
+        view.bridgeAvailable = r.hostBridgeAvailable;
+        view.scriptCount = r.injectedScripts.size();
+        view.styleCount = r.injectedStyleSheets.size();
+        view.uiCount = r.uiCount;
+        for (auto const& error : r.errors) view.errors.push_back(error.code);
+        mApi->recordInjectionReport(std::move(view));
+    }
     if (injectResult.isErr()) {
         logger.warning("inject", "failed")
             .withContext(id)
@@ -435,6 +461,7 @@ void Runtime::onPageDestroyed(api::ContextId id) {
 
     if (context) {
         if (mApi != nullptr) {
+            mApi->clearRuntimeReports(id);
             mApi->notifyPage(api::PageEvent::Destroyed, api::PageContextView{id, context->page});
         }
         diagnostic::recordStage3PageDestroyed(id, context->page);
