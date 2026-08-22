@@ -42,10 +42,9 @@ namespace {
 
 RuntimeInjector::RuntimeInjector(
     diagnostic::DiagnosticLogger& logger,
-    ipc::IHostBridge&             bridge,
-    std::string                   wsUrl
+    ipc::IHostBridge&             bridge
 )
-: mLogger(logger), mBridge(bridge), mWsUrl(std::move(wsUrl)) {}
+: mLogger(logger), mBridge(bridge) {}
 
 api::Result<InjectionReport> RuntimeInjector::inject(api::ContextId id, resource::IResourceIndex const& index) {
     InjectionReport report;

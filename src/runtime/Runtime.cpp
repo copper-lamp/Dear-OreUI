@@ -150,24 +150,7 @@ bool Runtime::enable() {
     // the game's native facet:request protocol; dynamic BindCall/
     // RegisterForEvent is deliberately not used on this client.
     mHostBridge->setHostDispatcher(*mHostDispatcher);
-    // Keep the loopback server only as an isolated legacy/diagnostic transport
-    // for now. RuntimeInjector currently does not emit its endpoint and uses
-    // the native Facet protocol; see the API status document for the active
-    // contract.
-    std::string wsUrl;
-    mWsServer = std::make_unique<ipc::LoopbackWsServer>();
-    auto wsResult = mWsServer->start(*mHostDispatcher);
-    if (wsResult.isOk()) {
-        auto const& info = wsResult.value();
-        wsUrl = "ws://127.0.0.1:" + std::to_string(info.port) + "/dearoreui?token=" + info.token;
-        logger.info("ws", "url_ready").withField("url", wsUrl).emit();
-    } else {
-        logger.warning("ws", "start_failed")
-            .withError(wsResult.error().code)
-            .withMessage(wsResult.error().message)
-            .emit();
-    }
-    mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge, wsUrl);
+    mInjector       = std::make_unique<inject::RuntimeInjector>(logger, *mHostBridge);
     // Stage 8-A: native facet JS->C++ channel. The createFacetRegistry hook
     // hands every fresh IFacetRegistry to the bridge, which registers the
     // "dearoreui" facet (game-native dispatch, no engine bindings) and pushes
@@ -233,13 +216,6 @@ bool Runtime::disable() {
 
     if (mApi != nullptr) {
         mApi->setReady(false);
-    }
-
-    // Stop the WS loopback FIRST: its threads reference the host dispatcher,
-    // page manager and logger below, which are torn down next.
-    if (mWsServer != nullptr) {
-        mWsServer->stop();
-        mWsServer.reset();
     }
 
     bool hooksRemoved = true;

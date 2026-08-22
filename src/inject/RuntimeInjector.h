@@ -8,13 +8,11 @@ namespace dearoreui::inject {
 
 class RuntimeInjector : public IPageInjector {
 public:
-    // wsUrl (ws://127.0.0.1:PORT/dearoreui?token=...) is the Stage 8 JS->C++
-    // loopback endpoint. When empty the generated runtime script degrades to
-    // the unavailable stub (tests / missing server).
+    // JS->C++ uses the game's native Facet protocol. The C++ bridge remains
+    // responsible for ExecuteScript and response delivery.
     RuntimeInjector(
         diagnostic::DiagnosticLogger& logger,
-        ipc::IHostBridge&             bridge,
-        std::string                   wsUrl = {}
+        ipc::IHostBridge&             bridge
     );
 
     [[nodiscard]] api::Result<InjectionReport>
@@ -48,7 +46,6 @@ private:
 
     diagnostic::DiagnosticLogger& mLogger;
     ipc::IHostBridge&             mBridge;
-    std::string                   mWsUrl;
 };
 
 } // namespace dearoreui::inject
