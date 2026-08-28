@@ -55,6 +55,35 @@ HandlerLayout readHandlerLayout(void* handler) {
     return layout;
 }
 
+// S1: fingerprints a vtable slot before we replace it. cohtml::View layout is
+// version-fragile (mcmeta is NOT reliable), so a drifted slot can point at
+// data or a guard page; patching it would corrupt the heap. Reading the first
+// 8 bytes under SEH and rejecting fill patterns (0xCC = uninitialized,
+// 0x00/0xFF = data/guard) is a cheap heuristic. C-style only (no destructors)
+// so MSVC allows __try with /EHa.
+bool isPlausibleCodeSlot(void const* fn) {
+    if (fn == nullptr) {
+        return false;
+    }
+    unsigned char bytes[8];
+    __try {
+        std::memcpy(bytes, fn, sizeof(bytes));
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    bool     allCc      = true;
+    int      meaningful = 0;
+    for (unsigned char b : bytes) {
+        if (b != 0xCC) {
+            allCc = false;
+        }
+        if (b != 0x00 && b != 0xCC && b != 0xFF) {
+            ++meaningful;
+        }
+    }
+    return !allCc && meaningful >= 2;
+}
+
 void logRegister(char const* op, void* view, char const* name, void* handler, void* ret) {
     auto layout = readHandlerLayout(handler);
     diagnostic::globalLogger()
@@ -167,6 +196,46 @@ void BindingProbe::install(void* gamefaceView) {
     BindingProbeSlots& BindingProbeSlots = it->second;
     if (!inserted && BindingProbeSlots.registerForEvent != nullptr) {
         return; // already installed for this view
+    }
+
+    // S1: fingerprint the five slots we depend on BEFORE touching the vtable.
+    // Any slot that no longer looks like code (engine layout drift) logs a
+    // warning and skips the whole install — never patch a slot we cannot
+    // vouch for, and never leave a half-installed probe behind.
+    struct SlotRef {
+        std::size_t index;
+        char const* name;
+        void*       value;
+    };
+    SlotRef const slots[] = {
+        {kViewSlotRegisterForEvent,    "register_for_event",    vtable[kViewSlotRegisterForEvent]},
+        {kViewSlotUnregisterFromEvent, "unregister_from_event", vtable[kViewSlotUnregisterFromEvent]},
+        {kViewSlotBindCall,            "bind_call",             vtable[kViewSlotBindCall]},
+        {kViewSlotUnbindCall,          "unbind_call",           vtable[kViewSlotUnbindCall]},
+        {kViewSlotTriggerEvent,        "trigger_event",         vtable[kViewSlotTriggerEvent]},
+    };
+    bool allPlausible = true;
+    for (auto const& slot : slots) {
+        if (isPlausibleCodeSlot(slot.value)) {
+            continue;
+        }
+        allPlausible = false;
+        diagnostic::globalLogger()
+            .warning("bindprobe", "slot_fingerprint_failed")
+            .withField("view", std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView)))
+            .withField("slot", slot.name)
+            .withField("index", std::to_string(slot.index))
+            .withField("ptr", std::to_string(reinterpret_cast<std::uintptr_t>(slot.value)))
+            .emit();
+    }
+    if (!allPlausible) {
+        sSlots.erase(it);
+        diagnostic::globalLogger()
+            .warning("bindprobe", "install_skipped")
+            .withField("view", std::to_string(reinterpret_cast<std::uintptr_t>(gamefaceView)))
+            .withField("reason", "vtable layout fingerprint mismatch")
+            .emit();
+        return;
     }
 
     BindingProbeSlots.registerForEvent    = vtable[kViewSlotRegisterForEvent];
