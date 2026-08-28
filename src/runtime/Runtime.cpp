@@ -959,22 +959,6 @@ void Runtime::registerComponentShowcase() {
         return;
     }
 
-    // TEMP diagnostic (stage 8.1): dump the generated htmlBody and the
-    // serialized JS body array so the real-client rendering issue can be
-    // inspected without a debugger.
-    {
-        auto          html  = component::renderComponentToHtml(root);
-        auto          nodes = render::parseHtmlFragment(html);
-        std::ofstream dumpHtml(mConfig.dataDirectory / "showcase-html.html");
-        dumpHtml << html;
-        std::ofstream dumpBody(mConfig.dataDirectory / "showcase-body.js");
-        dumpBody << render::serializeDomForest(nodes);
-        logger.info("showcase", "dump_written")
-            .withField("html_length", std::to_string(html.size()))
-            .withField("node_count", std::to_string(nodes.size()))
-            .emit();
-    }
-
     logger.info("showcase", "overlay_registered")
         .withField("handle", std::to_string(uiResult.value().value()))
         .withField("container_id", api::makeUiContainerId("dearoreui", api::UiKind::Overlay, "component_showcase"))
