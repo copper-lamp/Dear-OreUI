@@ -15,6 +15,11 @@ namespace dearoreui::inject {
 
 namespace {
 
+// cohtml silently drops large ExecuteScript payloads (M8.1.2 verified: a ~47KB
+// combined bootstrap never executed, a ~9KB one did). Child groups larger than
+// this are split into separate append scripts.
+inline constexpr std::size_t kMaxChunkNodes = 4;
+
 [[nodiscard]] std::string escapeJsString(std::string_view value) {
     std::ostringstream stream;
     for (char c : value) {
@@ -305,35 +310,17 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
 
     // 2) One body-only script per UI. Large bodies (single container with many
     // children, e.g. the showcase root panel) are injected in chunks: the
-    // first chunk mounts the container with the root + first group, the rest
-    // append the remaining children into the root — each ExecuteScript stays
-    // under cohtml's silent size limit.
+    // unified renderer (renderUiScripts) emits a mount script for the root +
+    // first child group, then one append script per remaining group — each
+    // ExecuteScript stays under cohtml's silent size limit. This loop only
+    // submits the ordered script stream.
     for (auto const& item : plan.items) {
         if (item.decision != ui::UiMountDecision::Mount) {
             continue;
         }
-        auto body = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
-        // Page scripts are pulled out of the mounted DOM and re-attached to
-        // the first (mount) chunk, which runs them after the container exists.
-        std::string pageScripts = extractScriptNodes(body);
-        auto        chunks      = chunkUiBody(body, 4);
-        for (std::size_t chunkIndex = 0; chunkIndex < chunks.size(); ++chunkIndex) {
-            std::string script;
-            if (chunkIndex == 0) {
-                // First chunk: mount the root with the first group of children.
-                std::vector<api::DomNode> mountBody;
-                if (body.size() == 1 && chunks.size() > 1) {
-                    api::DomNode root = body[0];
-                    root.children        = chunks[0];
-                    mountBody.push_back(std::move(root));
-                } else {
-                    mountBody = chunks[0];
-                }
-                script = generateUiBodyScript(id, item, &mountBody, pageScripts);
-            } else {
-                // Later chunks: append the remaining children into the root.
-                script = generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex]);
-            }
+        auto scripts = renderUiScripts(id, item);
+        for (std::size_t chunkIndex = 0; chunkIndex < scripts.size(); ++chunkIndex) {
+            auto const& script = scripts[chunkIndex];
             if (script.empty() || !submitScript(script)) {
                 report.success = false;
                 return report;
@@ -455,6 +442,45 @@ std::string RuntimeInjector::generateUiAppendScript(
     stream << "    }\n";
     stream << "})();\n";
     return stream.str();
+}
+
+// Unified UI renderer (T2): the single place that answers "how is ONE UI
+// injected?". It resolves the body (domNodes preferred, htmlBody parsed
+// otherwise), extracts the page <script> text, splits the body into chunks
+// under kMaxChunkNodes, then emits the ordered script sequence:
+//   [0]      mount script (container root + first child group + pageScripts),
+//   [1..]    append scripts (remaining child groups appended into the root).
+// injectUi only submits the returned stream; it makes no chunking choices.
+std::vector<std::string> RuntimeInjector::renderUiScripts(
+    api::ContextId         id,
+    ui::UiMountItem const& item
+) const {
+    auto body = item.spec.domNodes.empty() ? render::parseHtmlFragment(item.spec.htmlBody) : item.spec.domNodes;
+    // Page scripts are pulled out of the mounted DOM and re-attached to the
+    // first (mount) script, which runs them after the container exists.
+    std::string pageScripts = extractScriptNodes(body);
+    auto        chunks      = chunkUiBody(body, kMaxChunkNodes);
+
+    std::vector<std::string> scripts;
+    scripts.reserve(chunks.size());
+    for (std::size_t chunkIndex = 0; chunkIndex < chunks.size(); ++chunkIndex) {
+        if (chunkIndex == 0) {
+            // First chunk: mount the root with the first group of children.
+            std::vector<api::DomNode> mountBody;
+            if (body.size() == 1 && chunks.size() > 1) {
+                api::DomNode root = body[0];
+                root.children        = chunks[0];
+                mountBody.push_back(std::move(root));
+            } else {
+                mountBody = chunks[0];
+            }
+            scripts.push_back(generateUiBodyScript(id, item, &mountBody, pageScripts));
+        } else {
+            // Later chunks: append the remaining children into the root.
+            scripts.push_back(generateUiAppendScript(id, item.spec.containerId, chunks[chunkIndex]));
+        }
+    }
+    return scripts;
 }
 
 } // namespace dearoreui::inject

@@ -18,6 +18,14 @@ public:
 
     [[nodiscard]] api::Result<InjectionReport> injectUi(api::ContextId id, ui::UiMountPlan const& plan) override;
     [[nodiscard]] std::string generateRuntimeScriptForTest(api::ContextId id, resource::IResourceIndex const& index) const;
+    // Unified UI renderer (T2): centralizes every per-UI self-containment
+    // decision (body source, page-script extraction, chunk boundaries, root
+    // wrapping, mount/append split) and returns the ordered injection script
+    // sequence for ONE UI: scripts[0] mounts the container (root + first child
+    // group + pageScripts), scripts[1..] append the remaining child groups.
+    // injectUi only submits the returned scripts; it makes no chunking choices.
+    [[nodiscard]] std::vector<std::string> renderUiScripts(
+        api::ContextId id, ui::UiMountItem const& item) const;
 
 private:
     [[nodiscard]] std::string generateRuntimeScript(api::ContextId id, resource::IResourceIndex const& index) const;
