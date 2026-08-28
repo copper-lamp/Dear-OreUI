@@ -1,9 +1,24 @@
+name: CI
+
 on:
-  release:
-    types:
-      - published
+  push:
+    branches: ['main']
+    tags: ['v*']
+  pull_request:
   workflow_dispatch:
-  
+    inputs:
+      release_tag:
+        description: '手动发布用的 tag（如 v0.1.0）。留空则只构建、不发布。'
+        required: false
+        default: ''
+      release_notes:
+        description: '手动发布时的 Release 说明正文。留空将从 CHANGELOG.md 读取。'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -11,8 +26,6 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: xmake-io/github-action-setup-xmake@v1
-        # with:
-        #   xmake-version: branch@master
 
       - uses: actions/cache@v6
         with:
@@ -22,26 +35,16 @@ jobs:
           restore-keys: |
             xmake-
 
-      - run: |
-          xmake repo -u
+      - run: xmake repo -u
 
-      - run: |
-          xmake f -a x64 -m release -p windows --target_type=client -y
+      - run: xmake f -a x64 -m release -p windows --target_type=client -y
 
-      - run: |
-          xmake -w -y
+      - run: xmake -w -y
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ github.event.repository.name }}-${{ github.sha }}-client-windows-x64
-          path: |
-            bin/
-
-      # Header-only public API artifact (used by the `dearoreui` xmake-repo
+      # Header-only public API artifact (consumed by the `dearoreui` xmake-repo
       # package). `xmake install` triggers the target's after_install whitelist
       # which emits include/dearoreui/{api,bridge}.
-      - run: |
-          xmake install -o "${{ github.workspace }}/hdrs" -y
+      - run: xmake install -o "${{ github.workspace }}/hdrs" -y
 
       - name: Build headers artifact
         shell: pwsh
@@ -59,56 +62,75 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ github.event.repository.name }}-headers
-          path: |
-            ${{ github.workspace }}/DearOreUI-headers.zip
+          name: ${{ github.event.repository.name }}-${{ github.sha }}-client-windows-x64
+          path: bin/
 
-  update-release-notes:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - id: extract-release-notes
-        uses: ffurrer2/extract-release-notes@v3
-
-      - uses: softprops/action-gh-release@v3
+      - uses: actions/upload-artifact@v7
         with:
-          body: |
-            ${{ steps.extract-release-notes.outputs.release_notes }}
+          name: ${{ github.event.repository.name }}-headers
+          path: ${{ github.workspace }}/DearOreUI-headers.zip
 
-  upload-to-release:
-    needs:
-      - build
-      - update-release-notes
-    permissions:
-      contents: write
+  # Runs only on a manual dispatch with a release_tag filled, or on a version
+  # tag push. Consumes the build artifacts and attaches them to the Release of
+  # that tag.
+  release:
+    needs: build
     runs-on: ubuntu-latest
+    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') || startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v8
+      - name: Resolve tag and notes source
+        id: ctx
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TAG=${{ github.event.inputs.release_tag }}" >> "$GITHUB_ENV"
+            echo "IS_MANUAL=true" >> "$GITHUB_ENV"
+          else
+            echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+            echo "IS_MANUAL=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Download mod artifact
+        uses: actions/download-artifact@v8
         with:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-client-windows-x64
-          path: artifact
+          path: artifact/
 
-      - uses: actions/download-artifact@v8
+      - name: Download headers artifact
+        uses: actions/download-artifact@v8
         with:
           name: ${{ github.event.repository.name }}-headers
-          path: headers-artifact
+          path: headers-artifact/
 
-      - run: |
+      - name: Pack and validate mod zip
+        run: |
           cp CHANGELOG.md LICENSE README.md artifact/
-          test -f artifact/DearOreUI.dll
-          find artifact -type f -name '*.log' -o -name '.env' | grep -q . && exit 1 || true
+          find artifact -type f -name 'DearOreUI.dll' | grep -q . || { echo "DearOreUI.dll missing"; exit 1; }
+          find artifact -type f -name 'manifest.json' | grep -q . || { echo "manifest.json missing"; exit 1; }
+          if find artifact -type f \( -name '*.log' -o -name '.env' \); then
+            echo "unexpected .log or .env file"; exit 1
+          fi
+          (cd artifact && zip -r "../${{ github.event.repository.name }}-windows-x64.zip" .)
+          mv headers-artifact/DearOreUI-headers.zip ./
+          ls -la "${{ github.event.repository.name }}-windows-x64.zip" DearOreUI-headers.zip
 
-      - run: |
-          zip -r ../${{ github.event.repository.name }}-windows-x64.zip *
-        working-directory: artifact
-
-      - uses: softprops/action-gh-release@v3
-        with:
-          files: |
-            ${{ github.event.repository.name }}-windows-x64.zip
-            headers-artifact/DearOreUI-headers.zip
+      - name: Create / update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MOD_ZIP="${{ github.event.repository.name }}-windows-x64.zip"
+          HDRS_ZIP="DearOreUI-headers.zip"
+          if [ "$IS_MANUAL" = "true" ]; then
+            NOTES="${{ github.event.inputs.release_notes }}"
+            [ -n "$NOTES" ] || NOTES="$(cat CHANGELOG.md)"
+          else
+            NOTES="$(cat CHANGELOG.md)"
+          fi
+          # If a Release already exists for this tag, only attach/refresh assets —
+          # never overwrite the release notes (tag push must not clobber them).
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$MOD_ZIP" "$HDRS_ZIP" --clobber
+          else
+            gh release create "$TAG" "$MOD_ZIP" "$HDRS_ZIP" --title "$TAG" --notes "$NOTES"
+          fi
