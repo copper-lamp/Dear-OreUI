@@ -17,8 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '要 bump 的 Release tag（如 v0.1.0）'
-        required: true
+        description: '要 bump 的 Release tag。留空则自动取最新的正式 release（推荐）。'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -28,11 +29,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve tag and version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
-          else
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
             TAG="${{ github.event.inputs.tag }}"
+          else
+            # Manual run with empty tag: fall back to the latest non-draft,
+            # non-prerelease release instead of hard-coding a version.
+            TAG="$(gh api repos/copper-lamp/Dear-OreUI/releases/latest --jq .tag_name)"
           fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "VER=${TAG#v}" >> "$GITHUB_ENV"
@@ -56,17 +63,11 @@ jobs:
         run: |
           PKG="packages/d/dearoreui/xmake.lua"
           if [ ! -f "$PKG" ]; then
-            # First release: generate the full upstream-form package descriptor.
             mkdir -p "$(dirname "$PKG")"
-            cat > "$PKG" <<EOF
-set_description("DearOreUI: header-only public API for OreUI client mods")
-set_license("CC0-1.0")
-add_urls("https://github.com/copper-lamp/Dear-OreUI/releases/download/\$(version)/DearOreUI-headers-\$(version).zip")
-add_versions("$VER", "$SHA")
-on_install(function(package)
-    os.vcp("dearoreui/*", package:installdir("include"))
-end)
-EOF
+            # 这里不用 heredoc：heredoc 的定界符必须顶格，而 YAML 的 `run: |` 块标量要求
+            # 所有内容行都缩进，二者冲突会让块标量提前结束、产生“Invalid workflow file”。
+            # 改用 printf 把整段 Lua 压进同一个块标量内，避开嵌套缩进陷阱。
+            printf 'set_description("DearOreUI: header-only public API for OreUI client mods")\nset_license("CC0-1.0")\nadd_urls("https://github.com/copper-lamp/Dear-OreUI/releases/download/$(version)/DearOreUI-headers-$(version).zip")\nadd_versions("%s", "%s")\non_install(function(package)\n    os.vcp("dearoreui/*", package:installdir("include"))\nend)\n' "$VER" "$SHA" > "$PKG"
           else
             # Existing package: drop any current add_versions line, then insert the new one.
             sed -i '/^[[:space:]]*add_versions(/d' "$PKG"
