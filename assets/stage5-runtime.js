@@ -89,5 +89,105 @@
     if (typeof console !== 'undefined' && console.log) {
         console.log('[DearOreUI] stage8 runtime injected, contextId=__DEAROREUI_CTX__, bridge=__DEAROREUI_BRIDGE__, facet=' + (hasFacet ? 'yes' : 'no') + '');
     }
+    // D1: 把页面 JS 异常与 console 输出桥回 C++ logger（只读遥测，不改业务）。
+    // 通道：dearOreUiFacetTrigger(纯字符串) → C++ onFacetInit → recordStage7JsReport。
+    // 约束：fire-and-forget；默认只桥 error/warn 级别；批量合并成单次 trigger；
+    //       每行截断 + 批量上限，避免刷爆受限的 facet 通道。
+    window.__DearOreUI__.diagnostics = (function() {
+        var queue = [];
+        var flushTimer = null;
+        var capturing = false;
+        var config = window.__DearOreUI__.config || (window.__DearOreUI__.config = {});
+        var maxLine = 512;   // 单行最大字符数（截断）
+        var maxBatch = 20;   // 单次 flush 最大行数（超限丢弃，防刷屏）
+
+        function safe(v) {
+            try {
+                if (typeof v === 'string') return v;
+                if (typeof v === 'undefined') return 'undefined';
+                var s = JSON.stringify(v);
+                return (typeof s === 'string') ? s : String(v);
+            } catch (e) {
+                try { return String(v); } catch (e2) { return '<unserializable>'; }
+            }
+        }
+
+        function push(prefix, fields) {
+            if (queue.length >= maxBatch) return;
+            var line = prefix + JSON.stringify(fields);
+            if (line.length > maxLine) line = line.slice(0, maxLine) + '…';
+            queue.push(line);
+            if (flushTimer === null) {
+                flushTimer = setTimeout(function() { flushTimer = null; flush(); }, 0);
+            }
+        }
+
+        function flush() {
+            if (capturing || !queue.length) return;
+            var lines = queue;
+            queue = [];
+            capturing = true;
+            try {
+                if (hasFacet) dearOreUiFacetTrigger(lines.join('\n'));
+            } catch (e) {}
+            capturing = false;
+        }
+
+        // 捕获阶段监听：页面脚本后续覆盖 window.onerror 也不会破坏本监听。
+        try {
+            window.addEventListener('error', function(ev) {
+                try {
+                    push('js_error:', {
+                        message: safe(ev.message),
+                        source: safe(ev.filename || ev.source || ''),
+                        line: ev.lineno || 0,
+                        col: ev.colno || 0,
+                        stack: safe(ev.error && ev.error.stack || '')
+                    });
+                } catch (e) {}
+            }, true);
+        } catch (e) {}
+
+        // 未处理的 Promise 拒绝。
+        try {
+            window.addEventListener('unhandledrejection', function(ev) {
+                try {
+                    var reason = ev.reason;
+                    push('js_error:', {
+                        type: 'unhandledrejection',
+                        message: safe(reason && (reason.stack || reason.message || reason)),
+                        line: 0,
+                        col: 0
+                    });
+                } catch (e) {}
+            });
+        } catch (e) {}
+
+        // console.*：默认只桥 error/warn；log/info/debug 需 config.bridgeConsole = true。
+        (function hookConsole() {
+            var levels = ['error', 'warn', 'log', 'info', 'debug'];
+            for (var i = 0; i < levels.length; i++) {
+                (function(level) {
+                    var original = console[level];
+                    if (typeof original !== 'function') return;
+                    console[level] = function() {
+                        try { original.apply(console, arguments); } catch (e) {}
+                        if (capturing) return;
+                        if (level === 'log' || level === 'info' || level === 'debug') {
+                            if (!config.bridgeConsole) return;
+                        }
+                        try {
+                            var args = Array.prototype.slice.call(arguments);
+                            var parts = [];
+                            for (var j = 0; j < args.length && j < 8; j++) parts.push(safe(args[j]));
+                            push('js_console:' + level + ':', parts);
+                        } catch (e) {}
+                    };
+                })(levels[i]);
+            }
+        })();
+
+        return { flush: flush, push: push, safe: safe };
+    })();
     window.__DearOreUI__.silent = true;
 })();

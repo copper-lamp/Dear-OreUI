@@ -108,8 +108,33 @@ void recordStage7UiUnmounted(api::ContextId contextId, std::string_view modNames
         .emit();
 }
 
+// D1: JS 侧将页面异常/console 输出按前缀桥回，这里按前缀路由日志级别。
+// 批量报告以 '\n' 分隔（每行自带前缀），逐行路由；未知前缀保持 info，
+// 兼容既有 dbg:/mounted:/runtime_executed: 等遥测。
 void recordStage7JsReport(std::string_view report) {
-    globalLogger().info("js", "report").withField("report", std::string{report}).emit();
+    if (report.empty()) {
+        return;
+    }
+    auto& logger = globalLogger();
+    std::size_t pos = 0;
+    while (pos <= report.size()) {
+        auto const end  = report.find('\n', pos);
+        auto const line = report.substr(pos, end == std::string_view::npos ? std::string_view::npos : end - pos);
+        auto const text = std::string{line};
+        if (text.rfind("js_error:", 0) == 0 || text.rfind("js_console:error:", 0) == 0) {
+            logger.error("js", "report").withField("report", text).emit();
+        } else if (text.rfind("js_console:warn:", 0) == 0) {
+            logger.warning("js", "report").withField("report", text).emit();
+        } else if (text.rfind("js_console:debug:", 0) == 0) {
+            logger.debug("js", "report").withField("report", text).emit();
+        } else {
+            logger.info("js", "report").withField("report", text).emit();
+        }
+        if (end == std::string_view::npos) {
+            break;
+        }
+        pos = end + 1;
+    }
 }
 
 } // namespace dearoreui::diagnostic
