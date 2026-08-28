@@ -748,15 +748,16 @@ Result<RegistrationHandle> DearOreUIApi::registerPage(ModId owner, UiManifest co
 
 Result<RegistrationHandle>
 DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, ComponentSpec const& spec) {
-    // Stage 8: render the declarative component into an htmlBody through the
-    // component renderer, then reuse the standard overlay registration path.
-    // The htmlBody is later parsed back into a DomNode forest by the universal
-    // CSSOM renderer at injection time.
+    // Stage 8: render the declarative component into a DomNode forest through
+    // the component renderer, then reuse the standard overlay registration path.
     //
-    // M8.1.2: also keep the rendered DomNode forest (with per-state cssText
-    // stateStyles) so injection can skip the lossy htmlBody round-trip.
+    // M8.1.2: injection prefers the rendered DomNode forest (with per-state
+    // cssText stateStyles) so it skips the lossy htmlBody round-trip.
+    //
+    // R4: render ONCE into DomNodes; htmlBody is derived from those nodes (pure
+    // serialization, no second render) for legacy transform/export compat.
     auto        nodes    = component::renderComponent(spec);
-    std::string htmlBody = component::renderComponentToHtml(spec);
+    std::string htmlBody = component::serializeDomNodesToHtml(nodes);
 
     mLogger.info("ui", "component_registered")
         .withMod(owner)

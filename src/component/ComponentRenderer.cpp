@@ -1107,12 +1107,19 @@ void appendDomNodeHtml(std::string& out, api::DomNode const& node) {
 
 } // namespace
 
-std::string renderComponentToHtml(api::ComponentSpec const& spec, ThemeTokens const& theme, IAssetResolver const& resolver) {
+// R4: serialize an already-rendered DomNode forest into an htmlBody string.
+// Pure serialization — no component re-render. Components render once into
+// DomNodes; htmlBody is only a derived view for legacy transform/export.
+std::string serializeDomNodesToHtml(std::vector<api::DomNode> const& nodes) {
     std::string html;
-    for (auto const& node : renderComponent(spec, theme, resolver)) {
+    for (auto const& node : nodes) {
         appendDomNodeHtml(html, node);
     }
     return html;
+}
+
+std::string renderComponentToHtml(api::ComponentSpec const& spec, ThemeTokens const& theme, IAssetResolver const& resolver) {
+    return serializeDomNodesToHtml(renderComponent(spec, theme, resolver));
 }
 
 } // namespace dearoreui::component

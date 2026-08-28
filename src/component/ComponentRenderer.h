@@ -26,8 +26,14 @@ namespace dearoreui::component {
     IAssetResolver const& resolver = defaultAssetResolver()
 );
 
-// Renders an api::ComponentSpec into an htmlBody string (DomNode -> HTML). This lets
-// registerComponent reuse the existing htmlBody injection pipeline unchanged.
+// Serializes an already-rendered DomNode forest back into an htmlBody string
+// (DomNode -> HTML). R4: components render ONCE into DomNodes; htmlBody is
+// only a derived view kept for legacy transform/export compatibility — it is
+// never parsed back into DOM (injection prefers domNodes).
+[[nodiscard]] std::string serializeDomNodesToHtml(std::vector<api::DomNode> const& nodes);
+
+// Convenience wrapper: renderComponent(spec) then serializeDomNodesToHtml.
+// Kept for callers that need a one-shot htmlBody (e.g. component tests).
 [[nodiscard]] std::string renderComponentToHtml(
     api::ComponentSpec const& spec,
     ThemeTokens const&    theme    = defaultThemeTokens(),
