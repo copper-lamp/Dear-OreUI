@@ -1039,6 +1039,14 @@ renderComponent(api::ComponentSpec const& spec, ThemeTokens const& theme, IAsset
         break;
     }
 
+    // R2: declarative layout anchor. Every component branch renders a single
+    // root node, so spec.id is injected once at the forest exit (zero-touch
+    // per branch). Page scripts can then reference component-tree nodes by id
+    // instead of re-building DOM by hand.
+    if (!spec.id.empty() && !nodes.empty()) {
+        nodes.front().attrs.push_back(api::DomAttr{"id", spec.id});
+    }
+
     return nodes;
 }
 

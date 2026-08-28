@@ -135,6 +135,9 @@ enum class ComponentKind {
 
 struct ComponentSpec {
     ComponentKind kind{ComponentKind::Panel};
+    std::string   id;              // declarative layout anchor (R2): emitted as the
+                                   // rendered root node's `id` attr so page scripts
+                                   // can reference component-tree nodes by id.
     std::string   label;           // primary text (button/panel title/input hint)
     std::string   variant;         // button: primary/secondary/neutral/destructive
     std::string   style{"normal"}; // button: normal|elevated; panel: default|dark|furnace|chest|...
