@@ -8,6 +8,7 @@
 #include "registry/ModRecord.h"
 #include "registry/RegistryEntry.h"
 #include "resource/ResourceUri.h"
+#include "security/HtmlSanitizer.h"
 #include "transform/ChangePlanner.h"
 
 #include <algorithm>
@@ -686,6 +687,18 @@ namespace {
     auto const modNamespace = manifest.modNamespace;
     auto const uiId         = manifest.id;
     auto const kind         = manifest.kind;
+
+    // S2: fail-closed security validation of external htmlBody before it
+    // enters the injection pipeline (XSS / unsafe URL / oreui:// traversal).
+    auto sanitize = dearoreui::security::HtmlSanitizer::validate(htmlBody);
+    if (sanitize.isErr()) {
+        logger.warning("security", "html_body_rejected")
+            .withMod(owner)
+            .withError(sanitize.error().code)
+            .withMessage(sanitize.error().message)
+            .emit();
+        return sanitize.error();
+    }
 
     dearoreui::registry::UiEntry entry;
     entry.owner    = owner;
