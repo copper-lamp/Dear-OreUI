@@ -17,6 +17,7 @@
 #include "inject/RuntimeInjector.h"
 #include "ipc/CoherentHostBridge.h"
 #include "poc/Stage1NavigationPoc.h"
+#include "preview/UiAssetExporter.h"
 #include "render/DomScriptSerializer.h"
 #include "render/HtmlDomParser.h"
 #include "resource/ResourceIndex.h"
@@ -427,6 +428,11 @@ void Runtime::runStage4Injection(api::ContextId id, api::PageInfo const& info) {
                     .withField("ui_count", std::to_string(uiInjectResult.value().uiCount))
                     .withField("submitted", uiInjectResult.value().hostBridgeAvailable ? "true" : "false")
                     .emit();
+
+                // Offline-preview asset export: after a mount, capture the
+                // freshly registered UIs (best-effort, de-duplicated; never
+                // affects the inject result).
+                exportUiAssetsForPreview();
             }
         } else {
             logger.warning("stage7", "ui_mount_failed")
@@ -975,6 +981,21 @@ void Runtime::registerComponentShowcase() {
         .withField("pointer_events", "auto")
         .withField("click_blocked", "true")
         .emit();
+}
+
+void Runtime::exportUiAssetsForPreview() {
+    if (mRegistry == nullptr) {
+        return;
+    }
+    auto uiEntries = mRegistry->listUiEntries();
+    if (uiEntries.size() == mLastExportedUiCount) {
+        return; // no new UIs since last export — avoid rewriting on every page
+    }
+
+    preview::UiAssetExporter exporter(diagnostic::globalLogger());
+    if (exporter.exportUiEntries(uiEntries, mConfig.dataDirectory / "preview")) {
+        mLastExportedUiCount = uiEntries.size();
+    }
 }
 
 } // namespace dearoreui::runtime
