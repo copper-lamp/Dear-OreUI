@@ -37,6 +37,32 @@ jobs:
           path: |
             bin/
 
+      # Header-only public API artifact (used by the `dearoreui` xmake-repo
+      # package). `xmake install` triggers the target's after_install whitelist
+      # which emits include/dearoreui/{api,bridge}.
+      - run: |
+          xmake install -o "${{ github.workspace }}/hdrs" -y
+
+      - name: Build headers artifact
+        shell: pwsh
+        run: |
+          $root = "$env:GITHUB_WORKSPACE/hdrs"
+          $api = "$root/include/dearoreui/api/IDearOreUIApi.h"
+          $brd = "$root/include/dearoreui/bridge/DearOreUIBridge.h"
+          if (-not (Test-Path $api) -or -not (Test-Path $brd)) {
+            Write-Error "Public headers not produced by xmake install."
+            exit 1
+          }
+          Push-Location "$root/include"
+          Compress-Archive -Path "dearoreui" -DestinationPath "$env:GITHUB_WORKSPACE/DearOreUI-headers.zip" -Force
+          Pop-Location
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ github.event.repository.name }}-headers
+          path: |
+            ${{ github.workspace }}/DearOreUI-headers.zip
+
   update-release-notes:
     permissions:
       contents: write
@@ -67,6 +93,11 @@ jobs:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-client-windows-x64
           path: artifact
 
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ github.event.repository.name }}-headers
+          path: headers-artifact
+
       - run: |
           cp CHANGELOG.md LICENSE README.md artifact/
           test -f artifact/DearOreUI.dll
@@ -80,3 +111,4 @@ jobs:
         with:
           files: |
             ${{ github.event.repository.name }}-windows-x64.zip
+            headers-artifact/DearOreUI-headers.zip

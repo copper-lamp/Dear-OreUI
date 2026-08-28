@@ -164,7 +164,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         auto const variant = spec.variant.empty() ? "neutral" : spec.variant;
         auto const keyPrefix =
             (spec.style == "elevated") ? "pressable.elevated." + variant + "." : "pressable." + variant + ".";
-        std::string base  = "display:inline-block;";
+        std::string base  = "display:flex;align-items:center;justify-content:center;";
         base             += "padding:0.8rem 1.6rem;"; // vanilla padding unknown; reasonable default
         base             += "font-family:" + theme.fontUi + ";";
         base             += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
@@ -326,7 +326,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         render::DomNode bubble;
         bubble.tag    = "div";
         bubble.style  = borderImageStyle(textureKeyFor(spec), theme, resolver);
-        bubble.style += "display:inline-block;padding:0.8rem 1.2rem;";
+        bubble.style += "display:flex;align-items:center;justify-content:center;padding:0.8rem 1.2rem;";
         bubble.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         bubble.style += "color:" + theme.colorText + ";";
         bubble.attrs.push_back(render::DomAttr{"data-component", "bubble"});
@@ -342,7 +342,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         render::DomNode bar;
         bar.tag    = "div";
         bar.style  = borderImageStyle(textureKeyFor(spec), theme, resolver);
-        bar.style += "display:inline-block;padding:0.4rem 0.8rem;";
+        bar.style += "display:flex;align-items:center;justify-content:center;padding:0.4rem 0.8rem;";
         bar.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         bar.style += "color:" + theme.colorText + ";";
         bar.attrs.push_back(render::DomAttr{"data-component", "filterBar"});
@@ -410,7 +410,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         tip.tag = "div";
         // Single-texture tooltip (gameplay-theme --tooltip*).
         tip.style  = borderImageStyle("tooltip.default", theme, resolver);
-        tip.style += "display:inline-block;padding:0.8rem 1.2rem;";
+        tip.style += "display:flex;align-items:center;justify-content:center;padding:0.8rem 1.2rem;";
         tip.style += "color:#fff;"; // --tooltipTextColor
         tip.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         tip.attrs.push_back(render::DomAttr{"data-component", "tooltip"});
@@ -462,7 +462,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         render::DomNode key;
         key.tag    = "div";
         key.style  = borderImageStyle("keyIcon.keyboard", theme, resolver);
-        key.style += "display:inline-flex;align-items:center;justify-content:center;";
+        key.style += "display:flex;align-items:center;justify-content:center;";
         key.style += "padding:1rem 0.8rem 1.2rem 0.8rem;"; // --buttonIconKeyboardPadding*
         key.attrs.push_back(render::DomAttr{"data-component", "keyIcon"});
         render::DomNode glyph;
@@ -555,13 +555,33 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         break;
     }
     case ComponentKind::Grid: {
+        // Flex-only grid. The engine (Yoga) silently ignores display:grid, so
+        // repeat(N,1fr) is reproduced as nested flex rows: a column container
+        // + one flex row per `cols` items + flex:1 cells (equal-width tracks).
         render::DomNode grid;
         grid.tag         = "div";
         auto const cols  = spec.columns > 0 ? spec.columns : 1;
-        grid.style       = "display:grid;grid-template-columns:repeat(" + std::to_string(cols) + ",1fr);";
-        grid.style      += "gap:" + px(theme.spaces[2]) + ";"; // --space2
+        grid.style       = "display:flex;flex-direction:column;";
+        grid.style      += "gap:" + px(theme.spaces[2]) + ";"; // --space2 (row gap)
         grid.attrs.push_back(render::DomAttr{"data-component", "grid"});
-        renderChildren(spec, theme, resolver, grid.children);
+        // Flatten component children + raw body into a cell list, then split
+        // into rows of `cols`. A trailing partial row keeps its items (flex:1
+        // fills the leftover space - documented 1fr deviation for non-full rows).
+        std::vector<render::DomNode> cells;
+        renderChildren(spec, theme, resolver, cells);
+        for (std::size_t i = 0; i < cells.size(); i += static_cast<std::size_t>(cols)) {
+            render::DomNode row;
+            row.tag   = "div";
+            row.style = "display:flex;flex-direction:row;";
+            row.style += "gap:" + px(theme.spaces[2]) + ";"; // --space2 (column gap)
+            row.attrs.push_back(render::DomAttr{"data-component", "gridRow"});
+            auto const end = std::min(cells.size(), i + static_cast<std::size_t>(cols));
+            for (auto j = i; j < end; ++j) {
+                cells[j].style += "flex:1;"; // equal-width 1fr cell
+                row.children.push_back(std::move(cells[j]));
+            }
+            grid.children.push_back(std::move(row));
+        }
         nodes.push_back(std::move(grid));
         break;
     }
@@ -652,11 +672,11 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         // trigger button + options panel (children as listItems).
         render::DomNode dropdown;
         dropdown.tag   = "div";
-        dropdown.style = "display:inline-block;position:relative;";
+        dropdown.style = "display:flex;position:relative;";
         dropdown.attrs.push_back(render::DomAttr{"data-component", "dropdown"});
         render::DomNode trigger;
         trigger.tag    = "div";
-        trigger.style  = "display:inline-flex;align-items:center;gap:0.6rem;";
+        trigger.style  = "display:flex;align-items:center;gap:0.6rem;";
         trigger.style += "padding:0.8rem 1.6rem;font-family:" + theme.fontUi + ";";
         trigger.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
         trigger.style += "cursor:pointer;";
@@ -732,7 +752,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         render::DomNode toast;
         toast.tag    = "div";
         toast.style  = borderImageStyle("bubble.base.default", theme, resolver);
-        toast.style += "display:inline-block;padding:0.8rem 1.2rem;";
+        toast.style += "display:flex;align-items:center;justify-content:center;padding:0.8rem 1.2rem;";
         toast.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         toast.style += "color:" + theme.colorText + ";";
         toast.attrs.push_back(render::DomAttr{"data-component", "toast"});
@@ -777,7 +797,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         // button state + checkmark icon (approximation of vanilla facet).
         render::DomNode toggle;
         toggle.tag    = "div";
-        toggle.style  = "display:inline-flex;align-items:center;gap:0.6rem;cursor:pointer;";
+        toggle.style  = "display:flex;align-items:center;gap:0.6rem;cursor:pointer;";
         toggle.style += "padding:0.6rem 1.2rem;font-family:" + theme.fontUi + ";";
         toggle.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
         toggle.style += borderImageStyle("pressable.neutral.default", theme, resolver);
@@ -908,7 +928,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         // button(-) + value + button(+).
         render::DomNode stepper;
         stepper.tag   = "div";
-        stepper.style = "display:inline-flex;align-items:center;gap:0.4rem;";
+        stepper.style = "display:flex;align-items:center;gap:0.4rem;";
         stepper.attrs.push_back(render::DomAttr{"data-component", "stepper"});
         auto makeStepBtn = [&](std::string const& glyph) {
             render::DomNode btn;
@@ -936,11 +956,11 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         // dropdown + list (reuse dropdown rendering with a label).
         render::DomNode picker;
         picker.tag   = "div";
-        picker.style = "display:inline-block;position:relative;";
+        picker.style = "display:flex;position:relative;";
         picker.attrs.push_back(render::DomAttr{"data-component", "picker"});
         render::DomNode trigger;
         trigger.tag    = "div";
-        trigger.style  = "display:inline-flex;align-items:center;gap:0.6rem;";
+        trigger.style  = "display:flex;align-items:center;gap:0.6rem;";
         trigger.style += "padding:0.8rem 1.6rem;font-family:" + theme.fontUi + ";";
         trigger.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
         trigger.style += "cursor:pointer;";
@@ -1002,7 +1022,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         render::DomNode badge;
         badge.tag    = "div";
         badge.style  = borderImageStyle("bubble.base.default", theme, resolver);
-        badge.style += "display:inline-block;padding:0.2rem 0.6rem;";
+        badge.style += "display:flex;align-items:center;justify-content:center;padding:0.2rem 0.6rem;";
         badge.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Tiny]) + ";";
         badge.style += "color:" + theme.colorText + ";";
         badge.attrs.push_back(render::DomAttr{"data-component", "badge"});

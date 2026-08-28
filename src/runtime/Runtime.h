@@ -50,6 +50,11 @@ private:
 
     void runStage4Injection(api::ContextId id, api::PageInfo const& info);
 
+    // Best-effort offline-preview asset export (see preview/UiAssetExporter).
+    // De-duplicated by UI count so repeated page creations don't rewrite the
+    // manifest. Always non-throwing; failures only log.
+    void exportUiAssetsForPreview();
+
     // Stage 7.1: register the built-in demo overlay for real-client display
     // verification. Gated by RuntimeConfig::enableDemoOverlay.
     void registerDemoOverlay();
@@ -78,6 +83,7 @@ private:
     std::unique_ptr<ipc::IHostBridge>           mHostBridge;
     std::unique_ptr<ipc::CoherentViewRegistry>  mViewRegistry;
     std::unique_ptr<ipc::OreUIFacetBridge>      mOreUIFacetBridge; // Stage 8-A native facet JS->C++ channel
+    std::size_t                                 mLastExportedUiCount{0}; // preview export dedupe
     bool                                        mInitialized{false};
     bool                                        mEnabled{false};
 };
