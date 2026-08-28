@@ -39,36 +39,12 @@ jobs:
 
       - run: xmake -w -y
 
-      # Header-only public API artifact (consumed by the `dearoreui` xmake-repo
-      # package). `xmake install` triggers the target's after_install whitelist
-      # which emits include/dearoreui/{api,bridge}.
-      - run: xmake install -o "${{ github.workspace }}/hdrs" -y
-
-      - name: Build headers artifact
-        shell: pwsh
-        run: |
-          $root = "$env:GITHUB_WORKSPACE/hdrs"
-          $api = "$root/include/dearoreui/api/IDearOreUIApi.h"
-          $brd = "$root/include/dearoreui/bridge/DearOreUIBridge.h"
-          if (-not (Test-Path $api) -or -not (Test-Path $brd)) {
-            Write-Error "Public headers not produced by xmake install."
-            exit 1
-          }
-          Push-Location "$root/include"
-          Compress-Archive -Path "dearoreui" -DestinationPath "$env:GITHUB_WORKSPACE/DearOreUI-headers.zip" -Force
-          Pop-Location
-
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-client-windows-x64
           path: bin/
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ github.event.repository.name }}-headers
-          path: ${{ github.workspace }}/DearOreUI-headers.zip
-
-  # Runs only on a manual dispatch with a release_tag filled, or on a version
+      # Runs only on a manual dispatch with a release_tag filled, or on a version
   # tag push. Consumes the build artifacts and attaches them to the Release of
   # that tag.
   release:
@@ -94,12 +70,6 @@ jobs:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-client-windows-x64
           path: artifact/
 
-      - name: Download headers artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ github.event.repository.name }}-headers
-          path: headers-artifact/
-
       - name: Pack and validate mod zip
         run: |
           cp CHANGELOG.md LICENSE README.md artifact/
@@ -111,16 +81,13 @@ jobs:
             echo "refusing to release: .env file detected in artifact"; exit 1
           fi
           (cd artifact && zip -r "../${{ github.event.repository.name }}-windows-x64.zip" . -x '*.log')
-          # Name must match the package's add_urls pattern DearOreUI-headers-$(version).zip
-          mv headers-artifact/DearOreUI-headers.zip "DearOreUI-headers-$TAG.zip"
-          ls -la "${{ github.event.repository.name }}-windows-x64.zip" "DearOreUI-headers-$TAG.zip"
+          ls -la "${{ github.event.repository.name }}-windows-x64.zip"
 
       - name: Create / update release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           MOD_ZIP="${{ github.event.repository.name }}-windows-x64.zip"
-          HDRS_ZIP="DearOreUI-headers-$TAG.zip"
           if [ "$IS_MANUAL" = "true" ]; then
             NOTES="${{ github.event.inputs.release_notes }}"
             [ -n "$NOTES" ] || NOTES="$(cat CHANGELOG.md)"
@@ -130,7 +97,7 @@ jobs:
           # If a Release already exists for this tag, only attach/refresh assets —
           # never overwrite the release notes (tag push must not clobber them).
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$MOD_ZIP" "$HDRS_ZIP" --clobber
+            gh release upload "$TAG" "$MOD_ZIP" --clobber
           else
-            gh release create "$TAG" "$MOD_ZIP" "$HDRS_ZIP" --title "$TAG" --notes "$NOTES"
+            gh release create "$TAG" "$MOD_ZIP" --title "$TAG" --notes "$NOTES"
           fi
