@@ -168,7 +168,7 @@ namespace {
 void appendUiSpec(
     std::ostream&                       stream,
     ui::OverlaySpec const&              spec,
-    std::vector<render::DomNode> const* bodyOverride = nullptr
+    std::vector<api::DomNode> const* bodyOverride = nullptr
 ) {
     // Stage 8: parse the Mod-provided htmlBody into a DomNode forest and
     // serialize it as a compact JS node array. The bootstrap renderer
@@ -213,13 +213,13 @@ void appendUiSpec(
 // the showcase root panel) is split by children; otherwise the body is one
 // chunk. Returns groups of the root's children (NOT wrapped in the root) so
 // the first chunk mounts the root and later chunks append into it.
-std::vector<std::vector<render::DomNode>>
-chunkUiBody(std::vector<render::DomNode> const& body, std::size_t maxChunkNodes) {
-    std::vector<std::vector<render::DomNode>> chunks;
+std::vector<std::vector<api::DomNode>>
+chunkUiBody(std::vector<api::DomNode> const& body, std::size_t maxChunkNodes) {
+    std::vector<std::vector<api::DomNode>> chunks;
     if (body.size() == 1 && body[0].children.size() > maxChunkNodes) {
         auto const& root = body[0];
         for (std::size_t i = 0; i < root.children.size(); i += maxChunkNodes) {
-            std::vector<render::DomNode> group;
+            std::vector<api::DomNode> group;
             auto const                   end = std::min(i + maxChunkNodes, root.children.size());
             for (std::size_t j = i; j < end; ++j) {
                 group.push_back(root.children[j]);
@@ -238,7 +238,7 @@ chunkUiBody(std::vector<render::DomNode> const& body, std::size_t maxChunkNodes)
 // text is executed through the native ExecuteScript channel after the UI's
 // container is mounted (see generateUiBodyScript), the same verified channel
 // the bootstrap machinery uses.
-std::string extractScriptNodes(std::vector<render::DomNode>& nodes) {
+std::string extractScriptNodes(std::vector<api::DomNode>& nodes) {
     std::string out;
     for (auto it = nodes.begin(); it != nodes.end();) {
         if (it->tag == "script") {
@@ -321,9 +321,9 @@ api::Result<InjectionReport> RuntimeInjector::injectUi(api::ContextId id, ui::Ui
             std::string script;
             if (chunkIndex == 0) {
                 // First chunk: mount the root with the first group of children.
-                std::vector<render::DomNode> mountBody;
+                std::vector<api::DomNode> mountBody;
                 if (body.size() == 1 && chunks.size() > 1) {
-                    render::DomNode root = body[0];
+                    api::DomNode root = body[0];
                     root.children        = chunks[0];
                     mountBody.push_back(std::move(root));
                 } else {
@@ -380,7 +380,7 @@ std::string RuntimeInjector::generateUiBootstrapScript(api::ContextId id, ui::Ui
 std::string RuntimeInjector::generateUiBodyScript(
     api::ContextId                      id,
     ui::UiMountItem const&              item,
-    std::vector<render::DomNode> const* bodyOverride,
+    std::vector<api::DomNode> const* bodyOverride,
     std::string const&                  pageScripts
 ) const {
     static_cast<void>(id);
@@ -434,7 +434,7 @@ std::string RuntimeInjector::generateUiBodyScript(
 std::string RuntimeInjector::generateUiAppendScript(
     api::ContextId                      id,
     std::string const&                  containerId,
-    std::vector<render::DomNode> const& nodes
+    std::vector<api::DomNode> const& nodes
 ) const {
     static_cast<void>(id);
     std::ostringstream stream;

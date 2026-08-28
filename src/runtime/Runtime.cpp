@@ -3,7 +3,7 @@
 #include "api/manifest/ManifestValidator.h"
 #include "capability/ICapabilityQuery.h"
 #include "component/ComponentRenderer.h"
-#include "component/ComponentSpec.h"
+#include "api/types/ComponentSpec.h"
 #include "diagnostic/CrashProbe.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "diagnostic/FileDiagnosticSink.h"
@@ -546,8 +546,8 @@ void Runtime::registerDemoOverlay() {
     // Stage 8-A cleanup: the demo overlay is now just a tiny corner badge —
     // it stays as the mount target for the round-6 event-context probe button,
     // but no longer renders the full-screen panel that blocked the view.
-    component::ComponentSpec demoBadge;
-    demoBadge.kind    = component::ComponentKind::Text;
+    api::ComponentSpec demoBadge;
+    demoBadge.kind    = api::ComponentKind::Text;
     demoBadge.variant = "muted";
     demoBadge.label   = "DearOreUI 0.2.0";
 
@@ -608,29 +608,29 @@ void Runtime::registerComponentShowcase() {
     // (stage 8.1) plus the stage 8.1.4 layout/composite/nav/interaction/data
     // components. The container blocks pointer events so clicks never reach
     // the vanilla UI underneath (no accidental clicks).
-    component::ComponentSpec root;
-    root.kind  = component::ComponentKind::Panel;
+    api::ComponentSpec root;
+    root.kind  = api::ComponentKind::Panel;
     root.style = "translucent";
     root.label = "DearOreUI 组件库展示 (Stage 8.1 + 8.1.4)";
 
     auto section = [](std::string title) {
-        component::ComponentSpec s;
-        s.kind    = component::ComponentKind::Text;
+        api::ComponentSpec s;
+        s.kind    = api::ComponentKind::Text;
         s.variant = "subheading";
         s.label   = title;
         return s;
     };
     auto text = [](std::string label, std::string variant) {
-        component::ComponentSpec t;
-        t.kind    = component::ComponentKind::Text;
+        api::ComponentSpec t;
+        t.kind    = api::ComponentKind::Text;
         t.variant = variant;
         t.label   = label;
         return t;
     };
     auto button =
         [](std::string label, std::string variant, std::string style = "normal", std::string state = "default") {
-            component::ComponentSpec b;
-            b.kind    = component::ComponentKind::Button;
+            api::ComponentSpec b;
+            b.kind    = api::ComponentKind::Button;
             b.variant = variant;
             b.style   = style;
             b.state   = state;
@@ -656,8 +656,8 @@ void Runtime::registerComponentShowcase() {
     // Panel.
     root.children.push_back(section("Panel"));
     {
-        component::ComponentSpec p;
-        p.kind  = component::ComponentKind::Panel;
+        api::ComponentSpec p;
+        p.kind  = api::ComponentKind::Panel;
         p.style = "chest";
         p.label = "Chest Panel";
         root.children.push_back(p);
@@ -666,14 +666,14 @@ void Runtime::registerComponentShowcase() {
     // Card / ListItem.
     root.children.push_back(section("Card / ListItem"));
     {
-        component::ComponentSpec card;
-        card.kind  = component::ComponentKind::Card;
+        api::ComponentSpec card;
+        card.kind  = api::ComponentKind::Card;
         card.label = "Card base";
         root.children.push_back(card);
     }
     {
-        component::ComponentSpec item;
-        item.kind  = component::ComponentKind::ListItem;
+        api::ComponentSpec item;
+        item.kind  = api::ComponentKind::ListItem;
         item.label = "List item base";
         root.children.push_back(item);
     }
@@ -681,27 +681,27 @@ void Runtime::registerComponentShowcase() {
     // Input / Divider.
     root.children.push_back(section("Input / Divider"));
     {
-        component::ComponentSpec input;
-        input.kind  = component::ComponentKind::Input;
+        api::ComponentSpec input;
+        input.kind  = api::ComponentKind::Input;
         input.label = "Seed";
         root.children.push_back(input);
     }
     {
-        component::ComponentSpec divider;
-        divider.kind = component::ComponentKind::Divider;
+        api::ComponentSpec divider;
+        divider.kind = api::ComponentKind::Divider;
         root.children.push_back(divider);
     }
 
     // TabBar.
     root.children.push_back(section("TabBar"));
     {
-        component::ComponentSpec bar;
-        bar.kind = component::ComponentKind::TabBar;
-        component::ComponentSpec tabA;
-        tabA.kind  = component::ComponentKind::Text;
+        api::ComponentSpec bar;
+        bar.kind = api::ComponentKind::TabBar;
+        api::ComponentSpec tabA;
+        tabA.kind  = api::ComponentKind::Text;
         tabA.label = "Tab A";
-        component::ComponentSpec tabB;
-        tabB.kind  = component::ComponentKind::Text;
+        api::ComponentSpec tabB;
+        tabB.kind  = api::ComponentKind::Text;
         tabB.label = "Tab B";
         bar.children.push_back(tabA);
         bar.children.push_back(tabB);
@@ -711,37 +711,37 @@ void Runtime::registerComponentShowcase() {
     // Tooltip / ContainerSlot / KeyIcon / Progress.
     root.children.push_back(section("Tooltip / Slot / Key / Progress"));
     {
-        component::ComponentSpec tip;
-        tip.kind  = component::ComponentKind::Tooltip;
+        api::ComponentSpec tip;
+        tip.kind  = api::ComponentKind::Tooltip;
         tip.label = "Tooltip text";
         root.children.push_back(tip);
     }
     {
-        component::ComponentSpec slot;
-        slot.kind  = component::ComponentKind::ContainerSlot;
+        api::ComponentSpec slot;
+        slot.kind  = api::ComponentKind::ContainerSlot;
         slot.label = "64";
         root.children.push_back(slot);
     }
     {
-        component::ComponentSpec key;
-        key.kind  = component::ComponentKind::KeyIcon;
+        api::ComponentSpec key;
+        key.kind  = api::ComponentKind::KeyIcon;
         key.label = "A";
         root.children.push_back(key);
     }
     {
-        component::ComponentSpec progress;
-        progress.kind = component::ComponentKind::Progress;
+        api::ComponentSpec progress;
+        progress.kind = api::ComponentKind::Progress;
         root.children.push_back(progress);
     }
     {
-        component::ComponentSpec bubble;
-        bubble.kind  = component::ComponentKind::Bubble;
+        api::ComponentSpec bubble;
+        bubble.kind  = api::ComponentKind::Bubble;
         bubble.label = "Bubble";
         root.children.push_back(bubble);
     }
     {
-        component::ComponentSpec filter;
-        filter.kind  = component::ComponentKind::FilterBar;
+        api::ComponentSpec filter;
+        filter.kind  = api::ComponentKind::FilterBar;
         filter.label = "Filter";
         root.children.push_back(filter);
     }
@@ -750,49 +750,49 @@ void Runtime::registerComponentShowcase() {
     // scrollView).
     root.children.push_back(section("Layout (Stack / Grid / Section / Scroll)"));
     {
-        component::ComponentSpec scroll;
-        scroll.kind = component::ComponentKind::ScrollView;
-        component::ComponentSpec item;
-        item.kind  = component::ComponentKind::ListItem;
+        api::ComponentSpec scroll;
+        scroll.kind = api::ComponentKind::ScrollView;
+        api::ComponentSpec item;
+        item.kind  = api::ComponentKind::ListItem;
         item.label = "Scroll item";
         scroll.children.push_back(item);
         root.children.push_back(scroll);
     }
     {
-        component::ComponentSpec spacer;
-        spacer.kind = component::ComponentKind::Spacer;
+        api::ComponentSpec spacer;
+        spacer.kind = api::ComponentKind::Spacer;
         root.children.push_back(spacer);
     }
     {
-        component::ComponentSpec stack;
-        stack.kind = component::ComponentKind::Stack;
-        component::ComponentSpec a;
-        a.kind  = component::ComponentKind::Button;
+        api::ComponentSpec stack;
+        stack.kind = api::ComponentKind::Stack;
+        api::ComponentSpec a;
+        a.kind  = api::ComponentKind::Button;
         a.label = "A";
-        component::ComponentSpec b;
-        b.kind  = component::ComponentKind::Button;
+        api::ComponentSpec b;
+        b.kind  = api::ComponentKind::Button;
         b.label = "B";
         stack.children.push_back(a);
         stack.children.push_back(b);
         root.children.push_back(stack);
     }
     {
-        component::ComponentSpec grid;
-        grid.kind    = component::ComponentKind::Grid;
+        api::ComponentSpec grid;
+        grid.kind    = api::ComponentKind::Grid;
         grid.columns = 3;
         for (int i = 0; i < 3; ++i) {
-            component::ComponentSpec slot;
-            slot.kind = component::ComponentKind::ContainerSlot;
+            api::ComponentSpec slot;
+            slot.kind = api::ComponentKind::ContainerSlot;
             grid.children.push_back(slot);
         }
         root.children.push_back(grid);
     }
     {
-        component::ComponentSpec sec;
-        sec.kind  = component::ComponentKind::Section;
+        api::ComponentSpec sec;
+        sec.kind  = api::ComponentKind::Section;
         sec.label = "Section title";
-        component::ComponentSpec tip;
-        tip.kind  = component::ComponentKind::Tooltip;
+        api::ComponentSpec tip;
+        tip.kind  = api::ComponentKind::Tooltip;
         tip.label = "Section content";
         sec.children.push_back(tip);
         root.children.push_back(sec);
@@ -802,86 +802,86 @@ void Runtime::registerComponentShowcase() {
     // navigationBar / toast / searchField / toggle / badge).
     root.children.push_back(section("Composite (Modal / Menu / Dropdown / Form)"));
     {
-        component::ComponentSpec modal;
-        modal.kind  = component::ComponentKind::Modal;
+        api::ComponentSpec modal;
+        modal.kind  = api::ComponentKind::Modal;
         modal.label = "Confirm";
-        component::ComponentSpec ok;
-        ok.kind    = component::ComponentKind::Button;
+        api::ComponentSpec ok;
+        ok.kind    = api::ComponentKind::Button;
         ok.variant = "primary";
         ok.label   = "OK";
         modal.children.push_back(ok);
         root.children.push_back(modal);
     }
     {
-        component::ComponentSpec menu;
-        menu.kind = component::ComponentKind::Menu;
+        api::ComponentSpec menu;
+        menu.kind = api::ComponentKind::Menu;
         for (int i = 0; i < 2; ++i) {
-            component::ComponentSpec item;
-            item.kind  = component::ComponentKind::ListItem;
+            api::ComponentSpec item;
+            item.kind  = api::ComponentKind::ListItem;
             item.label = "Item " + std::to_string(i + 1);
             menu.children.push_back(item);
         }
         root.children.push_back(menu);
     }
     {
-        component::ComponentSpec list;
-        list.kind = component::ComponentKind::ScrollingList;
+        api::ComponentSpec list;
+        list.kind = api::ComponentKind::ScrollingList;
         for (int i = 0; i < 3; ++i) {
-            component::ComponentSpec item;
-            item.kind  = component::ComponentKind::ListItem;
+            api::ComponentSpec item;
+            item.kind  = api::ComponentKind::ListItem;
             item.label = "List item " + std::to_string(i + 1);
             list.children.push_back(item);
         }
         root.children.push_back(list);
     }
     {
-        component::ComponentSpec dropdown;
-        dropdown.kind  = component::ComponentKind::Dropdown;
+        api::ComponentSpec dropdown;
+        dropdown.kind  = api::ComponentKind::Dropdown;
         dropdown.label = "Select";
-        component::ComponentSpec opt;
-        opt.kind  = component::ComponentKind::ListItem;
+        api::ComponentSpec opt;
+        opt.kind  = api::ComponentKind::ListItem;
         opt.label = "Option 1";
         dropdown.children.push_back(opt);
         root.children.push_back(dropdown);
     }
     {
-        component::ComponentSpec form;
-        form.kind  = component::ComponentKind::Form;
+        api::ComponentSpec form;
+        form.kind  = api::ComponentKind::Form;
         form.label = "Settings";
-        component::ComponentSpec input;
-        input.kind  = component::ComponentKind::Input;
+        api::ComponentSpec input;
+        input.kind  = api::ComponentKind::Input;
         input.label = "Seed";
         form.children.push_back(input);
         root.children.push_back(form);
     }
     {
-        component::ComponentSpec nav;
-        nav.kind  = component::ComponentKind::NavigationBar;
+        api::ComponentSpec nav;
+        nav.kind  = api::ComponentKind::NavigationBar;
         nav.label = "DearOreUI";
         root.children.push_back(nav);
     }
     {
-        component::ComponentSpec toast;
-        toast.kind  = component::ComponentKind::Toast;
+        api::ComponentSpec toast;
+        toast.kind  = api::ComponentKind::Toast;
         toast.label = "Saved!";
         root.children.push_back(toast);
     }
     {
-        component::ComponentSpec search;
-        search.kind  = component::ComponentKind::SearchField;
+        api::ComponentSpec search;
+        search.kind  = api::ComponentKind::SearchField;
         search.label = "Search...";
         root.children.push_back(search);
     }
     {
-        component::ComponentSpec toggle;
-        toggle.kind  = component::ComponentKind::Toggle;
+        api::ComponentSpec toggle;
+        toggle.kind  = api::ComponentKind::Toggle;
         toggle.state = "on";
         toggle.label = "Enable";
         root.children.push_back(toggle);
     }
     {
-        component::ComponentSpec badge;
-        badge.kind  = component::ComponentKind::Badge;
+        api::ComponentSpec badge;
+        badge.kind  = api::ComponentKind::Badge;
         badge.label = "3";
         root.children.push_back(badge);
     }
@@ -890,62 +890,62 @@ void Runtime::registerComponentShowcase() {
     // slider / stepper / picker / icon / image).
     root.children.push_back(section("Nav / Interaction / Data"));
     {
-        component::ComponentSpec crumb;
-        crumb.kind = component::ComponentKind::Breadcrumb;
-        component::ComponentSpec home;
-        home.kind  = component::ComponentKind::Text;
+        api::ComponentSpec crumb;
+        crumb.kind = api::ComponentKind::Breadcrumb;
+        api::ComponentSpec home;
+        home.kind  = api::ComponentKind::Text;
         home.label = "Home";
-        component::ComponentSpec worlds;
-        worlds.kind  = component::ComponentKind::Text;
+        api::ComponentSpec worlds;
+        worlds.kind  = api::ComponentKind::Text;
         worlds.label = "Worlds";
         crumb.children.push_back(home);
         crumb.children.push_back(worlds);
         root.children.push_back(crumb);
     }
     {
-        component::ComponentSpec pager;
-        pager.kind    = component::ComponentKind::Pager;
+        api::ComponentSpec pager;
+        pager.kind    = api::ComponentKind::Pager;
         pager.columns = 3;
         pager.value   = "1";
         root.children.push_back(pager);
     }
     {
-        component::ComponentSpec area;
-        area.kind  = component::ComponentKind::TextArea;
+        api::ComponentSpec area;
+        area.kind  = api::ComponentKind::TextArea;
         area.label = "Notes";
         root.children.push_back(area);
     }
     {
-        component::ComponentSpec slider;
-        slider.kind  = component::ComponentKind::Slider;
+        api::ComponentSpec slider;
+        slider.kind  = api::ComponentKind::Slider;
         slider.value = "50";
         root.children.push_back(slider);
     }
     {
-        component::ComponentSpec stepper;
-        stepper.kind  = component::ComponentKind::Stepper;
+        api::ComponentSpec stepper;
+        stepper.kind  = api::ComponentKind::Stepper;
         stepper.value = "3";
         root.children.push_back(stepper);
     }
     {
-        component::ComponentSpec picker;
-        picker.kind  = component::ComponentKind::Picker;
+        api::ComponentSpec picker;
+        picker.kind  = api::ComponentKind::Picker;
         picker.value = "A";
-        component::ComponentSpec opt;
-        opt.kind  = component::ComponentKind::ListItem;
+        api::ComponentSpec opt;
+        opt.kind  = api::ComponentKind::ListItem;
         opt.label = "A";
         picker.children.push_back(opt);
         root.children.push_back(picker);
     }
     {
-        component::ComponentSpec icon;
-        icon.kind = component::ComponentKind::Icon;
+        api::ComponentSpec icon;
+        icon.kind = api::ComponentKind::Icon;
         icon.icon = "checkmark";
         root.children.push_back(icon);
     }
     {
-        component::ComponentSpec image;
-        image.kind = component::ComponentKind::Image;
+        api::ComponentSpec image;
+        image.kind = api::ComponentKind::Image;
         image.src  = "/hbui/assets/Play-b8e5aadba97d31b3abd0.png";
         root.children.push_back(image);
     }

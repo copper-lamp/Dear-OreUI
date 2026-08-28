@@ -2,13 +2,13 @@
 
 #include "api/manifest/Permission.h"
 #include "facet/IFacetProvider.h"
-#include "ipc/IHostMethod.h"
+#include "api/IHostMethod.h"
 
 #include <memory>
 
 namespace dearoreui::facet {
 
-class FacetHostMethod : public ipc::IHostMethod {
+class FacetHostMethod : public api::IHostMethod {
 public:
     explicit FacetHostMethod(std::shared_ptr<IFacetProvider> provider, api::Permission requiredPermission);
 

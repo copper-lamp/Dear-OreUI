@@ -1,5 +1,6 @@
 #pragma once
 
+#include "api/types/DomNode.h"
 #include "diagnostic/DiagnosticLogger.h"
 #include "inject/IPageInjector.h"
 #include "ipc/IHostBridge.h"
@@ -31,7 +32,7 @@ private:
     [[nodiscard]] std::string generateUiBodyScript(
         api::ContextId                      id,
         ui::UiMountItem const&              item,
-        std::vector<render::DomNode> const* bodyOverride = nullptr,
+        std::vector<api::DomNode> const* bodyOverride = nullptr,
         std::string const&                  pageScripts  = {}
     ) const;
     // Append-only script for chunked UIs: appends a node forest into an
@@ -40,7 +41,7 @@ private:
     [[nodiscard]] std::string generateUiAppendScript(
         api::ContextId                      id,
         std::string const&                  containerId,
-        std::vector<render::DomNode> const& nodes
+        std::vector<api::DomNode> const& nodes
     ) const;
 
     diagnostic::DiagnosticLogger& mLogger;

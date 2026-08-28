@@ -657,7 +657,7 @@ namespace {
     dearoreui::api::UiKind                   expectedKind,
     dearoreui::registry::IModRegistry&       registry,
     dearoreui::diagnostic::DiagnosticLogger& logger,
-    std::vector<dearoreui::render::DomNode>  domNodes = {}
+    std::vector<dearoreui::api::DomNode>     domNodes = {}
 ) {
     using namespace dearoreui::api;
 
@@ -747,7 +747,7 @@ DearOreUIApi::registerComponent(ModId owner, UiManifest const& manifest, Compone
 
     mLogger.info("ui", "component_registered")
         .withMod(owner)
-        .withField("component", std::string(component::componentKindName(spec.kind)))
+        .withField("component", std::string(api::componentKindName(spec.kind)))
         .withField("html_body_length", std::to_string(htmlBody.size()))
         .withField("dom_node_count", std::to_string(nodes.size()))
         .emit();

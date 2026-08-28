@@ -9,7 +9,7 @@ namespace dearoreui::ipc {
 api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
     const api::ModId&                   owner,
     api::PermissionSet const&           permissions,
-    const std::shared_ptr<IHostMethod>& method
+    const std::shared_ptr<api::IHostMethod>& method
 ) {
     api::HostMethodManifest manifest;
     manifest.name        = method != nullptr ? method->name() : std::string{};
@@ -20,7 +20,7 @@ api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
 api::Result<api::RegistrationHandle> HostMethodRegistry::registerMethod(
     const api::ModId&                   owner,
     api::HostMethodManifest             manifest,
-    const std::shared_ptr<IHostMethod>& method
+    const std::shared_ptr<api::IHostMethod>& method
 ) {
     if (!owner.isValid() || method == nullptr || manifest.name.empty()) {
         return api::Error{api::ErrorCode::InvalidArgument, "invalid owner, manifest or method"};
@@ -68,7 +68,7 @@ bool HostMethodRegistry::unregister(api::RegistrationHandle handle) {
     return true;
 }
 
-std::shared_ptr<IHostMethod> HostMethodRegistry::find(std::string_view name) const {
+std::shared_ptr<api::IHostMethod> HostMethodRegistry::find(std::string_view name) const {
     std::lock_guard lock(mMutex);
     auto            iterator = mByName.find(std::string{name});
     if (iterator == mByName.end()) {

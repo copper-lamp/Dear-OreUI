@@ -72,7 +72,7 @@ struct Cursor {
 }
 
 // Parses attributes of an opening tag. Returns false on structural problems.
-bool parseAttributes(Cursor& cursor, DomNode& node) {
+bool parseAttributes(Cursor& cursor, api::DomNode& node) {
     for (;;) {
         cursor.skipWhitespace();
         if (cursor.eof()) {
@@ -105,7 +105,7 @@ bool parseAttributes(Cursor& cursor, DomNode& node) {
         if (name == "style") {
             node.style = std::move(value);
         } else {
-            node.attrs.push_back(DomAttr{std::move(name), std::move(value)});
+            node.attrs.push_back(api::DomAttr{std::move(name), std::move(value)});
         }
     }
 }
@@ -122,7 +122,7 @@ std::string readText(Cursor& cursor) {
 
 // Parses a fragment starting at an opening tag. Returns the node on success.
 // `isRoot` distinguishes the top-level call (may be text-only) from recursion.
-bool parseNode(Cursor& cursor, DomNode& node, bool allowTextOnly) {
+bool parseNode(Cursor& cursor, api::DomNode& node, bool allowTextOnly) {
     cursor.skipWhitespace();
     if (cursor.eof()) {
         return false;
@@ -180,7 +180,7 @@ bool parseNode(Cursor& cursor, DomNode& node, bool allowTextOnly) {
             }
             return false; // mismatched closing tag
         }
-        DomNode child;
+        api::DomNode child;
         if (!parseNode(cursor, child, true)) {
             return false;
         }
@@ -197,8 +197,8 @@ bool parseNode(Cursor& cursor, DomNode& node, bool allowTextOnly) {
 
 } // namespace
 
-std::vector<DomNode> parseHtmlFragment(std::string_view html) {
-    std::vector<DomNode> forest;
+std::vector<api::DomNode> parseHtmlFragment(std::string_view html) {
+    std::vector<api::DomNode> forest;
     Cursor               cursor{html, 0};
 
     for (;;) {
@@ -206,7 +206,7 @@ std::vector<DomNode> parseHtmlFragment(std::string_view html) {
         if (cursor.eof()) {
             break;
         }
-        DomNode node;
+        api::DomNode node;
         if (!parseNode(cursor, node, true)) {
             break; // structural failure: return what we have
         }

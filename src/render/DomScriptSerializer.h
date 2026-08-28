@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/DomNode.h"
+#include "api/types/DomNode.h"
 
 #include <string>
 #include <vector>
@@ -13,6 +13,6 @@ namespace dearoreui::render {
 // Only non-empty fields are emitted so the generated script stays small.
 // The output is an expression, not a statement: callers embed it directly,
 // e.g. `var nodes = <serialize...>;`.
-[[nodiscard]] std::string serializeDomForest(std::vector<DomNode> const& nodes);
+[[nodiscard]] std::string serializeDomForest(std::vector<api::DomNode> const& nodes);
 
 } // namespace dearoreui::render

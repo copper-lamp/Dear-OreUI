@@ -48,7 +48,7 @@ borderImageStyle(std::string_view key, ThemeTokens const& theme, IAssetResolver 
 // state-specific texture cssText is stored; the shared base style goes into
 // node.baseStyle. Returns the default state's full cssText (texture + base).
 std::string emitStateStyles(
-    render::DomNode&                node,
+    api::DomNode&                node,
     std::vector<std::string> const& states,
     std::string const&              keyPrefix,
     std::string const&              baseStyle,
@@ -72,10 +72,10 @@ std::string emitStateStyles(
 
 // Renders nested component children (excluding raw body) plus raw body nodes.
 void renderChildren(
-    ComponentSpec const&          spec,
+    api::ComponentSpec const&          spec,
     ThemeTokens const&            theme,
     IAssetResolver const&         resolver,
-    std::vector<render::DomNode>& out
+    std::vector<api::DomNode>& out
 ) {
     for (auto const& child : spec.children) {
         auto rendered = renderComponent(child, theme, resolver);
@@ -91,7 +91,7 @@ void renderChildren(
 // Effective interaction state: `disabled` wins over the declared state
 // (stage 8.1 plan 2.2: "disabled 与 state=disabled 等价"). Returns a view into
 // spec.state (a stable member) or a literal — never a temporary.
-[[nodiscard]] std::string_view effectiveState(ComponentSpec const& spec) {
+[[nodiscard]] std::string_view effectiveState(api::ComponentSpec const& spec) {
     if (spec.disabled) {
         return "disabled";
     }
@@ -104,23 +104,23 @@ void renderChildren(
 // Semantic texture key for a component, following the stage 8.1 plan 2.3
 // naming (<family>.<variant>.<state>). Unknown keys fall back to the vanilla
 // table lookup inside borderImageStyle.
-[[nodiscard]] std::string textureKeyFor(ComponentSpec const& spec) {
+[[nodiscard]] std::string textureKeyFor(api::ComponentSpec const& spec) {
     auto const state = effectiveState(spec);
     switch (spec.kind) {
-    case ComponentKind::Button: {
+    case api::ComponentKind::Button: {
         auto const variant = spec.variant.empty() ? "neutral" : spec.variant;
         if (spec.style == "elevated") {
             return "pressable.elevated." + variant + "." + std::string(state);
         }
         return "pressable." + variant + "." + std::string(state);
     }
-    case ComponentKind::TabBar:
+    case api::ComponentKind::TabBar:
         return "tabBar.neutral." + std::string(state);
-    case ComponentKind::Bubble:
+    case api::ComponentKind::Bubble:
         return spec.variant == "action" ? "bubble.action.default" : "bubble.base.default";
-    case ComponentKind::FilterBar:
+    case api::ComponentKind::FilterBar:
         return spec.variant == "action" ? "filterBar.action.default" : "filterBar.base.default";
-    case ComponentKind::ListItem: {
+    case api::ComponentKind::ListItem: {
         if (spec.variant == "action") {
             return "listItem.action." + std::string(state);
         }
@@ -131,7 +131,7 @@ void renderChildren(
         auto const baseState = (state == "focused") ? "focused" : "default";
         return "listItem.base." + std::string(baseState);
     }
-    case ComponentKind::Card: {
+    case api::ComponentKind::Card: {
         if (spec.variant == "action") {
             return "detailedCard.action." + std::string(state);
         }
@@ -152,13 +152,13 @@ VanillaAssetResolver const& defaultAssetResolver() {
     return resolver;
 }
 
-std::vector<render::DomNode>
-renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResolver const& resolver) {
-    std::vector<render::DomNode> nodes;
+std::vector<api::DomNode>
+renderComponent(api::ComponentSpec const& spec, ThemeTokens const& theme, IAssetResolver const& resolver) {
+    std::vector<api::DomNode> nodes;
 
     switch (spec.kind) {
-    case ComponentKind::Button: {
-        render::DomNode button;
+    case api::ComponentKind::Button: {
+        api::DomNode button;
         button.tag = "div";
         // pressable texture family: variant x style(elevated) x state.
         auto const variant = spec.variant.empty() ? "neutral" : spec.variant;
@@ -184,10 +184,10 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
             theme,
             resolver
         );
-        button.attrs.push_back(render::DomAttr{"data-component", "button"});
-        button.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        button.attrs.push_back(api::DomAttr{"data-component", "button"});
+        button.attrs.push_back(api::DomAttr{"tabindex", "0"});
         if (spec.disabled) {
-            button.attrs.push_back(render::DomAttr{"aria-disabled", "true"});
+            button.attrs.push_back(api::DomAttr{"aria-disabled", "true"});
         }
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, button.children);
@@ -197,8 +197,8 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(button));
         break;
     }
-    case ComponentKind::Panel: {
-        render::DomNode panel;
+    case api::ComponentKind::Panel: {
+        api::DomNode panel;
         panel.tag = "div";
         // panel texture family: 8 container variants (default/dark/furnace/...).
         // The "transparent" variant is a review container: no texture, fully
@@ -218,9 +218,9 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         }
         panel.style += "display:flex;flex-direction:column;";
         panel.style += "padding:1.6rem 1.6rem 2rem 1.6rem;"; // --panelPadding*
-        panel.attrs.push_back(render::DomAttr{"data-component", "panel"});
+        panel.attrs.push_back(api::DomAttr{"data-component", "panel"});
         if (!spec.label.empty()) {
-            render::DomNode title;
+            api::DomNode title;
             title.tag = "div";
             title.style =
                 "font-family:" + theme.fontHeading + ";font-size:" + px(theme.fontSizes[FontSize::Large]) + ";";
@@ -232,8 +232,8 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(panel));
         break;
     }
-    case ComponentKind::Text: {
-        render::DomNode text;
+    case api::ComponentKind::Text: {
+        api::DomNode text;
         text.tag  = "div";
         text.text = spec.label;
         if (spec.variant == "heading") {
@@ -258,8 +258,8 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(text));
         break;
     }
-    case ComponentKind::Card: {
-        render::DomNode card;
+    case api::ComponentKind::Card: {
+        api::DomNode card;
         card.tag = "div";
         // detailedCard texture family: base / action / additionalAction x state.
         std::string base = "padding:1.2rem 1.6rem;";
@@ -275,17 +275,17 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
                 theme,
                 resolver
             );
-            card.attrs.push_back(render::DomAttr{"tabindex", "0"});
+            card.attrs.push_back(api::DomAttr{"tabindex", "0"});
         } else {
             card.style = textureStyle("detailedCard.base", base, theme, resolver);
         }
-        card.attrs.push_back(render::DomAttr{"data-component", "card"});
+        card.attrs.push_back(api::DomAttr{"data-component", "card"});
         renderChildren(spec, theme, resolver, card.children);
         nodes.push_back(std::move(card));
         break;
     }
-    case ComponentKind::ListItem: {
-        render::DomNode item;
+    case api::ComponentKind::ListItem: {
+        api::DomNode item;
         item.tag = "div";
         // listItem texture family: base / action / additionalAction x state.
         std::string base = "display:flex;align-items:center;padding:0.8rem 1.4rem;";
@@ -301,17 +301,17 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
                 theme,
                 resolver
             );
-            item.attrs.push_back(render::DomAttr{"tabindex", "0"});
+            item.attrs.push_back(api::DomAttr{"tabindex", "0"});
         } else {
             // listItem.base only has default/focused textures.
             auto const baseState = (effectiveState(spec) == "focused") ? "focused" : "default";
             item.style           = textureStyle("listItem.base." + std::string(baseState), base, theme, resolver);
             emitStateStyles(item, {"default", "focused"}, "listItem.base.", base, theme, resolver);
-            item.attrs.push_back(render::DomAttr{"tabindex", "0"});
+            item.attrs.push_back(api::DomAttr{"tabindex", "0"});
         }
-        item.attrs.push_back(render::DomAttr{"data-component", "listItem"});
+        item.attrs.push_back(api::DomAttr{"data-component", "listItem"});
         if (!spec.label.empty()) {
-            render::DomNode label;
+            api::DomNode label;
             label.tag    = "div";
             label.text   = spec.label;
             label.style  = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
@@ -322,14 +322,14 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(item));
         break;
     }
-    case ComponentKind::Bubble: {
-        render::DomNode bubble;
+    case api::ComponentKind::Bubble: {
+        api::DomNode bubble;
         bubble.tag    = "div";
         bubble.style  = borderImageStyle(textureKeyFor(spec), theme, resolver);
         bubble.style += "display:flex;align-items:center;justify-content:center;padding:0.8rem 1.2rem;";
         bubble.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         bubble.style += "color:" + theme.colorText + ";";
-        bubble.attrs.push_back(render::DomAttr{"data-component", "bubble"});
+        bubble.attrs.push_back(api::DomAttr{"data-component", "bubble"});
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, bubble.children);
         } else {
@@ -338,14 +338,14 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(bubble));
         break;
     }
-    case ComponentKind::FilterBar: {
-        render::DomNode bar;
+    case api::ComponentKind::FilterBar: {
+        api::DomNode bar;
         bar.tag    = "div";
         bar.style  = borderImageStyle(textureKeyFor(spec), theme, resolver);
         bar.style += "display:flex;align-items:center;justify-content:center;padding:0.4rem 0.8rem;";
         bar.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         bar.style += "color:" + theme.colorText + ";";
-        bar.attrs.push_back(render::DomAttr{"data-component", "filterBar"});
+        bar.attrs.push_back(api::DomAttr{"data-component", "filterBar"});
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, bar.children);
         } else {
@@ -354,17 +354,17 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(bar));
         break;
     }
-    case ComponentKind::Input: {
-        render::DomNode wrapper;
+    case api::ComponentKind::Input: {
+        api::DomNode wrapper;
         wrapper.tag = "div";
         // inputLegend (menus-theme): wrapper background + hint typography.
         wrapper.style  = "display:flex;flex-direction:column;";
         wrapper.style += "background:#1e1e1f;";                     // --inputLegendWrapperBackgroundColor
         wrapper.style += "padding:0 2rem;";                         // --inputLegendWrapperPaddingLeft/Right
         wrapper.style += "text-shadow:0.2rem 0.2rem 0rem #303438;"; // --inputLegendWrapperTextShadow
-        wrapper.attrs.push_back(render::DomAttr{"data-component", "input"});
+        wrapper.attrs.push_back(api::DomAttr{"data-component", "input"});
         if (!spec.label.empty()) {
-            render::DomNode hint;
+            api::DomNode hint;
             hint.tag  = "div";
             hint.text = spec.label;
             // --inputLegendInputHint*: Minecraft Seven v2, 1.6rem.
@@ -373,7 +373,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
             hint.style += "color:#fff;margin-bottom:0.8rem;"; // --inputLegendInputHintSpaceToLabel
             wrapper.children.push_back(std::move(hint));
         }
-        render::DomNode field;
+        api::DomNode field;
         field.tag              = "input";
         std::string fieldBase  = "width:100%;box-sizing:border-box;padding:10px 12px;";
         fieldBase             += "background:#1e1e1f;color:" + theme.colorText + ";";
@@ -385,35 +385,35 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         field.baseStyle = fieldBase;
         field.stateStyles.emplace_back("default", "");
         field.stateStyles.emplace_back("focused", "border-color:#fff;outline:none;");
-        field.attrs.push_back(render::DomAttr{"type", "text"});
+        field.attrs.push_back(api::DomAttr{"type", "text"});
         if (spec.disabled) {
-            field.attrs.push_back(render::DomAttr{"disabled", "true"});
+            field.attrs.push_back(api::DomAttr{"disabled", "true"});
         }
         wrapper.children.push_back(std::move(field));
         nodes.push_back(std::move(wrapper));
         break;
     }
-    case ComponentKind::Divider: {
-        render::DomNode divider;
+    case api::ComponentKind::Divider: {
+        api::DomNode divider;
         divider.tag = "div";
         // formDivider (gameplay-theme .modalForm): 0.4rem hairline with a dark
         // top / light bottom border.
         divider.style  = "height:0.4rem;";                                    // --formDividerHeight
         divider.style += "border-top:0.2rem solid rgba(0,0,0,0.3);";          // --formDividerBorderTopColor
         divider.style += "border-bottom:0.2rem solid rgba(255,255,255,0.1);"; // --formDividerBorderBottomColor
-        divider.attrs.push_back(render::DomAttr{"data-component", "divider"});
+        divider.attrs.push_back(api::DomAttr{"data-component", "divider"});
         nodes.push_back(std::move(divider));
         break;
     }
-    case ComponentKind::Tooltip: {
-        render::DomNode tip;
+    case api::ComponentKind::Tooltip: {
+        api::DomNode tip;
         tip.tag = "div";
         // Single-texture tooltip (gameplay-theme --tooltip*).
         tip.style  = borderImageStyle("tooltip.default", theme, resolver);
         tip.style += "display:flex;align-items:center;justify-content:center;padding:0.8rem 1.2rem;";
         tip.style += "color:#fff;"; // --tooltipTextColor
         tip.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
-        tip.attrs.push_back(render::DomAttr{"data-component", "tooltip"});
+        tip.attrs.push_back(api::DomAttr{"data-component", "tooltip"});
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, tip.children);
         } else {
@@ -422,8 +422,8 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(tip));
         break;
     }
-    case ComponentKind::ContainerSlot: {
-        render::DomNode slot;
+    case api::ComponentKind::ContainerSlot: {
+        api::DomNode slot;
         slot.tag = "div";
         // Texture key: state picks default/highlight/touchSelection; style
         // picks the container tone (chest/barrel/shulker/furnace/...).
@@ -439,10 +439,10 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         slot.style  = borderImageStyle(key, theme, resolver);
         slot.style += "position:relative;";
         slot.style += "width:3.8rem;height:3.8rem;"; // --containerItemWidth/Height
-        slot.attrs.push_back(render::DomAttr{"data-component", "containerSlot"});
+        slot.attrs.push_back(api::DomAttr{"data-component", "containerSlot"});
         if (!spec.label.empty()) {
             // Stack amount badge (--containerItemAmountDefaultColor/TextShadow).
-            render::DomNode amount;
+            api::DomNode amount;
             amount.tag    = "div";
             amount.text   = spec.label;
             amount.style  = "position:absolute;right:0.2rem;bottom:0.2rem;";
@@ -453,19 +453,19 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(slot));
         break;
     }
-    case ComponentKind::KeyIcon: {
+    case api::ComponentKind::KeyIcon: {
         // Key cap (border-image) + per-key glyph (background-image + size).
         auto const* icon = VanillaAssets::keyIcon(spec.label);
         if (icon == nullptr) {
             break; // unknown key name -> render nothing
         }
-        render::DomNode key;
+        api::DomNode key;
         key.tag    = "div";
         key.style  = borderImageStyle("keyIcon.keyboard", theme, resolver);
         key.style += "display:flex;align-items:center;justify-content:center;";
         key.style += "padding:1rem 0.8rem 1.2rem 0.8rem;"; // --buttonIconKeyboardPadding*
-        key.attrs.push_back(render::DomAttr{"data-component", "keyIcon"});
-        render::DomNode glyph;
+        key.attrs.push_back(api::DomAttr{"data-component", "keyIcon"});
+        api::DomNode glyph;
         glyph.tag    = "div";
         glyph.style  = "width:" + icon->width + ";height:" + icon->height + ";";
         glyph.style += "background-image:url(" + resolver.resolveTexture(TextureSpec{icon->source, {}, {}, {}}) + ");";
@@ -474,13 +474,13 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(key));
         break;
     }
-    case ComponentKind::TabBar: {
-        render::DomNode bar;
+    case api::ComponentKind::TabBar: {
+        api::DomNode bar;
         bar.tag   = "div";
         bar.style = "display:flex;gap:0.4rem;";
-        bar.attrs.push_back(render::DomAttr{"data-component", "tabBar"});
+        bar.attrs.push_back(api::DomAttr{"data-component", "tabBar"});
         for (auto const& child : spec.children) {
-            render::DomNode tab;
+            api::DomNode tab;
             tab.tag  = "div";
             tab.text = child.label;
             // Each tab uses the tabBar texture family with its own state.
@@ -496,30 +496,30 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
                 theme,
                 resolver
             );
-            tab.attrs.push_back(render::DomAttr{"data-component", "tab"});
-            tab.attrs.push_back(render::DomAttr{"tabindex", "0"});
+            tab.attrs.push_back(api::DomAttr{"data-component", "tab"});
+            tab.attrs.push_back(api::DomAttr{"tabindex", "0"});
             bar.children.push_back(std::move(tab));
         }
         nodes.push_back(std::move(bar));
         break;
     }
-    case ComponentKind::Progress: {
+    case api::ComponentKind::Progress: {
         // Furnace progress: radial (smelting ring) or linear (fuel flame).
         // The keyframes (clip-path polygons) are already loaded by the page
         // (gameplay-theme); the renderer references them by name.
         auto const      radial = (spec.variant == "linear") ? false : true;
-        render::DomNode progress;
+        api::DomNode progress;
         progress.tag   = "div";
         progress.style = "position:relative;";
-        progress.attrs.push_back(render::DomAttr{"data-component", "progress"});
+        progress.attrs.push_back(api::DomAttr{"data-component", "progress"});
         if (radial) {
             progress.style += "width:2.6rem;height:2.6rem;"; // radial ring footprint
-            render::DomNode bg;
+            api::DomNode bg;
             bg.tag    = "div";
             bg.style  = borderImageStyle("progress.radial.bg", theme, resolver);
             bg.style += "position:absolute;inset:0;";
             progress.children.push_back(std::move(bg));
-            render::DomNode fill;
+            api::DomNode fill;
             fill.tag    = "div";
             fill.style  = borderImageStyle("progress.radial.fill", theme, resolver);
             fill.style += "position:absolute;inset:0;";
@@ -527,12 +527,12 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
             progress.children.push_back(std::move(fill));
         } else {
             progress.style += "width:3.8rem;height:3.8rem;"; // fuel slot footprint
-            render::DomNode bg;
+            api::DomNode bg;
             bg.tag    = "div";
             bg.style  = borderImageStyle("progress.linear.bg", theme, resolver);
             bg.style += "position:absolute;inset:0;";
             progress.children.push_back(std::move(bg));
-            render::DomNode fill;
+            api::DomNode fill;
             fill.tag    = "div";
             fill.style  = borderImageStyle("progress.linear.fill", theme, resolver);
             fill.style += "position:absolute;inset:0;";
@@ -543,38 +543,38 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         break;
     }
     // ---- Stage 8.1.4: layout (L) components (pure CSS, no texture) ----
-    case ComponentKind::Stack: {
-        render::DomNode stack;
+    case api::ComponentKind::Stack: {
+        api::DomNode stack;
         stack.tag       = "div";
         auto const dir  = (spec.orientation == "row") ? "row" : "column";
         stack.style     = "display:flex;flex-direction:" + std::string(dir) + ";";
         stack.style    += "gap:" + px(theme.spaces[2]) + ";"; // --space2
-        stack.attrs.push_back(render::DomAttr{"data-component", "stack"});
+        stack.attrs.push_back(api::DomAttr{"data-component", "stack"});
         renderChildren(spec, theme, resolver, stack.children);
         nodes.push_back(std::move(stack));
         break;
     }
-    case ComponentKind::Grid: {
+    case api::ComponentKind::Grid: {
         // Flex-only grid. The engine (Yoga) silently ignores display:grid, so
         // repeat(N,1fr) is reproduced as nested flex rows: a column container
         // + one flex row per `cols` items + flex:1 cells (equal-width tracks).
-        render::DomNode grid;
+        api::DomNode grid;
         grid.tag         = "div";
         auto const cols  = spec.columns > 0 ? spec.columns : 1;
         grid.style       = "display:flex;flex-direction:column;";
         grid.style      += "gap:" + px(theme.spaces[2]) + ";"; // --space2 (row gap)
-        grid.attrs.push_back(render::DomAttr{"data-component", "grid"});
+        grid.attrs.push_back(api::DomAttr{"data-component", "grid"});
         // Flatten component children + raw body into a cell list, then split
         // into rows of `cols`. A trailing partial row keeps its items (flex:1
         // fills the leftover space - documented 1fr deviation for non-full rows).
-        std::vector<render::DomNode> cells;
+        std::vector<api::DomNode> cells;
         renderChildren(spec, theme, resolver, cells);
         for (std::size_t i = 0; i < cells.size(); i += static_cast<std::size_t>(cols)) {
-            render::DomNode row;
+            api::DomNode row;
             row.tag   = "div";
             row.style = "display:flex;flex-direction:row;";
             row.style += "gap:" + px(theme.spaces[2]) + ";"; // --space2 (column gap)
-            row.attrs.push_back(render::DomAttr{"data-component", "gridRow"});
+            row.attrs.push_back(api::DomAttr{"data-component", "gridRow"});
             auto const end = std::min(cells.size(), i + static_cast<std::size_t>(cols));
             for (auto j = i; j < end; ++j) {
                 cells[j].style += "flex:1;"; // equal-width 1fr cell
@@ -585,22 +585,22 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(grid));
         break;
     }
-    case ComponentKind::ScrollView: {
-        render::DomNode scroll;
+    case api::ComponentKind::ScrollView: {
+        api::DomNode scroll;
         scroll.tag   = "div";
         scroll.style = "overflow-y:auto;height:100%;";
-        scroll.attrs.push_back(render::DomAttr{"data-component", "scrollView"});
+        scroll.attrs.push_back(api::DomAttr{"data-component", "scrollView"});
         renderChildren(spec, theme, resolver, scroll.children);
         nodes.push_back(std::move(scroll));
         break;
     }
-    case ComponentKind::Section: {
-        render::DomNode section;
+    case api::ComponentKind::Section: {
+        api::DomNode section;
         section.tag   = "div";
         section.style = "display:flex;flex-direction:column;gap:" + px(theme.spaces[2]) + ";";
-        section.attrs.push_back(render::DomAttr{"data-component", "section"});
+        section.attrs.push_back(api::DomAttr{"data-component", "section"});
         if (!spec.label.empty()) {
-            render::DomNode title;
+            api::DomNode title;
             title.tag  = "div";
             title.text = spec.label;
             title.style =
@@ -612,29 +612,29 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(section));
         break;
     }
-    case ComponentKind::Spacer: {
-        render::DomNode spacer;
+    case api::ComponentKind::Spacer: {
+        api::DomNode spacer;
         spacer.tag   = "div";
         spacer.style = "flex:1;";
-        spacer.attrs.push_back(render::DomAttr{"data-component", "spacer"});
+        spacer.attrs.push_back(api::DomAttr{"data-component", "spacer"});
         nodes.push_back(std::move(spacer));
         break;
     }
     // ---- Stage 8.1.4: composite (B) components ----
-    case ComponentKind::Modal: {
+    case api::ComponentKind::Modal: {
         // backdrop (semi-transparent overlay) -> panel(modalForm) -> content.
-        render::DomNode backdrop;
+        api::DomNode backdrop;
         backdrop.tag    = "div";
         backdrop.style  = "position:fixed;top:0;left:0;right:0;bottom:0;";
         backdrop.style += "background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;";
-        backdrop.attrs.push_back(render::DomAttr{"data-component", "modal"});
-        render::DomNode panel;
+        backdrop.attrs.push_back(api::DomAttr{"data-component", "modal"});
+        api::DomNode panel;
         panel.tag    = "div";
         panel.style  = borderImageStyle("panel.modalForm", theme, resolver);
         panel.style += "display:flex;flex-direction:column;gap:" + px(theme.spaces[2]) + ";";
         panel.style += "padding:1.6rem;min-width:24rem;max-width:80%;";
         if (!spec.label.empty()) {
-            render::DomNode title;
+            api::DomNode title;
             title.tag  = "div";
             title.text = spec.label;
             title.style =
@@ -647,54 +647,54 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(backdrop));
         break;
     }
-    case ComponentKind::Menu: {
+    case api::ComponentKind::Menu: {
         // panel -> listItem group.
-        render::DomNode menu;
+        api::DomNode menu;
         menu.tag    = "div";
         menu.style  = borderImageStyle("panel.default", theme, resolver);
         menu.style += "display:flex;flex-direction:column;padding:0.8rem;min-width:16rem;";
-        menu.attrs.push_back(render::DomAttr{"data-component", "menu"});
+        menu.attrs.push_back(api::DomAttr{"data-component", "menu"});
         renderChildren(spec, theme, resolver, menu.children);
         nodes.push_back(std::move(menu));
         break;
     }
-    case ComponentKind::ScrollingList: {
+    case api::ComponentKind::ScrollingList: {
         // scrollView -> listItem group.
-        render::DomNode scroll;
+        api::DomNode scroll;
         scroll.tag   = "div";
         scroll.style = "overflow-y:auto;height:100%;display:flex;flex-direction:column;";
-        scroll.attrs.push_back(render::DomAttr{"data-component", "scrollingList"});
+        scroll.attrs.push_back(api::DomAttr{"data-component", "scrollingList"});
         renderChildren(spec, theme, resolver, scroll.children);
         nodes.push_back(std::move(scroll));
         break;
     }
-    case ComponentKind::Dropdown: {
+    case api::ComponentKind::Dropdown: {
         // trigger button + options panel (children as listItems).
-        render::DomNode dropdown;
+        api::DomNode dropdown;
         dropdown.tag   = "div";
         dropdown.style = "display:flex;position:relative;";
-        dropdown.attrs.push_back(render::DomAttr{"data-component", "dropdown"});
-        render::DomNode trigger;
+        dropdown.attrs.push_back(api::DomAttr{"data-component", "dropdown"});
+        api::DomNode trigger;
         trigger.tag    = "div";
         trigger.style  = "display:flex;align-items:center;gap:0.6rem;";
         trigger.style += "padding:0.8rem 1.6rem;font-family:" + theme.fontUi + ";";
         trigger.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
         trigger.style += "cursor:pointer;";
         trigger.style += borderImageStyle("pressable.neutral.default", theme, resolver);
-        trigger.attrs.push_back(render::DomAttr{"data-component", "dropdownTrigger"});
-        trigger.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        trigger.attrs.push_back(api::DomAttr{"data-component", "dropdownTrigger"});
+        trigger.attrs.push_back(api::DomAttr{"tabindex", "0"});
         if (!spec.label.empty()) {
             trigger.text = spec.label;
         }
         dropdown.children.push_back(std::move(trigger));
         if (!spec.children.empty()) {
-            render::DomNode options;
+            api::DomNode options;
             options.tag    = "div";
             options.style  = "position:absolute;top:100%;left:0;margin-top:0.4rem;";
             options.style += "display:flex;flex-direction:column;min-width:100%;";
             options.style += borderImageStyle("panel.default", theme, resolver);
             options.style += "padding:0.4rem;z-index:10;";
-            options.attrs.push_back(render::DomAttr{"data-component", "dropdownOptions"});
+            options.attrs.push_back(api::DomAttr{"data-component", "dropdownOptions"});
             for (auto const& child : spec.children) {
                 auto rendered = renderComponent(child, theme, resolver);
                 for (auto& node : rendered) {
@@ -706,16 +706,16 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(dropdown));
         break;
     }
-    case ComponentKind::Form: {
+    case api::ComponentKind::Form: {
         // panel -> input group + formButton + formDivider.
-        render::DomNode form;
+        api::DomNode form;
         form.tag    = "div";
         form.style  = borderImageStyle("panel.modalForm", theme, resolver);
         form.style += "display:flex;flex-direction:column;gap:" + px(theme.spaces[2]) + ";";
         form.style += "padding:1.6rem;";
-        form.attrs.push_back(render::DomAttr{"data-component", "form"});
+        form.attrs.push_back(api::DomAttr{"data-component", "form"});
         if (!spec.label.empty()) {
-            render::DomNode title;
+            api::DomNode title;
             title.tag  = "div";
             title.text = spec.label;
             title.style =
@@ -727,15 +727,15 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(form));
         break;
     }
-    case ComponentKind::NavigationBar: {
+    case api::ComponentKind::NavigationBar: {
         // brand + tabBar + keyIcon hint.
-        render::DomNode bar;
+        api::DomNode bar;
         bar.tag    = "div";
         bar.style  = "display:flex;align-items:center;gap:" + px(theme.spaces[3]) + ";";
         bar.style += "padding:0.8rem 1.6rem;";
-        bar.attrs.push_back(render::DomAttr{"data-component", "navigationBar"});
+        bar.attrs.push_back(api::DomAttr{"data-component", "navigationBar"});
         if (!spec.label.empty()) {
-            render::DomNode brand;
+            api::DomNode brand;
             brand.tag  = "div";
             brand.text = spec.label;
             brand.style =
@@ -747,15 +747,15 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(bar));
         break;
     }
-    case ComponentKind::Toast: {
+    case api::ComponentKind::Toast: {
         // bubble + text.
-        render::DomNode toast;
+        api::DomNode toast;
         toast.tag    = "div";
         toast.style  = borderImageStyle("bubble.base.default", theme, resolver);
         toast.style += "display:flex;align-items:center;justify-content:center;padding:0.8rem 1.2rem;";
         toast.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
         toast.style += "color:" + theme.colorText + ";";
-        toast.attrs.push_back(render::DomAttr{"data-component", "toast"});
+        toast.attrs.push_back(api::DomAttr{"data-component", "toast"});
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, toast.children);
         } else {
@@ -764,25 +764,25 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(toast));
         break;
     }
-    case ComponentKind::SearchField: {
+    case api::ComponentKind::SearchField: {
         // input + search icon.
-        render::DomNode wrapper;
+        api::DomNode wrapper;
         wrapper.tag    = "div";
         wrapper.style  = "display:flex;align-items:center;gap:0.6rem;";
         wrapper.style += "background:#1e1e1f;padding:0 1rem;";
-        wrapper.attrs.push_back(render::DomAttr{"data-component", "searchField"});
-        render::DomNode field;
+        wrapper.attrs.push_back(api::DomAttr{"data-component", "searchField"});
+        api::DomNode field;
         field.tag    = "input";
         field.style  = "flex:1;background:transparent;border:none;outline:none;";
         field.style += "color:" + theme.colorText + ";font-family:" + theme.fontUi + ";";
         field.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";padding:0.8rem 0;";
-        field.attrs.push_back(render::DomAttr{"type", "text"});
+        field.attrs.push_back(api::DomAttr{"type", "text"});
         if (!spec.label.empty()) {
-            field.attrs.push_back(render::DomAttr{"placeholder", spec.label});
+            field.attrs.push_back(api::DomAttr{"placeholder", spec.label});
         }
         wrapper.children.push_back(std::move(field));
         if (auto const* icon = VanillaAssets::icon("search"); icon != nullptr) {
-            render::DomNode glyph;
+            api::DomNode glyph;
             glyph.tag   = "div";
             glyph.style = "width:" + icon->width + ";height:" + icon->height + ";";
             glyph.style +=
@@ -793,19 +793,19 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(wrapper));
         break;
     }
-    case ComponentKind::Toggle: {
+    case api::ComponentKind::Toggle: {
         // button state + checkmark icon (approximation of vanilla facet).
-        render::DomNode toggle;
+        api::DomNode toggle;
         toggle.tag    = "div";
         toggle.style  = "display:flex;align-items:center;gap:0.6rem;cursor:pointer;";
         toggle.style += "padding:0.6rem 1.2rem;font-family:" + theme.fontUi + ";";
         toggle.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
         toggle.style += borderImageStyle("pressable.neutral.default", theme, resolver);
-        toggle.attrs.push_back(render::DomAttr{"data-component", "toggle"});
-        toggle.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        toggle.attrs.push_back(api::DomAttr{"data-component", "toggle"});
+        toggle.attrs.push_back(api::DomAttr{"tabindex", "0"});
         if (spec.state == "on" || spec.state == "checked") {
             if (auto const* icon = VanillaAssets::icon("checkmark"); icon != nullptr) {
-                render::DomNode glyph;
+                api::DomNode glyph;
                 glyph.tag   = "div";
                 glyph.style = "width:" + icon->width + ";height:" + icon->height + ";";
                 glyph.style +=
@@ -815,7 +815,7 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
             }
         }
         if (!spec.label.empty()) {
-            render::DomNode label;
+            api::DomNode label;
             label.tag    = "div";
             label.text   = spec.label;
             label.style  = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
@@ -826,15 +826,15 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         break;
     }
     // ---- Stage 8.1.4: navigation (N) / interaction (I) / data (D) ----
-    case ComponentKind::Breadcrumb: {
-        render::DomNode crumb;
+    case api::ComponentKind::Breadcrumb: {
+        api::DomNode crumb;
         crumb.tag   = "div";
         crumb.style = "display:flex;align-items:center;gap:0.6rem;";
-        crumb.attrs.push_back(render::DomAttr{"data-component", "breadcrumb"});
+        crumb.attrs.push_back(api::DomAttr{"data-component", "breadcrumb"});
         bool first = true;
         for (auto const& child : spec.children) {
             if (!first) {
-                render::DomNode sep;
+                api::DomNode sep;
                 sep.tag   = "div";
                 sep.text  = "/";
                 sep.style = "color:" + theme.colorMuted + ";font-family:" + theme.fontUi + ";";
@@ -849,40 +849,40 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(crumb));
         break;
     }
-    case ComponentKind::Pager: {
+    case api::ComponentKind::Pager: {
         // button group (dots/pages).
-        render::DomNode pager;
+        api::DomNode pager;
         pager.tag   = "div";
         pager.style = "display:flex;align-items:center;gap:0.4rem;";
-        pager.attrs.push_back(render::DomAttr{"data-component", "pager"});
+        pager.attrs.push_back(api::DomAttr{"data-component", "pager"});
         auto const count = spec.columns > 0 ? spec.columns : 1;
         for (int i = 0; i < count; ++i) {
-            render::DomNode dot;
+            api::DomNode dot;
             dot.tag           = "div";
             auto const active = (spec.value == std::to_string(i));
             dot.style         = "width:1rem;height:1rem;border-radius:50%;";
             dot.style += active ? "background:" + theme.colorPrimary + ";" : "background:" + theme.colorMuted + ";";
-            dot.attrs.push_back(render::DomAttr{"data-component", "pagerDot"});
+            dot.attrs.push_back(api::DomAttr{"data-component", "pagerDot"});
             pager.children.push_back(std::move(dot));
         }
         nodes.push_back(std::move(pager));
         break;
     }
-    case ComponentKind::TextArea: {
-        render::DomNode wrapper;
+    case api::ComponentKind::TextArea: {
+        api::DomNode wrapper;
         wrapper.tag    = "div";
         wrapper.style  = "display:flex;flex-direction:column;";
         wrapper.style += "background:#1e1e1f;padding:0 2rem;";
-        wrapper.attrs.push_back(render::DomAttr{"data-component", "textArea"});
+        wrapper.attrs.push_back(api::DomAttr{"data-component", "textArea"});
         if (!spec.label.empty()) {
-            render::DomNode hint;
+            api::DomNode hint;
             hint.tag    = "div";
             hint.text   = spec.label;
             hint.style  = "font-family:" + theme.fontUi + ";font-size:1.6rem;line-height:1.6rem;";
             hint.style += "color:#fff;margin-bottom:0.8rem;";
             wrapper.children.push_back(std::move(hint));
         }
-        render::DomNode area;
+        api::DomNode area;
         area.tag    = "textarea";
         area.style  = "width:100%;box-sizing:border-box;padding:10px 12px;";
         area.style += "background:#1e1e1f;color:" + theme.colorText + ";";
@@ -890,31 +890,31 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         area.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
         area.style += "min-height:6rem;resize:vertical;";
         if (spec.disabled) {
-            area.attrs.push_back(render::DomAttr{"disabled", "true"});
+            area.attrs.push_back(api::DomAttr{"disabled", "true"});
         }
         wrapper.children.push_back(std::move(area));
         nodes.push_back(std::move(wrapper));
         break;
     }
-    case ComponentKind::Slider: {
+    case api::ComponentKind::Slider: {
         // progress track + button handle.
-        render::DomNode slider;
+        api::DomNode slider;
         slider.tag   = "div";
         slider.style = "display:flex;align-items:center;gap:0.8rem;";
-        slider.attrs.push_back(render::DomAttr{"data-component", "slider"});
-        render::DomNode track;
+        slider.attrs.push_back(api::DomAttr{"data-component", "slider"});
+        api::DomNode track;
         track.tag    = "div";
         track.style  = "flex:1;height:0.8rem;position:relative;";
         track.style += borderImageStyle("progress.linear.bg", theme, resolver);
         slider.children.push_back(std::move(track));
-        render::DomNode handle;
+        api::DomNode handle;
         handle.tag    = "div";
         handle.style  = "width:1.6rem;height:1.6rem;";
         handle.style += borderImageStyle("pressable.neutral.default", theme, resolver);
-        handle.attrs.push_back(render::DomAttr{"data-component", "sliderHandle"});
+        handle.attrs.push_back(api::DomAttr{"data-component", "sliderHandle"});
         slider.children.push_back(std::move(handle));
         if (!spec.value.empty()) {
-            render::DomNode val;
+            api::DomNode val;
             val.tag    = "div";
             val.text   = spec.value;
             val.style  = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Small]) + ";";
@@ -924,25 +924,25 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(slider));
         break;
     }
-    case ComponentKind::Stepper: {
+    case api::ComponentKind::Stepper: {
         // button(-) + value + button(+).
-        render::DomNode stepper;
+        api::DomNode stepper;
         stepper.tag   = "div";
         stepper.style = "display:flex;align-items:center;gap:0.4rem;";
-        stepper.attrs.push_back(render::DomAttr{"data-component", "stepper"});
+        stepper.attrs.push_back(api::DomAttr{"data-component", "stepper"});
         auto makeStepBtn = [&](std::string const& glyph) {
-            render::DomNode btn;
+            api::DomNode btn;
             btn.tag    = "div";
             btn.style  = "padding:0.4rem 0.8rem;cursor:pointer;";
             btn.style += borderImageStyle("pressable.neutral.default", theme, resolver);
             btn.style += "font-family:" + theme.fontUi + ";color:" + theme.colorText + ";";
-            btn.attrs.push_back(render::DomAttr{"data-component", "stepperButton"});
-            btn.attrs.push_back(render::DomAttr{"tabindex", "0"});
+            btn.attrs.push_back(api::DomAttr{"data-component", "stepperButton"});
+            btn.attrs.push_back(api::DomAttr{"tabindex", "0"});
             btn.text = glyph;
             return btn;
         };
         stepper.children.push_back(makeStepBtn("-"));
-        render::DomNode val;
+        api::DomNode val;
         val.tag    = "div";
         val.text   = spec.value.empty() ? "0" : spec.value;
         val.style  = "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";";
@@ -952,31 +952,31 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(stepper));
         break;
     }
-    case ComponentKind::Picker: {
+    case api::ComponentKind::Picker: {
         // dropdown + list (reuse dropdown rendering with a label).
-        render::DomNode picker;
+        api::DomNode picker;
         picker.tag   = "div";
         picker.style = "display:flex;position:relative;";
-        picker.attrs.push_back(render::DomAttr{"data-component", "picker"});
-        render::DomNode trigger;
+        picker.attrs.push_back(api::DomAttr{"data-component", "picker"});
+        api::DomNode trigger;
         trigger.tag    = "div";
         trigger.style  = "display:flex;align-items:center;gap:0.6rem;";
         trigger.style += "padding:0.8rem 1.6rem;font-family:" + theme.fontUi + ";";
         trigger.style += "font-size:" + px(theme.fontSizes[FontSize::Medium]) + ";color:" + theme.colorText + ";";
         trigger.style += "cursor:pointer;";
         trigger.style += borderImageStyle("pressable.neutral.default", theme, resolver);
-        trigger.attrs.push_back(render::DomAttr{"data-component", "pickerTrigger"});
-        trigger.attrs.push_back(render::DomAttr{"tabindex", "0"});
+        trigger.attrs.push_back(api::DomAttr{"data-component", "pickerTrigger"});
+        trigger.attrs.push_back(api::DomAttr{"tabindex", "0"});
         trigger.text = spec.value.empty() ? (spec.label.empty() ? "Select" : spec.label) : spec.value;
         picker.children.push_back(std::move(trigger));
         if (!spec.children.empty()) {
-            render::DomNode options;
+            api::DomNode options;
             options.tag    = "div";
             options.style  = "position:absolute;top:100%;left:0;margin-top:0.4rem;";
             options.style += "display:flex;flex-direction:column;min-width:100%;";
             options.style += borderImageStyle("panel.default", theme, resolver);
             options.style += "padding:0.4rem;z-index:10;";
-            options.attrs.push_back(render::DomAttr{"data-component", "pickerOptions"});
+            options.attrs.push_back(api::DomAttr{"data-component", "pickerOptions"});
             for (auto const& child : spec.children) {
                 auto rendered = renderComponent(child, theme, resolver);
                 for (auto& node : rendered) {
@@ -988,44 +988,44 @@ renderComponent(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResol
         nodes.push_back(std::move(picker));
         break;
     }
-    case ComponentKind::Icon: {
+    case api::ComponentKind::Icon: {
         auto const* icon = VanillaAssets::icon(spec.icon);
         if (icon == nullptr) {
             break; // unknown icon -> render nothing
         }
-        render::DomNode ic;
+        api::DomNode ic;
         ic.tag    = "div";
         ic.style  = "width:" + icon->width + ";height:" + icon->height + ";";
         ic.style += "background-image:url(" + resolver.resolveTexture(TextureSpec{icon->source, {}, {}, {}}) + ");";
         ic.style += "background-size:contain;background-repeat:no-repeat;background-position:center;";
-        ic.attrs.push_back(render::DomAttr{"data-component", "icon"});
+        ic.attrs.push_back(api::DomAttr{"data-component", "icon"});
         nodes.push_back(std::move(ic));
         break;
     }
-    case ComponentKind::Image: {
-        render::DomNode img;
+    case api::ComponentKind::Image: {
+        api::DomNode img;
         img.tag        = "img";
         auto const src = spec.src.empty() ? spec.icon : spec.src;
         if (src.empty()) {
             break; // no source -> render nothing
         }
-        img.attrs.push_back(render::DomAttr{"src", src});
-        img.attrs.push_back(render::DomAttr{"data-component", "image"});
+        img.attrs.push_back(api::DomAttr{"src", src});
+        img.attrs.push_back(api::DomAttr{"data-component", "image"});
         if (!spec.style.empty() && spec.style != "normal") {
             img.style = spec.style;
         }
         nodes.push_back(std::move(img));
         break;
     }
-    case ComponentKind::Badge: {
+    case api::ComponentKind::Badge: {
         // bubble + text (corner badge).
-        render::DomNode badge;
+        api::DomNode badge;
         badge.tag    = "div";
         badge.style  = borderImageStyle("bubble.base.default", theme, resolver);
         badge.style += "display:flex;align-items:center;justify-content:center;padding:0.2rem 0.6rem;";
         badge.style += "font-family:" + theme.fontUi + ";font-size:" + px(theme.fontSizes[FontSize::Tiny]) + ";";
         badge.style += "color:" + theme.colorText + ";";
-        badge.attrs.push_back(render::DomAttr{"data-component", "badge"});
+        badge.attrs.push_back(api::DomAttr{"data-component", "badge"});
         if (spec.label.empty()) {
             renderChildren(spec, theme, resolver, badge.children);
         } else {
@@ -1066,7 +1066,7 @@ void appendEscapedHtml(std::string& out, std::string_view value) {
     }
 }
 
-void appendDomNodeHtml(std::string& out, render::DomNode const& node) {
+void appendDomNodeHtml(std::string& out, api::DomNode const& node) {
     auto const tag  = node.tag.empty() ? "div" : node.tag;
     out            += '<';
     out            += tag;
@@ -1099,7 +1099,7 @@ void appendDomNodeHtml(std::string& out, render::DomNode const& node) {
 
 } // namespace
 
-std::string renderComponentToHtml(ComponentSpec const& spec, ThemeTokens const& theme, IAssetResolver const& resolver) {
+std::string renderComponentToHtml(api::ComponentSpec const& spec, ThemeTokens const& theme, IAssetResolver const& resolver) {
     std::string html;
     for (auto const& node : renderComponent(spec, theme, resolver)) {
         appendDomNodeHtml(html, node);

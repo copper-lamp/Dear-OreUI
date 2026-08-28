@@ -41,7 +41,7 @@ void appendJsString(std::ostream& stream, std::string_view value) {
     stream << '"';
 }
 
-void appendNode(std::ostream& stream, DomNode const& node) {
+void appendNode(std::ostream& stream, api::DomNode const& node) {
     stream << '{';
     if (!node.tag.empty()) {
         stream << "t:";
@@ -117,7 +117,7 @@ void appendNode(std::ostream& stream, DomNode const& node) {
 
 } // namespace
 
-std::string serializeDomForest(std::vector<DomNode> const& nodes) {
+std::string serializeDomForest(std::vector<api::DomNode> const& nodes) {
     std::ostringstream stream;
     stream << '[';
     for (std::size_t index = 0; index < nodes.size(); ++index) {

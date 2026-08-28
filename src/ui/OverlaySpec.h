@@ -1,7 +1,7 @@
 #pragma once
 
 #include "api/types/Id.h"
-#include "render/DomNode.h"
+#include "api/types/DomNode.h"
 #include "ui/UiManifest.h"
 
 #include <string>
@@ -21,7 +21,7 @@ struct OverlaySpec {
     // M8.1.2: pre-rendered DomNode forest (component-registered UIs only).
     // Injection prefers this over parsing htmlBody so per-state cssText
     // (stateStyles) survives to the bootstrap.
-    std::vector<render::DomNode> domNodes;
+    std::vector<api::DomNode> domNodes;
     std::vector<std::string>     scripts;
     std::vector<std::string>     styles;
 };

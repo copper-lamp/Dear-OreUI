@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/DomNode.h"
+#include "api/types/DomNode.h"
 
 #include <string>
 #include <string_view>
@@ -21,6 +21,6 @@ namespace dearoreui::render {
 // cohtml discards style="" set through innerHTML. Unbalanced tags cause the
 // parser to stop and return what it has (callers treat structural failure as
 // a render fallback, never as a crash).
-[[nodiscard]] std::vector<DomNode> parseHtmlFragment(std::string_view html);
+[[nodiscard]] std::vector<api::DomNode> parseHtmlFragment(std::string_view html);
 
 } // namespace dearoreui::render

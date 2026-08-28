@@ -4,7 +4,7 @@
 #include "api/types/HostMethodManifest.h"
 #include "api/types/Id.h"
 #include "api/types/Result.h"
-#include "ipc/IHostMethod.h"
+#include "api/IHostMethod.h"
 
 #include <atomic>
 #include <memory>
@@ -19,7 +19,7 @@ struct HostMethodEntry {
     api::ModId                   owner;
     api::PermissionSet           permissions;
     api::HostMethodManifest      manifest;
-    std::shared_ptr<IHostMethod> method;
+    std::shared_ptr<api::IHostMethod> method;
 };
 
 class HostMethodRegistry {
@@ -29,18 +29,18 @@ public:
     [[nodiscard]] api::Result<api::RegistrationHandle> registerMethod(
         const api::ModId&                   owner,
         api::PermissionSet const&           permissions,
-        const std::shared_ptr<IHostMethod>& method
+        const std::shared_ptr<api::IHostMethod>& method
     );
 
     [[nodiscard]] api::Result<api::RegistrationHandle> registerMethod(
         const api::ModId&                   owner,
         api::HostMethodManifest             manifest,
-        const std::shared_ptr<IHostMethod>& method
+        const std::shared_ptr<api::IHostMethod>& method
     );
 
     [[nodiscard]] bool unregister(api::RegistrationHandle handle);
 
-    [[nodiscard]] std::shared_ptr<IHostMethod>   find(std::string_view name) const;
+    [[nodiscard]] std::shared_ptr<api::IHostMethod>   find(std::string_view name) const;
     [[nodiscard]] std::optional<HostMethodEntry> findByName(std::string_view name) const;
     [[nodiscard]] std::optional<HostMethodEntry> findEntry(api::RegistrationHandle handle) const;
     [[nodiscard]] std::size_t                    size() const;
