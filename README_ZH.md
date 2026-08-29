@@ -150,7 +150,13 @@ OreUI Bundle 的兼容性不能只依据 Minecraft 版本判断，还取决于�
 
 ## 快速开始
 
-DearOreUI 尚未发布稳定运行时版本。开发构建需要准备 Windows x64 LeviLamina 26.10.x 客户端环境，然后在 `DearOreUI/` 目录执行：
+在 LeviLamina 数据目录（如 BDS 服务器根目录）用 lip 安装最新稳定版：
+
+```powershell
+lip install github.com/copper-lamp/Dear-OreUI
+```
+
+模组会安装到 `mods/DearOreUI/`。开发构建需要准备 Windows x64 LeviLamina 26.10.x 客户端环境，然后在 `DearOreUI/` 目录执行：
 
 ```powershell
 xmake repo -u

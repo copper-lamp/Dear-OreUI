@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] - 2026-08-29
 
-> 版本号暂未提升：以下内容已进入当前代码树并完成部分真实客户端验证，但尚未作为稳定运行时发布。发布前仍需处理已知边界（见 [README_ZH.md](README_ZH.md)「兼容性」一节）。
+> 本版本包含阶段 1~8 的运行时实现与优化，已作为稳定运行时发布。已知边界见 [README_ZH.md](README_ZH.md)「兼容性」一节。
 
 ### Added
 

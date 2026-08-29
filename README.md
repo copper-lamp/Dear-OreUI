@@ -149,7 +149,13 @@ Verified boundary, from the stage 7.1 and stage 8-A client records:
 
 ## Quick Start
 
-DearOreUI is not yet distributed as a stable runtime release. For development builds, prepare a Windows x64 LeviLamina 26.10.x client environment and build from the `DearOreUI/` directory.
+Install the latest stable release with lip (run inside your LeviLamina data directory, e.g. the Bedrock Server root):
+
+```powershell
+lip install github.com/copper-lamp/Dear-OreUI
+```
+
+The mod is placed under `mods/DearOreUI/`. For development builds, prepare a Windows x64 LeviLamina 26.10.x client environment and build from the `DearOreUI/` directory.
 
 ```powershell
 xmake repo -u

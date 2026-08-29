@@ -80,14 +80,14 @@ jobs:
           if find artifact -type f -name '.env' | grep -q .; then
             echo "refusing to release: .env file detected in artifact"; exit 1
           fi
-          (cd artifact && zip -r "../${{ github.event.repository.name }}-windows-x64.zip" . -x '*.log')
-          ls -la "${{ github.event.repository.name }}-windows-x64.zip"
+          (cd artifact && zip -r "../DearOreUI-windows-x64.zip" . -x '*.log')
+          ls -la "DearOreUI-windows-x64.zip"
 
       - name: Create / update release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          MOD_ZIP="${{ github.event.repository.name }}-windows-x64.zip"
+          MOD_ZIP="DearOreUI-windows-x64.zip"
           if [ "$IS_MANUAL" = "true" ]; then
             NOTES="${{ github.event.inputs.release_notes }}"
             [ -n "$NOTES" ] || NOTES="$(cat CHANGELOG.md)"
