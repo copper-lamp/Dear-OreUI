@@ -1075,6 +1075,14 @@ void appendEscapedHtml(std::string& out, std::string_view value) {
 }
 
 void appendDomNodeHtml(std::string& out, api::DomNode const& node) {
+    // Page scripts never appear in the serialized htmlBody. They are carried
+    // in the DomNode tree and injected through the verified ExecuteScript
+    // channel (see inject::RuntimeInjector::extractScriptNodes), so emitting a
+    // literal <script> here would both fail the S2 fail-closed htmlBody
+    // sanitizer and produce a non-functional DOM <script> element.
+    if (node.tag == "script") {
+        return;
+    }
     auto const tag  = node.tag.empty() ? "div" : node.tag;
     out            += '<';
     out            += tag;
