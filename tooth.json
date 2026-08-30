@@ -5,7 +5,7 @@
     "version": "0.1.2",
     "info": {
         "name": "DearOreUI",
-        "description": "Powerful client-side front-end, based on oreUI, providing powerful front-end capabilities for your mods",
+        "description": "Runtime UI framework for Minecraft Bedrock — extend OreUI (Coherent Gameface) at runtime from LeviLamina client mods. Read, transform, and inject UI declaratively.",
         "tags": [
             "platform:levilamina",
             "type:mod"

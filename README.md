@@ -10,6 +10,10 @@
     ·
     <a href="https://copper-lamp.github.io/dearoreui-docs/">Documentation</a>
     ·
+    <a href="https://github.com/copper-lamp/DearOreUI-dev-tools">Designer</a>
+    ·
+    <a href="https://github.com/magicobs0z/dearoreui-ExampleMod">Example mod</a>
+    ·
     <a href="CONTRIBUTING.md">Contributing</a>
     ·
     <a href="README_ZH.md">简体中文</a>
@@ -31,6 +35,18 @@
 
 DearOreUI is a native Windows x64 client mod for LeviLamina 26.10.x. It reads the OreUI resources loaded by the original Minecraft client, combines changes declared by multiple mods, and injects the verified result back into the active OreUI page. This lets you focus on writing your own UI without worrying about UI compatibility with other mods.
 DearOreUI is not a replacement UI and does not directly expose page pointers, compiled bundle internals, or arbitrary local file access to other mods.
+
+## Ecosystem
+
+DearOreUI is the runtime core of a full toolchain for building Minecraft Bedrock user interfaces:
+
+| Project | Repository | Role |
+| --- | --- | --- |
+| **DearOreUI** | [copper-lamp/Dear-OreUI](https://github.com/copper-lamp/Dear-OreUI) | Native LeviLamina runtime (this repo) — hook, snapshot, transform, inject OreUI |
+| **DearOreUI Designer** | [copper-lamp/DearOreUI-dev-tools](https://github.com/copper-lamp/DearOreUI-dev-tools) | Offline visual designer (Tauri) — auto-detect and preview mod UI without launching the game |
+| **DearOreUI Docs** | [copper-lamp/dearoreui-docs](https://github.com/copper-lamp/dearoreui-docs) | Official documentation and learning site (https://copper-lamp.github.io/dearoreui-docs/) |
+| **dearoreui-ExampleMod** | [magicobs0z/dearoreui-ExampleMod](https://github.com/magicobs0z/dearoreui-ExampleMod) | Progressive tutorial mod (calendar theme) built on DearOreUI |
+| **dearoreui-repo** | [copper-lamp/dearoreui-repo](https://github.com/copper-lamp/dearoreui-repo) | Self-hosted xmake package repo for the header-only public API |
 
 ## What Works
 
@@ -136,7 +152,7 @@ The current target is a client-only LeviLamina mod for Windows x64:
 | C++ standard | C++20 |
 | Toolchain | Clang-CL |
 | Build system | xmake |
-| Mod version | `0.1.0` |
+| Mod version | `0.1.2` |
 
 OreUI bundle compatibility cannot be inferred from the Minecraft version alone. Runtime support depends on the detected OreUI resources, Coherent host, page type, resource fingerprint, and available capabilities.
 

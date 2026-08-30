@@ -10,6 +10,10 @@
     ·
     <a href="https://copper-lamp.github.io/dearoreui-docs/">项目文档</a>
     ·
+    <a href="https://github.com/copper-lamp/DearOreUI-dev-tools">设计器</a>
+    ·
+    <a href="https://github.com/magicobs0z/dearoreui-ExampleMod">示例模组</a>
+    ·
     <a href="CONTRIBUTING.zh-CN.md">参与贡献</a>
     ·
     <a href="README.md">English</a>
@@ -30,6 +34,18 @@
 
 DearOreUI 是面向 LeviLamina 26.10.x 的 Windows x64 客户端原生模组。它在 Minecraft 客户端运行期间读取原版 OreUI 资源，合并多个 Mod 声明的变更，并把校验后的结果注入当前 OreUI 页面。这让你可以专注地编写你的界面，无需操心与其它模组的ui兼容性
 DearOreUI 不是独立 UI 替代品，也不会向其他 Mod 直接暴露页面指针、编译后 Bundle 内部变量或任意本地文件访问。
+
+## 生态
+
+DearOreUI 是面向 Minecraft Bedrock 界面开发的完整工具链的运行时核心：
+
+| 项目 | 仓库 | 作用 |
+| --- | --- | --- |
+| **DearOreUI** | [copper-lamp/Dear-OreUI](https://github.com/copper-lamp/Dear-OreUI) | 原生 LeviLamina 运行时（本仓库）—— 读取-变换-注入 OreUI |
+| **DearOreUI 设计器** | [copper-lamp/DearOreUI-dev-tools](https://github.com/copper-lamp/DearOreUI-dev-tools) | 离线可视化设计器（Tauri）—— 不启动游戏即可自动识别并预览模组 UI |
+| **DearOreUI 文档** | [copper-lamp/dearoreui-docs](https://github.com/copper-lamp/dearoreui-docs) | 官方文档与学习站点（https://copper-lamp.github.io/dearoreui-docs/） |
+| **dearoreui-ExampleMod** | [magicobs0z/dearoreui-ExampleMod](https://github.com/magicobs0z/dearoreui-ExampleMod) | 基于 DearOreUI 的阶梯教程模组（日历主题） |
+| **dearoreui-repo** | [copper-lamp/dearoreui-repo](https://github.com/copper-lamp/dearoreui-repo) | 自托管 xmake 包仓库（header-only 公共 API） |
 
 ## 已实现的能力
 
@@ -137,7 +153,7 @@ Mod C 注册
 | C++ 标准 | C++20 |
 | 工具链 | Clang-CL |
 | 构建系统 | xmake |
-| 模组版本 | `0.1.0` |
+| 模组版本 | `0.1.2` |
 
 OreUI Bundle 的兼容性不能只依据 Minecraft 版本判断，还取决于检测到的 OreUI 资源、Coherent 宿主、页面类型、资源指纹和可用能力。
 
